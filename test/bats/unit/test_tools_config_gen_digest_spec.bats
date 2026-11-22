@@ -13,9 +13,10 @@
 #
 # The tree is a scratch copy so a config-gen source can be edited. The
 # expected digest is the literal observed from the shell library itself
-# (`tool_image_derive config_gen` -> config-gen:b3b5e2b5cdca on the seeded
-# tree, the same literal config_gen_digest_spec.bats holds), not recomputed
-# here. Unit level (ADR-00000018).
+# (`tool_image_derive config_gen` -> config-gen:2173903f6c17 on the seeded
+# tree), not recomputed here. The seeded tree is the live
+# dockerfile/config-gen, so any edit to those sources moves this literal.
+# Unit level (ADR-00000018).
 
 bats_require_minimum_version 1.5.0
 
@@ -25,7 +26,7 @@ setup() {
   create_mock_dir
   ROOT=/source
   # Observed on the tree these sources are copied from.
-  WANT_DIGEST="b3b5e2b5cdca"
+  WANT_DIGEST="2173903f6c17"
 }
 
 teardown() {

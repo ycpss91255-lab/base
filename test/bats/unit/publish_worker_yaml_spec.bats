@@ -539,7 +539,7 @@ _confirm_step_for() {
   for (( _i = 0; _i < ${#_arts[@]}; _i += 2 )); do
     printf '%s\n' "${_arts[_i+1]}" > "${_dir}/digests/${_arts[_i]}"
   done
-  _base='ghcr.io/ycpss91255-docker/ros_distro'
+  _base='ghcr.io/ycpss91255-lab/ros_distro'
   printf '%s %s\n%s %s\n' \
       "${_base}:v1.2.3-standard" "${_ver}" \
       "${_base}:latest-standard" "${_latest}" > "${SCRATCH}/fx/tags"
@@ -970,7 +970,7 @@ merge: packages: write'
   assert_output '1'
   run yq -r "${_checkout} | .value.with.repository" "${WF}"
   assert_success
-  assert_output 'ycpss91255-docker/base'
+  assert_output 'ycpss91255-lab/base'
   run yq -r "${_checkout} | .value.with.ref" "${WF}"
   assert_success
   assert_output '${{ github.job_workflow_sha }}'

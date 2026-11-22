@@ -19,7 +19,7 @@ setup() {
 
   CHECK="/source/script/ci/single_issue_pr.sh"
 
-  export REPO="ycpss91255-docker/base"
+  export REPO="ycpss91255-lab/base"
   unset PR_CLOSING_REFS PR_COMMITS PR_BODY
 }
 
@@ -27,7 +27,7 @@ setup() {
 # leave the bundled-PR habit unenforced; the message must name both
 # issues so the author knows what to split (base#1629).
 @test "single_issue_pr.sh: two closing references fail and the message names both (base#1629)" {
-  export PR_CLOSING_REFS=$'ycpss91255-docker/base#1\nycpss91255-docker/base#2'
+  export PR_CLOSING_REFS=$'ycpss91255-lab/base#1\nycpss91255-lab/base#2'
 
   run --separate-stderr bash "${CHECK}"
   assert_failure 1
@@ -54,7 +54,7 @@ setup() {
 # distinct strings would fail a PR that closes exactly one issue
 # (base#1629).
 @test "single_issue_pr.sh: the same issue as a qualified ref and a bare commit ref passes (base#1629)" {
-  export PR_CLOSING_REFS="ycpss91255-docker/base#1"
+  export PR_CLOSING_REFS="ycpss91255-lab/base#1"
   export PR_COMMITS=$'fix: only\n\nCloses #1'
 
   run --separate-stderr bash "${CHECK}"
@@ -128,7 +128,7 @@ setup() {
 # force authors to defeat the check some other way; the reason must be
 # echoed so the bypass is visible in the job log (base#1629).
 @test "single_issue_pr.sh: an exemption marker with a reason passes and prints the reason (base#1629)" {
-  export PR_CLOSING_REFS=$'ycpss91255-docker/base#1\nycpss91255-docker/base#2'
+  export PR_CLOSING_REFS=$'ycpss91255-lab/base#1\nycpss91255-lab/base#2'
   export PR_BODY=$'Closes #1\nCloses #2\n\nSingle-issue-exempt: one mechanical rename spans both issues'
 
   run --separate-stderr bash "${CHECK}"

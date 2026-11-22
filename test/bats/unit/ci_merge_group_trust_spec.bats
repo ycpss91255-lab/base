@@ -28,7 +28,7 @@ setup() {
 
   TRUST="/source/script/ci/merge_group_trust.sh"
 
-  export REPO="ycpss91255-docker/base"
+  export REPO="ycpss91255-lab/base"
   export BASE_REF="refs/heads/main"
   unset GITHUB_OUTPUT
 
@@ -72,9 +72,9 @@ _queue() {
 # (base#1587).
 @test "merge_group_trust.sh: a group of three same-repository pull requests is trusted (base#1587)" {
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
-    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-docker/base)" \
-    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-docker/base)")"
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
+    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-lab/base)" \
+    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-lab/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
   export HEAD_REF="refs/heads/gh-readonly-queue/main/pr-103-a61b898dd898e4c4bf5c5cf00b3ef76076d0a1d3"
@@ -108,7 +108,7 @@ _queue() {
 # (base#1587).
 @test "merge_group_trust.sh: a gh call that fails once and then answers is retried and trusted (base#1587)" {
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 3333333333333333333333333333333333333333 103 false ycpss91255-docker/base)")"
+    "$(_entry 1 3333333333333333333333333333333333333333 103 false ycpss91255-lab/base)")"
   export MOCK_REPLY
   export GH_CALLS="${BATS_TEST_TMPDIR}/gh_calls"
   : > "${GH_CALLS}"
@@ -174,8 +174,8 @@ printf "%s\n" "${MOCK_REPLY}"
   # it is proven. The answer is false, and an `::error::` line says why,
   # since classify stays green (exit 0).
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
-    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-docker/base)")"
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
+    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-lab/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
   export HEAD_REF="refs/heads/gh-readonly-queue/main/pr-103-a61b898dd898e4c4bf5c5cf00b3ef76076d0a1d3"
@@ -195,9 +195,9 @@ printf "%s\n" "${MOCK_REPLY}"
   # not proven to be that entry. The answer is false, and an `::error::`
   # line says why, since classify stays green (exit 0).
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
-    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-docker/base)" \
-    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-docker/base)")"
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
+    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-lab/base)" \
+    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-lab/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
   export HEAD_REF="refs/heads/gh-readonly-queue/main/pr-999-a61b898dd898e4c4bf5c5cf00b3ef76076d0a1d3"
@@ -218,9 +218,9 @@ printf "%s\n" "${MOCK_REPLY}"
   # has it null. The answer is false, and an `::error::` line says why,
   # since classify stays green (exit 0).
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
     '{"position":2,"headCommit":{"oid":"2222222222222222222222222222222222222222"},"pullRequest":{"number":102,"isCrossRepository":false,"headRepository":null}}' \
-    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-docker/base)")"
+    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-lab/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
   export HEAD_REF="refs/heads/gh-readonly-queue/main/pr-103-a61b898dd898e4c4bf5c5cf00b3ef76076d0a1d3"
@@ -239,9 +239,9 @@ printf "%s\n" "${MOCK_REPLY}"
   # Entry 2 is in the group (ahead of entry 3) and comes from a fork, so
   # the group holds fork-authored code. The answer is false.
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
     "$(_entry 2 2222222222222222222222222222222222222222 102 true someone/base)" \
-    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-docker/base)")"
+    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-lab/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
   export HEAD_REF="refs/heads/gh-readonly-queue/main/pr-103-a61b898dd898e4c4bf5c5cf00b3ef76076d0a1d3"
@@ -257,8 +257,8 @@ printf "%s\n" "${MOCK_REPLY}"
 @test "merge_group_trust.sh: a cross-repository pull request as the HEAD_SHA entry leaves the group untrusted (base#1587)" {
   # The group head itself, entry 3, comes from a fork. The answer is false.
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
-    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-docker/base)" \
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
+    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-lab/base)" \
     "$(_entry 3 3333333333333333333333333333333333333333 103 true someone/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
@@ -278,9 +278,9 @@ printf "%s\n" "${MOCK_REPLY}"
   # fork parked in the queue must not block same-repository groups ahead
   # of it. The answer is true.
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
-    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-docker/base)" \
-    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-docker/base)" \
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
+    "$(_entry 2 2222222222222222222222222222222222222222 102 false ycpss91255-lab/base)" \
+    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-lab/base)" \
     "$(_entry 4 4444444444444444444444444444444444444444 104 true someone/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
@@ -299,9 +299,9 @@ printf "%s\n" "${MOCK_REPLY}"
   # REPO, so the two fields disagree and same-repository is not proven.
   # The answer is false.
   MOCK_REPLY="$(_queue \
-    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-docker/base)" \
+    "$(_entry 1 1111111111111111111111111111111111111111 101 false ycpss91255-lab/base)" \
     "$(_entry 2 2222222222222222222222222222222222222222 102 false someone/base)" \
-    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-docker/base)")"
+    "$(_entry 3 3333333333333333333333333333333333333333 103 false ycpss91255-lab/base)")"
   export MOCK_REPLY
   export HEAD_SHA="3333333333333333333333333333333333333333"
   export HEAD_REF="refs/heads/gh-readonly-queue/main/pr-103-a61b898dd898e4c4bf5c5cf00b3ef76076d0a1d3"

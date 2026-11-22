@@ -809,8 +809,16 @@ _upgrade() {
     # the worker takes at the ref this line moves (base#1122), so moving the
     # ref moves it: a version written into main.yaml here would be a second
     # source of it again. A spec holds the workers to declaring no such input.
+    #
+    # A ref still under the slug base was published from before the org was
+    # renamed (BASE_UPSTREAM_RETIRED_RE) is moved to the current slug first,
+    # path and ref untouched, so the line below then bumps it like any other.
+    # Only worker paths are moved: the anchor is the same
+    # `/.github/workflows/<file>.yaml@` shape, so a retired-org reference in
+    # a comment or a URL is left alone.
     local _before
     _before="$(cat "${main_yaml}")"
+    sed -i -E "s|${BASE_UPSTREAM_RETIRED_RE}(/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml@)|${BASE_UPSTREAM_SLUG}\1|g" "${main_yaml}"
     sed -i -E "s|(${BASE_UPSTREAM_SLUG//./\\.}/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)@v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?|\1@${target_ver}|g" "${main_yaml}"
     # What the commit message says is read off what CHANGED, not restated
     # from the rule above. The old message asserted "workflow @tag updated to

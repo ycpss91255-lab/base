@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // layerRow is one row of corpus/s6/s6_layers.tsv: a whole layer and the

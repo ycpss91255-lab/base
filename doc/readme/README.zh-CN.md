@@ -1,7 +1,7 @@
-<!-- sync: base 1a496212d858 81de30627b69 -->
+<!-- sync: base 79b64b589cf1 82d3308961f0 -->
 # base
 
-[![CI](https://github.com/ycpss91255-docker/base/actions/workflows/self-test.yaml/badge.svg)](https://github.com/ycpss91255-docker/base/actions/workflows/self-test.yaml)
+[![CI](https://github.com/ycpss91255-lab/base/actions/workflows/self-test.yaml/badge.svg)](https://github.com/ycpss91255-lab/base/actions/workflows/self-test.yaml)
 
 ![Language](https://img.shields.io/badge/Language-Bash%20%7C%20Go-blue?style=flat-square)
 ![Testing](https://img.shields.io/badge/Testing-Bats%20%7C%20go%20test-orange?style=flat-square)
@@ -9,7 +9,7 @@
 ![Coverage](../badge/coverage.svg)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../../LICENSE)
 
-[ycpss91255-docker](https://github.com/ycpss91255-docker) 组织下所有 Docker 容器 repo 的共用模板。
+[ycpss91255-lab](https://github.com/ycpss91255-lab) 组织下所有 Docker 容器 repo 的共用模板。
 
 **[English](../../README.md)** | **[繁體中文](README.zh-TW.md)** | **[简体中文](README.zh-CN.md)** | **[日本語](README.ja.md)**
 
@@ -30,7 +30,7 @@
 
 ---
 
-<!-- sync: tldr e3106fd287a0 5a2258d43b26 -->
+<!-- sync: tldr bd7bd82eb318 d6a373087d32 -->
 ## TL;DR
 
 ```bash
@@ -39,7 +39,7 @@ mkdir <repo_name> && cd <repo_name>
 git init
 git commit --allow-empty -m "chore: initial commit"
 git subtree add --prefix=.base \
-    https://github.com/ycpss91255-docker/base.git vX.Y.Z --squash
+    https://github.com/ycpss91255-lab/base.git vX.Y.Z --squash
 ./.base/dist/script/base/init.sh   # 一次性 bootstrap；之后用 just base init
 
 # 升级
@@ -510,7 +510,7 @@ scaffold 一次，之后永不覆写。可以放心编辑，跑 setup 也不会�
 <!-- sync: upgrading 56de8c94ebd2 cda6dbd6204d -->
 ## 升级
 
-<!-- sync: updating 0c4663a7ac2e 879f1b5ae15d -->
+<!-- sync: updating 562337ad3245 927b2b0f463f -->
 ### 更新
 
 前置条件：`git config user.name` / `user.email` 必须有设，working tree
@@ -550,7 +550,7 @@ just base upgrade v0.3.0
    （`.env.generated`、`compose.yaml`、…），最后调用 `setup.sh apply`
    重生 `.env.generated` + `compose.yaml`
 4. `sed` 改写 `.github/workflows/main.yaml` 里每一个
-   `ycpss91255-docker/base/.github/workflows/<file>@vX.Y.Z` ref，连同步骤 3
+   `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref，连同步骤 3
    的变更一起 commit 为 `chore: update template references to <version>`
 5. `apply_migrations`（`lib/dockerfile_migrate.sh`）修补 **repo 根目录的
    `Dockerfile`** 与 **`script/entrypoint.sh`**（base contract 在它们底下
@@ -579,19 +579,19 @@ reset 回它开始时的 commit，并把自己建立的文件清掉，失败的�
 > git add -A && git commit -m "chore: resync .base wrappers"
 > ```
 
-<!-- sync: pointing-base-at-a-different-upstream 9621cc89b4d5 a38b608bdda8 -->
+<!-- sync: pointing-base-at-a-different-upstream 301e742abfa0 da6d98dcbde0 -->
 #### 把 `.base` 指到别的 upstream
 
 `TEMPLATE_REMOTE` 是所有 `.base` 操作读的 git remote：查「有没有新 tag」
 以及那个会改写你 working tree 里 `.base/` 的 `git subtree pull`。默认是
-`https://github.com/ycpss91255-docker/base.git` — 用 HTTPS，所以刚 clone
+`https://github.com/ycpss91255-lab/base.git` — 用 HTTPS，所以刚 clone
 的环境、CI runner、第一次贡献而没有 SSH key 的人都能直接跑。这个默认值只
 定义在一个地方：`.base/dist/script/base/upstream.sh`；`TEMPLATE_REMOTE`
 则是逐次调用的覆写。
 
 ```bash
 # 改用 SSH（agent 认证，或只能用 SSH 连到的 fork）
-TEMPLATE_REMOTE=git@github.com:ycpss91255-docker/base.git just base upgrade
+TEMPLATE_REMOTE=git@github.com:ycpss91255-lab/base.git just base upgrade
 
 # 你自己维护的 private fork：这个 repo 追的是「你的」base
 TEMPLATE_REMOTE=git@github.com:acme/base.git just base upgrade v1.2.0
@@ -651,15 +651,15 @@ upgrade.sh **不会**动的：`setup.toml` 里除了上面这些 migration 以�
 upgrade.sh 会打印 `diff -ruN .base/dist/config config` 提示，由你自行
 reconcile，而不是替你合并。
 
-<!-- sync: automated-version-bumps-optional 885a5a03faa6 37860298e460 -->
+<!-- sync: automated-version-bumps-optional 0f7ac5d7d0f0 381d1c45676a -->
 #### 自动升版（选用）
 
 Dependabot 可以在 base 出新 tag 时自动开 PR：加一个 `.github/dependabot.yml`，
 用 `github-actions` ecosystem、`directory: "/"`。它只会更新 `main.yaml` 里的
-`uses: ycpss91255-docker/base/...@vX.Y.Z` ref；subtree 本身仍需在本地跑
+`uses: ycpss91255-lab/base/...@vX.Y.Z` ref；subtree 本身仍需在本地跑
 `just base upgrade vX.Y.Z`。
 
-<!-- sync: ci-reusable-workflows 5b9ed4f4572c a655ce93185a -->
+<!-- sync: ci-reusable-workflows 3356897db234 ceb4d4f3aea8 -->
 ## CI Reusable Workflows
 
 下游 repo 从 `.github/workflows/main.yaml` 调用这些 reusable workflow：
@@ -668,7 +668,7 @@ Dependabot 可以在 base 出新 tag 时自动开 PR：加一个 `.github/depend
 # .github/workflows/main.yaml
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@vX.Y.Z
     with:
       image_name: my_app
       build_args: |
@@ -681,7 +681,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@vX.Y.Z
     with:
       archive_name_prefix: my_app
 ```

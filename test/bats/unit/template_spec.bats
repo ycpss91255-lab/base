@@ -1487,9 +1487,9 @@ _shipped_reusable_workers() {
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.5.0
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.5.0
   call-release:
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.5.0
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.5.0
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.6.4
 
@@ -1516,9 +1516,9 @@ EOF
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.10.0-rc1
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.10.0-rc1
   call-release:
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.10.0-rc1
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.10.0-rc1
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.10.0-rc2
 
@@ -1544,9 +1544,9 @@ EOF
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.10.0-rc2
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.10.0-rc2
   call-release:
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.9.9
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.9.9
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.10.0
 
@@ -1612,6 +1612,44 @@ EOF
   rm -rf "${_tmp}"
 }
 
+# why: The org was renamed and the retired org's names no longer resolve, so
+# a worker ref still under the retired org moves to the current org at the
+# new tag, whichever worker it names -- publish-worker included -- and a ref
+# already under the current org is bumped the same way (base#2106)
+@test "upgrade.sh main.yaml rewrite moves retired-org worker refs to the current org at the new tag (base#2106)" {
+  local _tmp _yaml _retired
+  _tmp="$(mktemp -d)"
+  _yaml="${_tmp}/main.yaml"
+  # Assembled, so this file never spells the retired slug in one piece.
+  _retired="ycpss91255-""docker/base"
+  cat > "${_yaml}" <<EOF
+jobs:
+  call-docker-build:
+    uses: ${_retired}/.github/workflows/build-worker.yaml@v0.41.0
+  call-release:
+    uses: ${_retired}/.github/workflows/release-worker.yaml@v0.41.0
+  call-publish:
+    uses: ${_retired}/.github/workflows/publish-worker.yaml@v0.41.0
+  call-multi:
+    uses: ycpss91255-lab/base/.github/workflows/multi-distro-build-worker.yaml@v0.42.0
+  call-vendor:
+    uses: someone/elsewhere/.github/workflows/build-worker.yaml@v0.41.0
+EOF
+  _apply_main_yaml_rewrite "${_yaml}" v0.43.0-rc6
+
+  local _w
+  for _w in build-worker release-worker publish-worker multi-distro-build-worker; do
+    run grep -cxF "    uses: ycpss91255-lab/base/.github/workflows/${_w}.yaml@v0.43.0-rc6" "${_yaml}"
+    assert_output "1"
+  done
+  run grep -cF "${_retired}" "${_yaml}"
+  assert_output "0"
+  run grep -Fc 'someone/elsewhere/.github/workflows/build-worker.yaml@v0.41.0' "${_yaml}"
+  assert_output "1"
+
+  rm -rf "${_tmp}"
+}
+
 # why: Name-independent must not become owner-independent -- the rewrite
 # rewrites OUR refs, and a stranger's worker is not ours to bump (#1112)
 @test "upgrade.sh main.yaml rewrite leaves a third party's worker ref alone (#1112)" {
@@ -1626,13 +1664,13 @@ EOF
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.5.0
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.5.0
   call-vendor:
     uses: someone/elsewhere/.github/workflows/build-worker.yaml@v0.5.0
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.6.4
 
-  run grep -Fc 'ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.6.4' "${_yaml}"
+  run grep -Fc 'ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.6.4' "${_yaml}"
   assert_output "1"
   run grep -Fc 'someone/elsewhere/.github/workflows/build-worker.yaml@v0.5.0' "${_yaml}"
   assert_output "1"
@@ -3299,8 +3337,8 @@ FIXTURE
 # image the template targets, the dependency is safe, and downstream
 # overrides can now use natural shell semantics. Discovered during
 # the v0.21.1 runtime-test framework's downstream rollout
-# (ycpss91255-docker/docker_harness#57); see also
-# ycpss91255-docker/template#249.
+# (ycpss91255-lab/docker_harness#57); see also
+# ycpss91255-lab/template#249.
 #
 # The grep tests below lock all three invariants (positive: bash -c
 # wrapper present; negative: no bare ARG substitution; negative:
@@ -3334,7 +3372,7 @@ FIXTURE
       "the shipped template Dockerfile this spec pins"
   # Regression guard: sh -c (dash) cannot parse bash-syntax files in
   # `source` / `.` overrides. Blocks all ROS-style smoke commands.
-  # See ycpss91255-docker/docker_harness#57 + for context.
+  # See ycpss91255-lab/docker_harness#57 + for context.
   run grep -E '^# RUN sh -c "\$\{RUNTIME_SMOKE_CMD\}"$' "${_df}"
   [ "${status}" -ne 0 ] || [ -z "${output}" ]
 }
@@ -3357,7 +3395,7 @@ FIXTURE
 # Dockerfile.example: builder + runtime split pattern
 #
 # Lifts the three lessons proven empirically in
-# ycpss91255-docker/ros1_bridge#60 (saved ~1.1 GB/arch on runtime):
+# ycpss91255-lab/ros1_bridge#60 (saved ~1.1 GB/arch on runtime):
 #   1. runtime MUST NOT be FROM devel -- forces devel to delete its
 #      own source to avoid runtime bloat, breaking the dev workflow.
 #   2. Runtime apt: install only the ldd-identified missing libs.
@@ -3528,11 +3566,11 @@ FIXTURE
 # ════════════════════════════════════════════════════════════════════
 
 # why: GHCR publisher
-@test "release-test-tools.yaml exists and pushes to ghcr.io/ycpss91255-docker/test-tools" {
+@test "release-test-tools.yaml exists and pushes to ghcr.io/ycpss91255-lab/test-tools" {
   local _yaml="/source/.github/workflows/release-test-tools.yaml"
   assert_spec_subject "${_yaml}" \
       "the test-tools release workflow this spec pins"
-  run grep -F 'ghcr.io/ycpss91255-docker/test-tools' "${_yaml}"
+  run grep -F 'ghcr.io/ycpss91255-lab/test-tools' "${_yaml}"
   assert_success
 }
 

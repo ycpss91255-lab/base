@@ -1,6 +1,6 @@
 # base
 
-[![CI](https://github.com/ycpss91255-docker/base/actions/workflows/self-test.yaml/badge.svg)](https://github.com/ycpss91255-docker/base/actions/workflows/self-test.yaml)
+[![CI](https://github.com/ycpss91255-lab/base/actions/workflows/self-test.yaml/badge.svg)](https://github.com/ycpss91255-lab/base/actions/workflows/self-test.yaml)
 
 ![Language](https://img.shields.io/badge/Language-Bash%20%7C%20Go-blue?style=flat-square)
 ![Testing](https://img.shields.io/badge/Testing-Bats%20%7C%20go%20test-orange?style=flat-square)
@@ -8,7 +8,7 @@
 ![Coverage](doc/badge/coverage.svg)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](./LICENSE)
 
-Shared template for Docker container repos in the [ycpss91255-docker](https://github.com/ycpss91255-docker) organization.
+Shared template for Docker container repos in the [ycpss91255-lab](https://github.com/ycpss91255-lab) organization.
 
 **[English](README.md)** | **[繁體中文](doc/readme/README.zh-TW.md)** | **[简体中文](doc/readme/README.zh-CN.md)** | **[日本語](doc/readme/README.ja.md)**
 
@@ -36,7 +36,7 @@ mkdir <repo_name> && cd <repo_name>
 git init
 git commit --allow-empty -m "chore: initial commit"
 git subtree add --prefix=.base \
-    https://github.com/ycpss91255-docker/base.git vX.Y.Z --squash
+    https://github.com/ycpss91255-lab/base.git vX.Y.Z --squash
 ./.base/dist/script/base/init.sh   # one-time bootstrap; thereafter: just base init
 
 # Upgrade
@@ -562,7 +562,7 @@ running it on a repo with a live field deployment. The numbered cycle:
    tracked-but-now-derived files (`.env.generated`, `compose.yaml`, …), and
    call `setup.sh apply` to regenerate `.env.generated` + `compose.yaml`
 4. `sed` rewrites every
-   `ycpss91255-docker/base/.github/workflows/<file>@vX.Y.Z` ref in
+   `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref in
    `.github/workflows/main.yaml`, committed with step 3's changes as
    `chore: update template references to <version>`
 5. `apply_migrations` (`lib/dockerfile_migrate.sh`) heals the **repo-root
@@ -601,7 +601,7 @@ present after the pull is one the upgrade itself made.
 `TEMPLATE_REMOTE` is the git remote every `.base` operation reads: the
 "is there a newer tag" query and the `git subtree pull` that rewrites
 `.base/` in your working tree. It defaults to
-`https://github.com/ycpss91255-docker/base.git` — HTTPS, so a fresh clone,
+`https://github.com/ycpss91255-lab/base.git` — HTTPS, so a fresh clone,
 a CI runner or a first-time contributor with no SSH key works out of the
 box. The default has one definition,
 `.base/dist/script/base/upstream.sh`; `TEMPLATE_REMOTE` overrides it per
@@ -609,7 +609,7 @@ invocation.
 
 ```bash
 # SSH instead of HTTPS (agent-based auth, or a fork only reachable over SSH)
-TEMPLATE_REMOTE=git@github.com:ycpss91255-docker/base.git just base upgrade
+TEMPLATE_REMOTE=git@github.com:ycpss91255-lab/base.git just base upgrade
 
 # A private fork you maintain: this repo tracks YOUR base
 TEMPLATE_REMOTE=git@github.com:acme/base.git just base upgrade v1.2.0
@@ -677,7 +677,7 @@ config` hint so you can reconcile manually, rather than merging for you.
 
 Dependabot can open a PR whenever a new base tag ships: add a
 `.github/dependabot.yml` with the `github-actions` ecosystem at
-`directory: "/"`. It bumps the `uses: ycpss91255-docker/base/...@vX.Y.Z`
+`directory: "/"`. It bumps the `uses: ycpss91255-lab/base/...@vX.Y.Z`
 refs in `main.yaml` only; you still run `just base upgrade vX.Y.Z` locally
 to sync the subtree itself.
 
@@ -689,7 +689,7 @@ Downstream repos call these reusable workflows from `.github/workflows/main.yaml
 # .github/workflows/main.yaml
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@vX.Y.Z
     with:
       image_name: my_app
       build_args: |
@@ -702,7 +702,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@vX.Y.Z
     with:
       archive_name_prefix: my_app
 ```

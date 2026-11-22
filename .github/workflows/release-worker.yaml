@@ -44,7 +44,7 @@ jobs:
       - name: Checkout base worker source (version-matched via job_workflow_sha)
         uses: actions/checkout@v7
         with:
-          repository: ycpss91255-docker/base
+          repository: ycpss91255-lab/base
           ref: ${{ github.job_workflow_sha }}
           path: .preflight-base
       - name: Validate caller contract (preflight)
@@ -77,7 +77,7 @@ jobs:
       - name: Checkout base worker source (version-matched via job_workflow_sha)
         uses: actions/checkout@v7
         with:
-          repository: ycpss91255-docker/base
+          repository: ycpss91255-lab/base
           ref: ${{ github.job_workflow_sha }}
           path: .release-base
 

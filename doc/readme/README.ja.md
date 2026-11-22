@@ -1,7 +1,7 @@
-<!-- sync: base 1a496212d858 ae23e4414ff9 -->
+<!-- sync: base 79b64b589cf1 475ab31c3292 -->
 # base
 
-[![CI](https://github.com/ycpss91255-docker/base/actions/workflows/self-test.yaml/badge.svg)](https://github.com/ycpss91255-docker/base/actions/workflows/self-test.yaml)
+[![CI](https://github.com/ycpss91255-lab/base/actions/workflows/self-test.yaml/badge.svg)](https://github.com/ycpss91255-lab/base/actions/workflows/self-test.yaml)
 
 ![Language](https://img.shields.io/badge/Language-Bash%20%7C%20Go-blue?style=flat-square)
 ![Testing](https://img.shields.io/badge/Testing-Bats%20%7C%20go%20test-orange?style=flat-square)
@@ -9,7 +9,7 @@
 ![Coverage](../badge/coverage.svg)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../../LICENSE)
 
-[ycpss91255-docker](https://github.com/ycpss91255-docker) 組織のすべての Docker コンテナ repo で共有されるテンプレートです。
+[ycpss91255-lab](https://github.com/ycpss91255-lab) 組織のすべての Docker コンテナ repo で共有されるテンプレートです。
 
 **[English](../../README.md)** | **[繁體中文](README.zh-TW.md)** | **[简体中文](README.zh-CN.md)** | **[日本語](README.ja.md)**
 
@@ -30,7 +30,7 @@
 
 ---
 
-<!-- sync: tldr e3106fd287a0 0bc47ad031cb -->
+<!-- sync: tldr bd7bd82eb318 9531d75ba0d2 -->
 ## TL;DR
 
 ```bash
@@ -39,7 +39,7 @@ mkdir <repo_name> && cd <repo_name>
 git init
 git commit --allow-empty -m "chore: initial commit"
 git subtree add --prefix=.base \
-    https://github.com/ycpss91255-docker/base.git vX.Y.Z --squash
+    https://github.com/ycpss91255-lab/base.git vX.Y.Z --squash
 ./.base/dist/script/base/init.sh   # 初回ブートストラップ。以降は just base init
 
 # アップグレード
@@ -538,7 +538,7 @@ override は `setup.toml` に書きます。
 <!-- sync: upgrading 56de8c94ebd2 629908638ad8 -->
 ## アップグレード
 
-<!-- sync: updating 0c4663a7ac2e b705ceacd9a9 -->
+<!-- sync: updating 562337ad3245 95ae1c21c28d -->
 ### 更新
 
 前提条件：`git config user.name` / `user.email` が設定済みで、working tree
@@ -582,7 +582,7 @@ repo で実行する前に
    （`.env.generated`、`compose.yaml`、…）を `git rm --cached`、最後に
    `setup.sh apply` を呼んで `.env.generated` + `compose.yaml` を再生成
 4. `sed` で `.github/workflows/main.yaml` 内のすべての
-   `ycpss91255-docker/base/.github/workflows/<file>@vX.Y.Z` ref を更新し、
+   `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref を更新し、
    手順 3 の変更と合わせて `chore: update template references to <version>`
    として commit
 5. `apply_migrations`（`lib/dockerfile_migrate.sh`）が、base contract の
@@ -616,13 +616,13 @@ resync、sed、マイグレーションの手順は忘れがちです。
 > git add -A && git commit -m "chore: resync .base wrappers"
 > ```
 
-<!-- sync: pointing-base-at-a-different-upstream 9621cc89b4d5 f0c7c0507b2f -->
+<!-- sync: pointing-base-at-a-different-upstream 301e742abfa0 c2691d8ade0c -->
 #### `.base` を別の upstream に向ける
 
 `TEMPLATE_REMOTE` は `.base` に関わるすべての操作が読む git remote です
 （新しいタグの有無を問い合わせるクエリと、working tree の `.base/` を
 書き換える `git subtree pull`）。既定は
-`https://github.com/ycpss91255-docker/base.git` — HTTPS なので、clone
+`https://github.com/ycpss91255-lab/base.git` — HTTPS なので、clone
 した直後の環境、CI runner、SSH 鍵を持たない初めての貢献者でもそのまま
 動きます。この既定値の定義は
 `.base/dist/script/base/upstream.sh` の 1 か所だけで、
@@ -630,7 +630,7 @@ resync、sed、マイグレーションの手順は忘れがちです。
 
 ```bash
 # HTTPS ではなく SSH（agent 認証、または SSH でしか到達できない fork）
-TEMPLATE_REMOTE=git@github.com:ycpss91255-docker/base.git just base upgrade
+TEMPLATE_REMOTE=git@github.com:ycpss91255-lab/base.git just base upgrade
 
 # 自分で保守する private fork: この repo が追うのは「あなたの」base
 TEMPLATE_REMOTE=git@github.com:acme/base.git just base upgrade v1.2.0
@@ -695,16 +695,16 @@ upgrade.sh が **触れない**もの：`setup.toml` のうち上記マイグレ
 変わっていれば、upgrade.sh は `diff -ruN .base/dist/config config` のヒントを
 表示するだけで、あなたの代わりにマージはしません。
 
-<!-- sync: automated-version-bumps-optional 885a5a03faa6 d7096eddf6af -->
+<!-- sync: automated-version-bumps-optional 0f7ac5d7d0f0 61ca428999e4 -->
 #### 自動バージョン更新（任意）
 
 新しい base tag が出るたびに Dependabot に PR を立てさせられます：
 `github-actions` ecosystem と `directory: "/"` を指定した
 `.github/dependabot.yml` を追加してください。更新されるのは `main.yaml` の
-`uses: ycpss91255-docker/base/...@vX.Y.Z` ref だけで、subtree 自体は引き続き
+`uses: ycpss91255-lab/base/...@vX.Y.Z` ref だけで、subtree 自体は引き続き
 ローカルで `just base upgrade vX.Y.Z` を実行します。
 
-<!-- sync: ci-reusable-workflows 5b9ed4f4572c 98490d2c8ae4 -->
+<!-- sync: ci-reusable-workflows 3356897db234 262cab541803 -->
 ## CI Reusable Workflows
 
 下流 repo は `.github/workflows/main.yaml` からこれらの reusable workflow を呼び出します：
@@ -713,7 +713,7 @@ upgrade.sh が **触れない**もの：`setup.toml` のうち上記マイグレ
 # .github/workflows/main.yaml
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@vX.Y.Z
     with:
       image_name: my_app
       build_args: |
@@ -726,7 +726,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@vX.Y.Z
     with:
       archive_name_prefix: my_app
 ```

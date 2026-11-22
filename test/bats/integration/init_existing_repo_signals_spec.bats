@@ -12,7 +12,7 @@
 # branch it took is read off the files that came out.
 #
 # The artifacts are the evidence rather than a log line, because they are
-# what ycpss91255-docker/base#928 was actually about: `.github/workflows/
+# what ycpss91255-lab/base#928 was actually about: `.github/workflows/
 # main.yaml`, `doc/changelog/CHANGELOG.md` and the smoke tree reach a repo
 # through the new-repo path and through nothing else, so their presence and
 # their absence say which branch ran.

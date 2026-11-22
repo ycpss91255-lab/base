@@ -41,7 +41,7 @@ jobs:
         target:
           - { name: 'standard',  base: 'python:3.11-slim',     is_latest: true }
           - { name: 'minimal',   base: 'python:3.11-alpine',   is_latest: false }
-    uses: ycpss91255-docker/base/.github/workflows/publish-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/publish-worker.yaml@vX.Y.Z
     with:
       image_name: my_image
       tag_suffix: "-${{ matrix.target.name }}"

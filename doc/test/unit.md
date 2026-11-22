@@ -3898,11 +3898,10 @@ this repo owns. A publisher for somebody else's package is not a broken
 build here -- it is green, and it moves a floating tag on a package another
 repo ships. `release-toml-bridge.yaml` was exactly that (base#1180): an
 unfiltered `tags: ['v*']` arm plus an `else tags="${tags},${IMAGE}:latest"`
-branch, on a package `ycpss91255-docker/toml-bridge` now owns and has
-published `v0.1.0` of, so the next non-RC tag cut here would have
-republished the name and moved `:latest` off the image that repo shipped.
-Nothing in the tree could have said so: that workflow carried no spec at
-all.
+branch, on a package `ycpss91255-lab/toml-bridge` now owns and has published
+`v0.1.0` of, so the next non-RC tag cut here would have republished the name
+and moved `:latest` off the image that repo shipped. Nothing in the tree
+could have said so: that workflow carried no spec at all.
 
 | Test | Description |
 |------|-------------|
@@ -3918,7 +3917,7 @@ all.
 | `publish surface: build-push-action with push true makes its tagged ref a target` | build-push-action is the other way this repo pushes, and its `push: true` input is the operation. A tagged ref in that file is a target whatever the tag says. |
 | `publish surface: build-push-action with push false contributes nothing` | the same action with `push: false` builds and keeps the result local; no package moves, so the file is a consumer and contributes nothing. build-worker.yaml is this shape. |
 | `every GHCR package this repo publishes is one this repo owns` | the rule applied to the live tree, over a population derived from the directory rather than listed here -- which is what makes a publisher added tomorrow scanned the day it lands instead of the day somebody remembers this file exists. Set EQUALITY, so a publisher for a package this repo does not own fails, and so does losing the publisher for one it does. |
-| `no workflow here publishes the toml-bridge package, which another repo owns` | the named hazard, kept as its own case so the failure says WHY and not merely that a set differs. `ycpss91255-docker/toml-bridge` owns this package and has shipped v0.1.0 of it; a publisher here with an unfiltered `v*` arm moves `:latest` off that image on the next non-RC tag cut from main, silently and green (base#1180). |
+| `no workflow here publishes the toml-bridge package, which another repo owns` | the named hazard, kept as its own case so the failure says WHY and not merely that a set differs. `ycpss91255-lab/toml-bridge` owns this package and has shipped v0.1.0 of it; a publisher here with an unfiltered `v*` arm moves `:latest` off that image on the next non-RC tag cut from main, silently and green (base#1180). |
 | `the scan really walked this repo's workflows and still sees the real publisher` | the non-vacuity case, and the one that keeps the two above honest. An expected set satisfies them whether the scan read every workflow or none of them, and the match above is worth exactly as much as its ability to still see this repo's real publisher: the day `release-test-tools.yaml` stops pushing through an operation the scan knows, or stops naming its target as a literal, this fails and says so rather than reporting a clean surface it no longer looks at. |
 
 ### test/bats/unit/gitattributes_spec.bats (3)
@@ -5484,15 +5483,14 @@ Every refusal holds assert_refusal's five points.
 
 ### test/bats/unit/obtain_test_tools_spec.bats (13)
 
-Six jobs of self-test.yaml consume
-`ghcr.io/ycpss91255-docker/test-tools:main`. Five pulled it, probed it and
-rebuilt from source when the probe refused; the sixth -- the `acceptance`
-job, which scaffolds a downstream repo and runs `just docker build test`
-against a lint stage that is `FROM ${TEST_TOOLS_IMAGE}` -- pulled it and
-exited 0. It is precisely the job the mitigation was written for, and it is
-the one that did not get it, because the mitigation was a block of shell
-pasted into each job and a paste is something a person has to remember to
-do.
+Six jobs of self-test.yaml consume `ghcr.io/ycpss91255-lab/test-tools:main`.
+Five pulled it, probed it and rebuilt from source when the probe refused;
+the sixth -- the `acceptance` job, which scaffolds a downstream repo and
+runs `just docker build test` against a lint stage that is `FROM
+${TEST_TOOLS_IMAGE}` -- pulled it and exited 0. It is precisely the job the
+mitigation was written for, and it is the one that did not get it, because
+the mitigation was a block of shell pasted into each job and a paste is
+something a person has to remember to do.
 
 So the decision is a script and the jobs call it. What the script decides is
 asserted here through a docker seam, with no daemon; that no job reaches
@@ -5514,6 +5512,20 @@ list of job names.
 | `obtain: --artifact with an empty value is a usage error, never pulled or built (base#1588)` | base#1588. `--artifact ''` is a caller that meant to hand over an artifact and lost its path on the way (an empty expression). Treating it as "no artifact" would quietly pull or build instead, so it is a usage error, the same exit 2 as any other malformed option. |
 | `obtain: --artifact without TEST_TOOLS_ARTIFACT_TAG is a usage error, never loaded (base#1588)` | base#1588. The loaded image is found by the run-scoped tag the builder gave it, TEST_TOOLS_ARTIFACT_TAG. A caller that passes an artifact without that tag would re-tag an empty name, so it is a usage error, refused before the tar is touched. |
 | `workflows: no job obtains the rolling test-tools tag by hand (#1010)` | The structural half of the same defect, and the half that stops it recurring. While the decision was shell pasted into each consuming job, nothing could tell a job that probes from a job that does not -- no single copy looked wrong, and the one without a probe read like the others. A job that reaches the rolling tag without going through the script is that copy, whoever writes it next. |
+
+### test/bats/unit/org_name_spec.bats (3)
+
+The org was renamed and the old names no longer resolve, so a retired org
+name anywhere in the shipped or tested tree is a clone, an action call or an
+image pull that fails; the scan covers the whole checkout apart from the
+historical record (released changelog sections, ADRs) and the build and
+cache output a run leaves behind.
+
+| Test | Description |
+|------|-------------|
+| `org name: only doc/adr and doc/changelog are named adr or changelog (base#2106)` | The exemption is the historical record and nothing else -- an exclusion that also matched a live directory named the same would hide exactly what this spec looks for. |
+| `org name: the scan reports a retired name it is shown (base#2106)` | The scan itself must be able to find a hit, or a green result says nothing: a fixture tree carrying one retired name has to be reported with its path. |
+| `org name: the tree outside the historical record names no retired org (base#2106)` | The live tree names only the current org: no file outside the historical record carries a retired one. |
 
 ### test/bats/unit/per_test_timeout_spec.bats (8)
 
@@ -6957,8 +6969,8 @@ trip on missing `origin/<base>`.
 jobs (`test`, `integration-e2e`, `system`) precedes its test-tools
 provisioning with an `Obtain` step implementing the 3-layer fallback: PR
 touched `dockerfile/Dockerfile.test-tools` -> rebuild local; else `docker
-pull ghcr.io/ycpss91255-docker/test-tools:main` and re-tag; else fall back
-to a from-source rebuild. For `test` + `system` (which `docker compose run`
+pull ghcr.io/ycpss91255-lab/test-tools:main` and re-tag; else fall back to a
+from-source rebuild. For `test` + `system` (which `docker compose run`
 test-tools), the buildx Build step gates on
 `steps.obtain.outputs.build_local == 'true'` so the hot path skips it and
 the cold path reuses P1's GHA cache. For `integration-e2e` (which `docker
@@ -8669,7 +8681,7 @@ Unit tests for the repo-local command-group scaffolder
 | `new.sh registers a real mod? line even when the seed registry only COMMENTS that name (#785)` | - |
 | `new.sh source ships with the executable bit set (recipe invokes it directly) (#785)` | - |
 
-### test/bats/unit/template_spec.bats (170)
+### test/bats/unit/template_spec.bats (171)
 
 | Test | Description |
 |------|-------------|
@@ -8785,6 +8797,7 @@ Unit tests for the repo-local command-group scaffolder
 | `upgrade.sh main.yaml sed handles semver pre-release tags (RC → RC)` | `-rcN-rcN` regression |
 | `upgrade.sh main.yaml sed handles stable → stable + RC → stable transitions` | RC → stable cleanup |
 | `upgrade.sh rewrites the @ref of every reusable worker base ships (#1112)` | The rewrite's population has to be the workers base ships, not a roster the sed names -- a named roster cannot see the worker it omits (#1112) |
+| `upgrade.sh main.yaml rewrite moves retired-org worker refs to the current org at the new tag (base#2106)` | The org was renamed and the retired org's names no longer resolve, so a worker ref still under the retired org moves to the current org at the new tag, whichever worker it names -- publish-worker included -- and a ref already under the current org is bumped the same way (base#2106) |
 | `upgrade.sh main.yaml rewrite leaves a third party's worker ref alone (#1112)` | Name-independent must not become owner-independent -- the rewrite rewrites OUR refs, and a stranger's worker is not ours to bump (#1112) |
 | `build-worker.yaml: no legacy in-job test-tools build step` | v0.9.13 GHCR migration |
 | `build-worker.yaml: derives the tooling image from the version-matched checkout (closes #1122)` | the tooling image is derived from the version-matched checkout, not taken as an input (closes #1122) |
@@ -8829,7 +8842,7 @@ Unit tests for the repo-local command-group scaffolder
 | `Dockerfile.example has no SETUP_DIR or pip references (#407)` | - |
 | `Dockerfile.example declares ENV TZ (matches downstream fleet, #210)` | runtime $TZ alignment |
 | `Dockerfile.example declares ENV LANGUAGE=en_US:en (matches downstream fleet, #210)` | runtime $LANGUAGE alignment |
-| `release-test-tools.yaml exists and pushes to ghcr.io/ycpss91255-docker/test-tools` | GHCR publisher |
+| `release-test-tools.yaml exists and pushes to ghcr.io/ycpss91255-lab/test-tools` | GHCR publisher |
 | `release-test-tools.yaml declares packages:write permission` | ghcr auth scope |
 | `release-test-tools.yaml builds multi-arch (amd64 + arm64)` | arch coverage |
 | `release-test-tools.yaml uses template-repo-local Dockerfile path` | no subtree path confusion |
@@ -8935,9 +8948,10 @@ compose.yaml must list the arg in the bare form so compose passes it on.
 
 The tree is a scratch copy so a config-gen source can be edited. The
 expected digest is the literal observed from the shell library itself
-(`tool_image_derive config_gen` -> config-gen:b3b5e2b5cdca on the seeded
-tree, the same literal config_gen_digest_spec.bats holds), not recomputed
-here. Unit level (ADR-00000018).
+(`tool_image_derive config_gen` -> config-gen:2173903f6c17 on the seeded
+tree), not recomputed here. The seeded tree is the live
+dockerfile/config-gen, so any edit to those sources moves this literal. Unit
+level (ADR-00000018).
 
 | Test | Description |
 |------|-------------|
@@ -10348,11 +10362,12 @@ back is in upgrade_migration_reachability_spec.bats.
 | `upgrade.sh: a missing subtree root emits upgrade_subtree_root_not_found under LOG_FORMAT=json (base#1382)` | With the logger reachable (dist/script/docker/lib/ beside the copy) the failure must be a structured ERROR record naming the registered event |
 | `upgrade.sh: a lone copy with no logger still names upgrade_subtree_root_not_found and exits 1 (base#1382)` | The issue's own repro copies upgrade.sh alone, so log.sh is missing too; the failure must still name the registered event and exit 1 |
 
-### test/bats/unit/upstream_spec.bats (9)
+### test/bats/unit/upstream_spec.bats (10)
 
 | Test | Description |
 |------|-------------|
 | `upstream.sh: defines the slug and derives the clone URL from it (#895)` | - |
+| `upstream.sh: the retired upstream slug is one capture-free ERE that never matches the current slug (base#2106)` | The retired upstream is defined once, beside the current one, as an extended regex: it matches the retired slug and never the current one, and carries no capture group, so a caller can splice it into a sed pattern without renumbering its own groups (base#2106) |
 | `upstream.sh: sourcing it twice is inert (#895)` | - |
 | `upstream.sh: reads nothing from the environment (#895)` | - |
 | `exactly one shipped file names the upstream in code (#895)` | - |
