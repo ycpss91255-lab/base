@@ -47,7 +47,7 @@ EOS
 # every build would bury the one real export failure in noise, base#1602.
 @test "cache_export_warn: an export vertex that ends in DONE prints nothing and exits 0 (base#1602)" {
   # The cache export vertex of a good build, copied from the progress log
-  # of ycpss91255-docker/isaac run 42753553284 attempt 1 (vertex 63);
+  # of ycpss91255-lab/isaac run 42753553284 attempt 1 (vertex 63);
   # the middle of its writing-layer lines is cut, the ending is verbatim.
   cat > "${RECORD}" <<'EOS'
 #62 [devel 9/9] RUN true
@@ -74,7 +74,7 @@ EOS
 # the only trace of it, and the step itself must not turn red, base#1602.
 @test "cache_export_warn: an export vertex that ends in ERROR prints one ::warning:: with the error and exits 0 (base#1602)" {
   # The failed cache export vertex, copied from the progress log of
-  # ycpss91255-docker/isaac run 42753553284 attempt 1 (vertex 26); the
+  # ycpss91255-lab/isaac run 42753553284 attempt 1 (vertex 26); the
   # middle of its writing-layer lines is cut, the ERROR line is verbatim.
   cat > "${RECORD}" <<'EOS'
 #26 exporting to GitHub Actions Cache
@@ -94,7 +94,7 @@ EOS
 # why: A record that never says how the export ended cannot show a
 # success, so the script warns instead of assuming DONE, base#1602.
 @test "cache_export_warn: an export vertex with no final DONE or ERROR line prints one ::warning:: and exits 0 (base#1602)" {
-  # The failed vertex 26 of ycpss91255-docker/isaac run 42753553284
+  # The failed vertex 26 of ycpss91255-lab/isaac run 42753553284
   # attempt 1, cut before its ERROR line: the record never says how the
   # export ended, so a success cannot be shown and the script must warn.
   cat > "${RECORD}" <<'EOS'
@@ -113,7 +113,7 @@ EOS
 # why: The build asked for a cache export; a record without one cannot
 # show it ran, so the script warns rather than stay silent, base#1602.
 @test "cache_export_warn: a record with no cache export vertex prints one ::warning:: and exits 0 (base#1602)" {
-  # The build steps of ycpss91255-docker/isaac run 42753553284 attempt 1
+  # The build steps of ycpss91255-lab/isaac run 42753553284 attempt 1
   # (vertex 62) with no `exporting to GitHub Actions Cache` vertex after
   # them: the build asked for a cache export the record never shows, so a
   # success cannot be shown and the script must warn.
@@ -132,7 +132,7 @@ EOS
 @test "cache_export_warn: metadata with no buildx.build.ref prints one ::warning:: and exits 0 (base#1602)" {
   # The metadata names no build record, so no record of this build can be
   # read. The docker stub still replays the good vertex 63 of
-  # ycpss91255-docker/isaac run 42753553284 attempt 1, so a script that
+  # ycpss91255-lab/isaac run 42753553284 attempt 1, so a script that
   # reads some other record (the builder's latest) and finds it DONE stays
   # silent and fails this test: without a ref a success cannot be shown.
   cat > "${RECORD}" <<'EOS'
@@ -152,7 +152,7 @@ EOS
 # base#1602.
 @test "cache_export_warn: a docker buildx history call that exits 1 prints one ::warning:: and exits 0 (base#1602)" {
   # The history call fails (exit 1, an error on stderr) after printing the
-  # good vertex 63 of ycpss91255-docker/isaac run 42753553284 attempt 1.
+  # good vertex 63 of ycpss91255-lab/isaac run 42753553284 attempt 1.
   # A failed replay cannot vouch for the record, so a script that ignores
   # the exit code and reads the DONE line stays silent and fails this test.
   cat > "${RECORD}" <<'EOS'

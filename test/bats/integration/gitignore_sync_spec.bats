@@ -302,9 +302,9 @@ EOF
   cat > "${DOWN_DIR}/.github/workflows/main.yaml" <<'YAML'
 jobs:
   build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v9.0.0
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v9.0.0
   release:
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v9.0.0
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@v9.0.0
 YAML
   git -C "${DOWN_DIR}" add -A
   git -C "${DOWN_DIR}" commit -q -m "initial"

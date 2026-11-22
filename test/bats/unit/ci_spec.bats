@@ -5374,11 +5374,11 @@ _host_direct_lint_arms() {
   # rewrite a caller-pinned value.
   run bash -c '
     source /source/script/test/test.sh
-    TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:v9.9.9 \
+    TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:v9.9.9 \
       _resolve_test_tools_image "/source/dockerfile/Dockerfile.test-tools"
   '
   assert_success
-  assert_output "ghcr.io/ycpss91255-docker/test-tools:v9.9.9"
+  assert_output "ghcr.io/ycpss91255-lab/test-tools:v9.9.9"
 }
 
 # why: #891 no silent bare-literal fallback
@@ -5981,7 +5981,7 @@ _tag_as_nobody() {
   run bash -c '
     source /source/script/test/test.sh
     export PATH="'"${MOCK_DIR}"'"
-    export TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:v9.9.9
+    export TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:v9.9.9
     _ensure_test_tools_image "${TEST_TOOLS_IMAGE}" base-000000000000
   '
   assert_success

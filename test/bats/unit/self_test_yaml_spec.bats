@@ -57,7 +57,7 @@
 # downstream jobs (`test`, `integration-e2e`, `system`) precedes its
 # test-tools provisioning with an `Obtain` step implementing the 3-layer
 # fallback: PR touched `dockerfile/Dockerfile.test-tools` -> rebuild local;
-# else `docker pull ghcr.io/ycpss91255-docker/test-tools:main` and re-tag;
+# else `docker pull ghcr.io/ycpss91255-lab/test-tools:main` and re-tag;
 # else fall back to a from-source rebuild. For `test` + `system` (which
 # `docker compose run` test-tools), the buildx Build step gates on
 # `steps.obtain.outputs.build_local == 'true'` so the hot path skips it and

@@ -926,7 +926,7 @@ permissions:
 
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.41.0
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.41.0
     with:
       image_name: legacy_repo
 

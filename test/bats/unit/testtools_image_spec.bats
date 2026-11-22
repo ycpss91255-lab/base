@@ -6,7 +6,7 @@
 #
 # ── The question, and why it had two answers ─────────────────────────────
 #
-# `ghcr.io/ycpss91255-docker/test-tools:<tag>` is the build-arg a
+# `ghcr.io/ycpss91255-lab/test-tools:<tag>` is the build-arg a
 # downstream Dockerfile's test stage is declared `FROM`, so it decides
 # which shellcheck, which hadolint and which bats that repo's CI lints and
 # tests with. Two things named it, and they were never the same string:
@@ -133,7 +133,7 @@ _consuming_tag_literals() {
     while IFS= read -r _line; do
       printf 'finding: %s: %s\n' "${_f##*/}" \
           "${_line#"${_line%%[![:space:]]*}"}"
-    done < <(code_grep -F 'ghcr.io/ycpss91255-docker/test-tools:' "${_f}" \
+    done < <(code_grep -F 'ghcr.io/ycpss91255-lab/test-tools:' "${_f}" \
         || true)
   done < <(workflow_files "${WF_DIR}")
   printf 'scanned=%s\n' "${_scanned}"
@@ -240,7 +240,7 @@ _step_run_by_id() {
   _root="$(_tree 'v0.40.3')"
   run bash "${DERIVATION}" "${_root}"
   assert_success
-  assert_output 'ghcr.io/ycpss91255-docker/test-tools:v0.40.3'
+  assert_output 'ghcr.io/ycpss91255-lab/test-tools:v0.40.3'
 }
 
 # why: The pair that is the whole point: the consumed tag MOVES with the
@@ -251,10 +251,10 @@ _step_run_by_id() {
   _b="$(_tree 'v0.43.0')"
   run bash "${DERIVATION}" "${_a}"
   assert_success
-  assert_output 'ghcr.io/ycpss91255-docker/test-tools:v0.42.0'
+  assert_output 'ghcr.io/ycpss91255-lab/test-tools:v0.42.0'
   run bash "${DERIVATION}" "${_b}"
   assert_success
-  assert_output 'ghcr.io/ycpss91255-docker/test-tools:v0.43.0'
+  assert_output 'ghcr.io/ycpss91255-lab/test-tools:v0.43.0'
 }
 
 # why: An RC publishes `:<ver>` and leaves `:latest` where it was, so an
@@ -265,7 +265,7 @@ _step_run_by_id() {
   _root="$(_tree 'v0.43.0-rc2')"
   run bash "${DERIVATION}" "${_root}"
   assert_success
-  assert_output 'ghcr.io/ycpss91255-docker/test-tools:v0.43.0-rc2'
+  assert_output 'ghcr.io/ycpss91255-lab/test-tools:v0.43.0-rc2'
 }
 
 # why: Trailing whitespace is how a version file arrives from an editor; a
@@ -276,7 +276,7 @@ _step_run_by_id() {
   printf '  v0.41.0  \n\n' > "${_root}/.version"
   run bash "${DERIVATION}" "${_root}"
   assert_success
-  assert_output 'ghcr.io/ycpss91255-docker/test-tools:v0.41.0'
+  assert_output 'ghcr.io/ycpss91255-lab/test-tools:v0.41.0'
 }
 
 # why: The fallback that suggests itself for an unreadable version is
@@ -346,7 +346,7 @@ _step_run_by_id() {
       "${VERSION_FILE} is empty -- this case has nothing to compare against."
   run bash "${DERIVATION}"
   assert_success
-  assert_output "ghcr.io/ycpss91255-docker/test-tools:${_tracked}"
+  assert_output "ghcr.io/ycpss91255-lab/test-tools:${_tracked}"
 }
 
 # ── The population of consuming sites, derived from the tree ──────────

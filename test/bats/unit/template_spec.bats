@@ -1487,9 +1487,9 @@ _shipped_reusable_workers() {
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.5.0
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.5.0
   call-release:
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.5.0
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.5.0
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.6.4
 
@@ -1516,9 +1516,9 @@ EOF
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.10.0-rc1
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.10.0-rc1
   call-release:
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.10.0-rc1
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.10.0-rc1
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.10.0-rc2
 
@@ -1544,9 +1544,9 @@ EOF
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.10.0-rc2
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.10.0-rc2
   call-release:
-    uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.9.9
+    uses: ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.9.9
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.10.0
 
@@ -1626,13 +1626,13 @@ EOF
   cat > "${_yaml}" <<'EOF'
 jobs:
   call-docker-build:
-    uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.5.0
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.5.0
   call-vendor:
     uses: someone/elsewhere/.github/workflows/build-worker.yaml@v0.5.0
 EOF
   _apply_main_yaml_rewrite "${_yaml}" v0.6.4
 
-  run grep -Fc 'ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.6.4' "${_yaml}"
+  run grep -Fc 'ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.6.4' "${_yaml}"
   assert_output "1"
   run grep -Fc 'someone/elsewhere/.github/workflows/build-worker.yaml@v0.5.0' "${_yaml}"
   assert_output "1"
@@ -3299,8 +3299,8 @@ FIXTURE
 # image the template targets, the dependency is safe, and downstream
 # overrides can now use natural shell semantics. Discovered during
 # the v0.21.1 runtime-test framework's downstream rollout
-# (ycpss91255-docker/docker_harness#57); see also
-# ycpss91255-docker/template#249.
+# (ycpss91255-lab/docker_harness#57); see also
+# ycpss91255-lab/template#249.
 #
 # The grep tests below lock all three invariants (positive: bash -c
 # wrapper present; negative: no bare ARG substitution; negative:
@@ -3334,7 +3334,7 @@ FIXTURE
       "the shipped template Dockerfile this spec pins"
   # Regression guard: sh -c (dash) cannot parse bash-syntax files in
   # `source` / `.` overrides. Blocks all ROS-style smoke commands.
-  # See ycpss91255-docker/docker_harness#57 + for context.
+  # See ycpss91255-lab/docker_harness#57 + for context.
   run grep -E '^# RUN sh -c "\$\{RUNTIME_SMOKE_CMD\}"$' "${_df}"
   [ "${status}" -ne 0 ] || [ -z "${output}" ]
 }
@@ -3357,7 +3357,7 @@ FIXTURE
 # Dockerfile.example: builder + runtime split pattern
 #
 # Lifts the three lessons proven empirically in
-# ycpss91255-docker/ros1_bridge#60 (saved ~1.1 GB/arch on runtime):
+# ycpss91255-lab/ros1_bridge#60 (saved ~1.1 GB/arch on runtime):
 #   1. runtime MUST NOT be FROM devel -- forces devel to delete its
 #      own source to avoid runtime bloat, breaking the dev workflow.
 #   2. Runtime apt: install only the ldd-identified missing libs.
@@ -3528,11 +3528,11 @@ FIXTURE
 # ════════════════════════════════════════════════════════════════════
 
 # why: GHCR publisher
-@test "release-test-tools.yaml exists and pushes to ghcr.io/ycpss91255-docker/test-tools" {
+@test "release-test-tools.yaml exists and pushes to ghcr.io/ycpss91255-lab/test-tools" {
   local _yaml="/source/.github/workflows/release-test-tools.yaml"
   assert_spec_subject "${_yaml}" \
       "the test-tools release workflow this spec pins"
-  run grep -F 'ghcr.io/ycpss91255-docker/test-tools' "${_yaml}"
+  run grep -F 'ghcr.io/ycpss91255-lab/test-tools' "${_yaml}"
   assert_success
 }
 

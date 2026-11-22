@@ -944,9 +944,9 @@ _confirm_step_for() {
     STUB_RAW_FAIL="${_rawfail}" \
     STUB_TAG_UNRESOLVED="${_unresolved}" \
     STUB_TAG_ANSWER="${_answer}" \
-    IMAGE='ghcr.io/ycpss91255-docker/test-tools' \
-    IMAGE_TAG='ghcr.io/ycpss91255-docker/test-tools:main' \
-    VERIFIED_REF="ghcr.io/ycpss91255-docker/test-tools@sha256:${_verified}" \
+    IMAGE='ghcr.io/ycpss91255-lab/test-tools' \
+    IMAGE_TAG='ghcr.io/ycpss91255-lab/test-tools:main' \
+    VERIFIED_REF="ghcr.io/ycpss91255-lab/test-tools@sha256:${_verified}" \
       bash "${_dir}/step.sh" 2>&1
   ) || _status=$?
   return "${_status}"
@@ -990,7 +990,7 @@ _resolve_tags_for() {
   (
     cd -- "$(_repo_root)" || exit 2
     GITHUB_REF="${_ref}" \
-    IMAGE='ghcr.io/ycpss91255-docker/test-tools' \
+    IMAGE='ghcr.io/ycpss91255-lab/test-tools' \
     GITHUB_OUTPUT="${_dir}/out" \
       bash "${_dir}/step.sh" > /dev/null
   ) || _status=$?
@@ -1118,8 +1118,8 @@ _spec_prose() {
 @test "release-test-tools.yaml: a release tag publishes :<ver> and moves :latest" {
   run _resolve_tags_for refs/tags/v0.42.0
   assert_success
-  assert_output --partial 'tags=ghcr.io/ycpss91255-docker/test-tools:v0.42.0,ghcr.io/ycpss91255-docker/test-tools:latest'
-  assert_output --partial 'smoke=ghcr.io/ycpss91255-docker/test-tools:v0.42.0'
+  assert_output --partial 'tags=ghcr.io/ycpss91255-lab/test-tools:v0.42.0,ghcr.io/ycpss91255-lab/test-tools:latest'
+  assert_output --partial 'smoke=ghcr.io/ycpss91255-lab/test-tools:v0.42.0'
 }
 
 # why: The load-bearing case: `v0.42.0-rc1` through `-rc4` each matched the
@@ -1132,8 +1132,8 @@ _spec_prose() {
   # built its lint stage from it.
   run _resolve_tags_for refs/tags/v0.42.0-rc4
   assert_success
-  assert_output --partial 'tags=ghcr.io/ycpss91255-docker/test-tools:v0.42.0-rc4'
-  assert_output --partial 'smoke=ghcr.io/ycpss91255-docker/test-tools:v0.42.0-rc4'
+  assert_output --partial 'tags=ghcr.io/ycpss91255-lab/test-tools:v0.42.0-rc4'
+  assert_output --partial 'smoke=ghcr.io/ycpss91255-lab/test-tools:v0.42.0-rc4'
   refute_output --partial ':latest'
 }
 
@@ -1142,8 +1142,8 @@ _spec_prose() {
 @test "release-test-tools.yaml: a main push publishes the :main rolling tag only" {
   run _resolve_tags_for refs/heads/main
   assert_success
-  assert_output --partial 'tags=ghcr.io/ycpss91255-docker/test-tools:main'
-  assert_output --partial 'smoke=ghcr.io/ycpss91255-docker/test-tools:main'
+  assert_output --partial 'tags=ghcr.io/ycpss91255-lab/test-tools:main'
+  assert_output --partial 'smoke=ghcr.io/ycpss91255-lab/test-tools:main'
   refute_output --partial ':latest'
 }
 
@@ -1391,7 +1391,7 @@ _spec_prose() {
     printf 'answer: [%s]\n' "${_answer}"
     run _confirm_step_for unresolved "${_answer}"
     assert_failure
-    assert_output --partial '::error::ghcr.io/ycpss91255-docker/test-tools:main did not resolve to a digest'
+    assert_output --partial '::error::ghcr.io/ycpss91255-lab/test-tools:main did not resolve to a digest'
     refute_output --partial 'names the verified'
   done
 }
