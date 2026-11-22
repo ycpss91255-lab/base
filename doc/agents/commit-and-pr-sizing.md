@@ -2,7 +2,7 @@
 
 How big a pull request and a commit may be in this repo, and how to split work
 that is bigger. These rules apply to people and to agents alike. Enforcement is
-a separate concern, tracked in `ycpss91255-docker/base#1629`.
+a separate concern, tracked in `ycpss91255-lab/base#1629`.
 
 ## One PR = one behaviour
 

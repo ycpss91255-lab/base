@@ -29,7 +29,7 @@ _BASE_UPSTREAM_SOURCED=1
 # GitHub <owner>/<repo> of upstream base. check-base-version.sh queries
 # `repos/<slug>/releases/latest` through it and puts it in the release
 # link of the reminder issue it files.
-BASE_UPSTREAM_SLUG='ycpss91255-docker/base'
+BASE_UPSTREAM_SLUG='ycpss91255-lab/base'
 
 # The clone URL upgrade.sh / init.sh default to. HTTPS so a fresh clone, a
 # CI runner or a first-time contributor with no SSH key works out of the
