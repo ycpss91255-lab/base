@@ -924,7 +924,7 @@ _exclude_tags() {
   run _with_block
   assert_success
   assert_output --partial 'package: test-tools'
-  assert_output --partial 'owner: ycpss91255-lab'
+  assert_output --partial 'owner: ${{ github.repository_owner }}'
 }
 
 # why: `expand-packages` would widen this to every package in the org

@@ -38,6 +38,25 @@ setup() {
   assert_line --index 1 "https://github.com/ycpss91255-lab/base.git"
 }
 
+# why: The retired upstream is defined once, beside the current one, as an
+# extended regex: it matches the retired slug and never the current one, and
+# carries no capture group, so a caller can splice it into a sed pattern
+# without renumbering its own groups (base#2106)
+@test "upstream.sh: the retired upstream slug is one capture-free ERE that never matches the current slug (base#2106)" {
+  run bash -c "
+    source '${UPSTREAM_SH}'
+    printf '%s\n' \"\${BASE_UPSTREAM_RETIRED_RE}\"
+  "
+  assert_success
+  refute_output ''
+  refute_output --partial '('
+  local _re="${output}"
+  run bash -c "printf '%s\n' 'ycpss91255-''docker/base' | grep -cxE '${_re}'"
+  assert_output "1"
+  run bash -c "printf '%s\n' 'ycpss91255-lab/base' | grep -cxE '${_re}'"
+  assert_output "0"
+}
+
 @test "upstream.sh: sourcing it twice is inert (#895)" {
   # upgrade.sh sources it and then sources _lib.sh, which pulls in more of
   # the tree; a second arrival must not abort a `set -e` caller.

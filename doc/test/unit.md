@@ -8681,7 +8681,7 @@ Unit tests for the repo-local command-group scaffolder
 | `new.sh registers a real mod? line even when the seed registry only COMMENTS that name (#785)` | - |
 | `new.sh source ships with the executable bit set (recipe invokes it directly) (#785)` | - |
 
-### test/bats/unit/template_spec.bats (170)
+### test/bats/unit/template_spec.bats (171)
 
 | Test | Description |
 |------|-------------|
@@ -8797,6 +8797,7 @@ Unit tests for the repo-local command-group scaffolder
 | `upgrade.sh main.yaml sed handles semver pre-release tags (RC → RC)` | `-rcN-rcN` regression |
 | `upgrade.sh main.yaml sed handles stable → stable + RC → stable transitions` | RC → stable cleanup |
 | `upgrade.sh rewrites the @ref of every reusable worker base ships (#1112)` | The rewrite's population has to be the workers base ships, not a roster the sed names -- a named roster cannot see the worker it omits (#1112) |
+| `upgrade.sh main.yaml rewrite moves retired-org worker refs to the current org at the new tag (base#2106)` | The org was renamed and the retired org's names no longer resolve, so a worker ref still under the retired org moves to the current org at the new tag, whichever worker it names -- publish-worker included -- and a ref already under the current org is bumped the same way (base#2106) |
 | `upgrade.sh main.yaml rewrite leaves a third party's worker ref alone (#1112)` | Name-independent must not become owner-independent -- the rewrite rewrites OUR refs, and a stranger's worker is not ours to bump (#1112) |
 | `build-worker.yaml: no legacy in-job test-tools build step` | v0.9.13 GHCR migration |
 | `build-worker.yaml: derives the tooling image from the version-matched checkout (closes #1122)` | the tooling image is derived from the version-matched checkout, not taken as an input (closes #1122) |
@@ -10361,11 +10362,12 @@ back is in upgrade_migration_reachability_spec.bats.
 | `upgrade.sh: a missing subtree root emits upgrade_subtree_root_not_found under LOG_FORMAT=json (base#1382)` | With the logger reachable (dist/script/docker/lib/ beside the copy) the failure must be a structured ERROR record naming the registered event |
 | `upgrade.sh: a lone copy with no logger still names upgrade_subtree_root_not_found and exits 1 (base#1382)` | The issue's own repro copies upgrade.sh alone, so log.sh is missing too; the failure must still name the registered event and exit 1 |
 
-### test/bats/unit/upstream_spec.bats (9)
+### test/bats/unit/upstream_spec.bats (10)
 
 | Test | Description |
 |------|-------------|
 | `upstream.sh: defines the slug and derives the clone URL from it (#895)` | - |
+| `upstream.sh: the retired upstream slug is one capture-free ERE that never matches the current slug (base#2106)` | The retired upstream is defined once, beside the current one, as an extended regex: it matches the retired slug and never the current one, and carries no capture group, so a caller can splice it into a sed pattern without renumbering its own groups (base#2106) |
 | `upstream.sh: sourcing it twice is inert (#895)` | - |
 | `upstream.sh: reads nothing from the environment (#895)` | - |
 | `exactly one shipped file names the upstream in code (#895)` | - |

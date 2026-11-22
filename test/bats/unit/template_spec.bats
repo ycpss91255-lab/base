@@ -1612,6 +1612,44 @@ EOF
   rm -rf "${_tmp}"
 }
 
+# why: The org was renamed and the retired org's names no longer resolve, so
+# a worker ref still under the retired org moves to the current org at the
+# new tag, whichever worker it names -- publish-worker included -- and a ref
+# already under the current org is bumped the same way (base#2106)
+@test "upgrade.sh main.yaml rewrite moves retired-org worker refs to the current org at the new tag (base#2106)" {
+  local _tmp _yaml _retired
+  _tmp="$(mktemp -d)"
+  _yaml="${_tmp}/main.yaml"
+  # Assembled, so this file never spells the retired slug in one piece.
+  _retired="ycpss91255-""docker/base"
+  cat > "${_yaml}" <<EOF
+jobs:
+  call-docker-build:
+    uses: ${_retired}/.github/workflows/build-worker.yaml@v0.41.0
+  call-release:
+    uses: ${_retired}/.github/workflows/release-worker.yaml@v0.41.0
+  call-publish:
+    uses: ${_retired}/.github/workflows/publish-worker.yaml@v0.41.0
+  call-multi:
+    uses: ycpss91255-lab/base/.github/workflows/multi-distro-build-worker.yaml@v0.42.0
+  call-vendor:
+    uses: someone/elsewhere/.github/workflows/build-worker.yaml@v0.41.0
+EOF
+  _apply_main_yaml_rewrite "${_yaml}" v0.43.0-rc6
+
+  local _w
+  for _w in build-worker release-worker publish-worker multi-distro-build-worker; do
+    run grep -cxF "    uses: ycpss91255-lab/base/.github/workflows/${_w}.yaml@v0.43.0-rc6" "${_yaml}"
+    assert_output "1"
+  done
+  run grep -cF "${_retired}" "${_yaml}"
+  assert_output "0"
+  run grep -Fc 'someone/elsewhere/.github/workflows/build-worker.yaml@v0.41.0' "${_yaml}"
+  assert_output "1"
+
+  rm -rf "${_tmp}"
+}
+
 # why: Name-independent must not become owner-independent -- the rewrite
 # rewrites OUR refs, and a stranger's worker is not ours to bump (#1112)
 @test "upgrade.sh main.yaml rewrite leaves a third party's worker ref alone (#1112)" {
