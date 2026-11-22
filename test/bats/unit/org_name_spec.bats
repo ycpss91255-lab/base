@@ -37,7 +37,9 @@ setup() {
 # _scan_retired
 #   Every line under ROOT naming a retired org, as <path>:<line>:<text>.
 #   The enumeration is grep -r, not git ls-files: /source may be a mounted
-#   worktree whose .git points at a path the container cannot see.
+#   worktree whose .git points at a path the container cannot see. The
+#   exclusions are the historical record plus what .gitignore keeps out of
+#   the tree (run output, editor and agent state).
 _scan_retired() {
   grep -rnIiE "${RETIRED_RE}" "${ROOT}" \
     --exclude-dir=.git \
@@ -50,7 +52,8 @@ _scan_retired() {
     --exclude-dir=.config-gen-bin \
     --exclude-dir=__pycache__ \
     --exclude-dir=.prev-release \
-    --exclude='.env' --exclude='.env.local' --exclude='.setup.conf.local'
+    --exclude='.env' --exclude='.env.local' --exclude='.setup.conf.local' \
+    --exclude='CLAUDE.md'
 }
 
 # why: The exemption is the historical record and nothing else -- an
