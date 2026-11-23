@@ -8684,7 +8684,7 @@ Unit tests for the repo-local command-group scaffolder
 | `new.sh registers a real mod? line even when the seed registry only COMMENTS that name (#785)` | - |
 | `new.sh source ships with the executable bit set (recipe invokes it directly) (#785)` | - |
 
-### test/bats/unit/template_spec.bats (171)
+### test/bats/unit/template_spec.bats (175)
 
 | Test | Description |
 |------|-------------|
@@ -8802,6 +8802,10 @@ Unit tests for the repo-local command-group scaffolder
 | `upgrade.sh rewrites the @ref of every reusable worker base ships (#1112)` | The rewrite's population has to be the workers base ships, not a roster the sed names -- a named roster cannot see the worker it omits (#1112) |
 | `upgrade.sh main.yaml rewrite moves retired-org worker refs to the current org at the new tag (base#2106)` | The org was renamed and the retired org's names no longer resolve, so a worker ref still under the retired org moves to the current org at the new tag, whichever worker it names -- publish-worker included -- and a ref already under the current org is bumped the same way (base#2106) |
 | `upgrade.sh main.yaml rewrite leaves a third party's worker ref alone (#1112)` | Name-independent must not become owner-independent -- the rewrite rewrites OUR refs, and a stranger's worker is not ours to bump (#1112) |
+| `upgrade.sh main.yaml rewrite leaves an owner that only ends in the slug alone (base#2118)` | An owner whose name merely ENDS in the slug is a stranger, and the rewrite of a retired ref replaces part of that name, so without a left boundary it turns the stranger's owner into one that does not exist (base#2118) |
+| `upgrade.sh main.yaml rewrite acts on inline uses: values only (base#2118)` | Only the value of a `uses:` is a ref an upgrade owns: a note that records which ref a repo came from is the repo's own history, and rewriting it makes the note false. A ref that is quoted, inline or commented out is still a `uses:` and still moves (base#2118) |
+| `upgrade.sh main.yaml rewrite reaches each inline spelling under both slugs (base#2118)` | Each of these is a ref the rewrite used to reach, under both the retired and the current slug; losing one leaves a consumer's job pinned to an org that no longer resolves, or to the old release (base#2118) |
+| `upgrade.sh main.yaml rewrite leaves a key that only ends in uses alone (base#2118)` | The line that bumps the ref needs the left boundary as much as the one that moves the org: a key merely ending in `uses` is not a `uses`, whichever slug it carries (base#2118) |
 | `build-worker.yaml: no legacy in-job test-tools build step` | v0.9.13 GHCR migration |
 | `build-worker.yaml: derives the tooling image from the version-matched checkout (closes #1122)` | the tooling image is derived from the version-matched checkout, not taken as an input (closes #1122) |
 | `build-worker.yaml: does not resurrect the GITHUB_WORKFLOW_REF parse step` | regression guard |
