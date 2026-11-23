@@ -2675,9 +2675,14 @@ set +u; { . /opt/ros/a/setup.bash; }; set -u\nsource /opt/ros/b/setup.bash
 set +u; for _x in 1; do . /opt/ros/a/setup.bash; done; set -u\nsource /opt/ros/b/setup.bash
 (set +u; source /opt/ros/a/setup.bash) || true\nsource /opt/ros/b/setup.bash
 (set +u; source /opt/ros/a/setup.bash) # quiet\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) </dev/null\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) >&1\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash); :\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) & wait\nsource /opt/ros/b/setup.bash
+set +u; case x in x) . /opt/ros/a/setup.bash; esac; set -u\nsource /opt/ros/b/setup.bash
 (set +u; source /opt/ros/a/setup.bash) 2>/dev/null\nsource /opt/ros/b/setup.bash
 EOF
-  [ "${_n}" -eq 19 ]
+  [ "${_n}" -eq 24 ]
 
   # A path put together by a pipeline is a source too.
   printf '%s\n' 'set -eu' '. "$(ls -d /opt/ros/* | tail -n 1)/setup.bash"' > "${TEMP_DIR}/script/entrypoint.sh"
