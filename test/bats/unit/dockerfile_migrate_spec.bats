@@ -1750,12 +1750,15 @@ RUN cd /lint && hadolint Dockerfile" || fail "from: ${_before}"
 # hadolint ignore = DL3059|# hadolint ignore = DL3059,DL3003
 #  hadolint  ignore= DL3059|#  hadolint  ignore= DL3059,DL3003
 # hadolint ignore=DL3059 # not DL3003|# hadolint ignore=DL3059,DL3003 # not DL3003
+# hadolint ignore=DL3003 because|# hadolint ignore=DL3003 because\n# hadolint ignore=DL3003
+# hadolint ignore=DL3059 DL3003|# hadolint ignore=DL3059 DL3003\n# hadolint ignore=DL3003
+# hadolint ignore=DL3059,|# hadolint ignore=DL3059,\n# hadolint ignore=DL3003
 # hadolint ignore=DL30031|# hadolint ignore=DL30031,DL3003
 # see hadolint ignore=DL3003|# see hadolint ignore=DL3003\n# hadolint ignore=DL3003
 # hadolint global ignore=DL3059|# hadolint global ignore=DL3059\n# hadolint ignore=DL3003
 RUN echo "hadolint ignore=DL3003"|RUN echo "hadolint ignore=DL3003"\n# hadolint ignore=DL3003
 EOF
-  [ "${_n}" -eq 10 ]
+  [ "${_n}" -eq 13 ]
 }
 
 # why: a Dockerfile already in the template's shape is the consumer's own
