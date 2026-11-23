@@ -132,8 +132,12 @@ _cs_diff() {
   [[ -n "${_base}" ]] || { echo empty_base; return 1; }
   git rev-parse --verify --quiet "${_base}^{commit}" >/dev/null 2>&1 \
     || { echo bad_base; return 1; }
-  git merge-base "${_base}" HEAD >/dev/null 2>&1 || { echo no_merge_base; return 1; }
-  git diff --raw -z --no-renames --no-abbrev "${_base}...HEAD" >"${_out}" 2>/dev/null \
+  local _mb
+  _mb="$(git merge-base --all "${_base}" HEAD 2>/dev/null)" || { echo no_merge_base; return 1; }
+  # A three-dot diff reads one merge base of several, and can hide what the
+  # others would show (base#2110).
+  [[ "${_mb}" != *$'\n'* ]] || { echo many_merge_bases; return 1; }
+  git diff --raw --ignore-submodules=none -z --no-renames --no-abbrev "${_base}...HEAD" >"${_out}" 2>/dev/null \
     || { echo diff_failed; return 1; }
 }
 
@@ -190,8 +194,9 @@ main() {
 
   # Only a pull request narrows the selection: push, tag and
   # workflow_dispatch runs select every job, so main runs the full suite
-  # (owner decision, base#1584). classify names a fork's pull request by
-  # another event, so a fork is never narrowed (base#2110).
+  # (owner decision, base#1584). classify names a pull request from a fork,
+  # or into any branch but the default one, by another event, so neither is
+  # narrowed (base#2110).
   if [[ "${_event}" != pull_request ]]; then
     _cs_select_all non_pr
     return 0

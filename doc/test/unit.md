@@ -1146,7 +1146,7 @@ Pure git + filesystem, no docker.
 | `changelog layout: no [Unreleased] anywhere is refused, not passed` | The same rule in the direction that fails open: with no live series every placement rule holds and the tree reports clean, while there is nowhere left to write the next entry. |
 | `changelog layout: a changelog directory with no series files DIES` | The vacuous pass this repo keeps paying for. With nothing to walk, every rule above holds and the lint prints a green line that means the scan found nothing, not that nothing is wrong. |
 
-### test/bats/unit/check_selection_spec.bats (28)
+### test/bats/unit/check_selection_spec.bats (30)
 
 classify gave every heavy job one answer, code_changed, so a PR that touched
 one config-gen spec and two docs ran config-gen and all twelve coverage
@@ -1176,6 +1176,8 @@ and the probes cited per case, never from the map's own output.
 | `check_selection: an unterminated last record is still read (base#1584)` | cycle 18. `read -d ''` drops a final record with no NUL, so `doc/a.md<NUL>zz/x` read as docs only. zz/x is an unknown path. |
 | `check_selection: a clean NUL-terminated docs record selects nothing (base#1584)` | cycle 18's control: a clean docs record still selects nothing, so the control-byte check does not reject clean input. |
 | `check_selection: an unreadable diff base selects every gated job with its reason (base#1584)` | cycle 19 (RR3-F3). An empty base reads as HEAD to git (`git diff "...HEAD"` exits 0 with no output, measured), a missing ref names no commit, base == HEAD is a diff with no path, and an orphan HEAD has no merge base (`git diff main...HEAD` exits 128 there, measured). Each selects every job and names its reason. |
+| `check_selection: more than one merge base selects every gated job with its reason (base#2110)` | base#2110. With two merge bases the three-dot diff is taken from one of them, so it can hide a change the merge would make (a pull request that holds a commit already on the base and its revert, seen from a criss-cross history). More than one merge base selects every job. |
+| `check_selection: a submodule bump hidden by .gitmodules selects every gated job (base#2110)` | base#2110. `ignore = all` in .gitmodules hides a submodule's new commit from a plain diff, so the diff must ask for it. |
 | `check_selection: an unreadable deny list selects every gated job (base#1584)` | cycle 20. A deny list that exits non-zero or prints nothing cannot say which paths config-gen ignores, so nothing may be dropped. |
 | `check_selection: a unit spec runs coverage and the code checks only (base#1584)` | the E1 row. A unit or integration spec is a leaf -- no file under test/ or script/ loads or sources a `*_spec.bats` -- so config-gen, acceptance and system never execute it; it is code, so coverage and the code checks run. |
 | `check_selection: a system spec runs coverage, system and the code checks (base#1584)` | the E1 row for a system spec: system runs the system specs, so it and worker-selftest stay; config-gen and acceptance drop. |
@@ -1589,7 +1591,7 @@ code, base#1562.
 | `_run_via_compose: the real ids are in the environment compose interpolates (#895)` | - |
 | `_fix_permissions: refuses a non-numeric id instead of handing it to chown (#895)` | - |
 
-### test/bats/unit/classify_testtools_spec.bats (24)
+### test/bats/unit/classify_testtools_spec.bats (27)
 
 `testtools_changed` tells every image-consuming job whether to rebuild the
 tooling image from source instead of pulling the rolling `:main`. On a pull
@@ -1622,6 +1624,9 @@ reads the output the step writes.
 | `classify: a docs-only pull request writes every gated job's selection as false (base#1584)` | cycle 21 (RR3-F1). A docs path selects nothing: the map's doc row is the code_changed allow-list (doc/**, README.md, LICENSE, CONTEXT.md). The base commit holds a real copy of /source/script, so the real map and deny list are read from the base through `git show`. Each value is exact: a classify that never carries a `false` through fails here. |
 | `classify: a pull request changing one unit spec selects coverage and the code checks only (base#1584)` | cycle 22 (RR3-F1). A unit spec is a leaf (row E1): coverage and the code checks run; config-gen, acceptance, system and worker-selftest do not. |
 | `classify: a fork pull request, or one not known to be same-repo, selects every gated job (base#2110)` | base#2110. A fork's pull request is never narrowed: classify answers `true` for every key, and so does a run that cannot say whether it is a fork. |
+| `classify: a pull request not known to target the default branch selects every gated job (base#2110)` | base#2110. A pull request into any other branch can be retargeted at the default branch without a new run, so its diff against the other branch would stand for the one that merges. Only a pull request into the default branch is narrowed, and not knowing is not being one. |
+| `classify: a tag named like the base branch does not stand in for it (base#2110)` | base#2110. `origin/main` as a bare name resolves to a tag of that name before the remote branch, so a pushed tag could stand in for the base. The step names the remote branch in full. |
+| `classify: a pull request's own selection_at_base.sh does not judge it (base#2110)` | base#2110. The script that runs the base side's map is read from the base too: one read from the pull request could answer without the map. |
 | `classify: a base map that fails or leaves a job out selects it (base#1584)` | cycle 23. A selection that exits non-zero gave no answer, and a line the selection leaves out is no `false`: classify writes `true` for both, and keeps the map's own values for every line it did print. |
 | `classify: a pull request that edits a selection file is judged by the base map (base#1584)` | cycle 26 (RR6-F1). A PR is judged by the BASE side's map, never its own: a PR whose map selects nothing for an unknown path, and which changes that map, would otherwise classify itself with it and skip every job (RR6-F1's probe printed all five false). Each selection file a PR edits is an unknown path to the base map, so every job runs. |
 | `classify: a base without the map or its deny list selects every gated job (base#1584)` | cycle 27, the bootstrap. A base with no map or no deny list (main when this change lands, and any older base) cannot judge the PR, so every job runs, naming map_missing_on_base. |
@@ -3184,7 +3189,7 @@ to escape.
 | `_sync_doc_counts: a second run over a generated catalogue changes nothing` | "Regenerating from scratch reproduces what is committed" is the gate check_test_md_drift.sh applies to the real tree, so a second run that moved a byte would make every branch red for a reason no diff explains. |
 | `_sync_doc_counts: a shipped smoke spec lands in smoke.md` | A shipped smoke spec is the one level whose glob leaves test/ for dist/, and it was the case that caught the doc-to-glob map going stale before. It stays because the map is still hand-written. |
 
-### test/bats/unit/doc_reader_specs_spec.bats (4)
+### test/bats/unit/doc_reader_specs_spec.bats (6)
 
 A documentation-only pull request skips coverage, the one job that runs
 these specs, so a doc edit that breaks one was first seen in the merge
@@ -3194,8 +3199,10 @@ listing.
 
 | Test | Description |
 |------|-------------|
-| `doc_reader_specs: every way of reading a live document lists the spec (base#2110)` | each way a spec can reach a live document, by the document's kind: a literal path, a variable holding the checkout, a glob, a directory, a relative path after entering the tree, and a walk of the whole tree. |
-| `doc_reader_specs: a comment, a fixture path, another tree and a system spec are not listed (base#2110)` | a comment, a fixture's own doc path and another part of the checkout are not reads of a document, so the list does not grow into the whole suite. The system suite needs a docker socket and is never listed. |
+| `doc_reader_specs: every way of reading a live document lists the spec (base#2110)` | each way a spec can reach a live document. The list is decided by what is named, not by how the checkout's root is spelled, because a spec can spell the root in any number of ways: a document name anywhere lists the spec, and so does the whole tree used as one argument. |
+| `doc_reader_specs: a helper that names a document lists the specs that load it (base#2110)` | a helper's read is a read by every spec that loads it. |
+| `doc_reader_specs: a comment, another part of the tree and a system spec are not listed (base#2110)` | a comment, a name that only contains a document's and another part of the checkout are not reads of a document, so the list does not grow into the whole suite. The system suite needs a docker socket and is never listed. |
+| `doc_reader_specs: a spec it cannot read fails the list (base#2110)` | a spec that cannot be read is not known to leave the documents alone. |
 | `doc_reader_specs: no listed spec is a failure (base#2110)` | an empty list would run nothing and read as a pass. |
 | `doc_reader_specs: the real tree's known document readers are listed, and each path exists (base#2110)` | the list over the real tree. Each of these specs opens a document of the checkout (read from its body), so a rule that stops seeing one of them fails here. The list may hold more. |
 
@@ -6959,7 +6966,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (163)
+### test/bats/unit/self_test_yaml_spec.bats (164)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:

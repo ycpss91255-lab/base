@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# doc_reader_specs.sh -- the unit and integration specs that read the
+# doc_reader_specs.sh -- the unit and integration specs that may read the
 # checkout's own documentation, base#2110.
 #
 # Usage: doc_reader_specs.sh [<root>]
@@ -11,21 +11,24 @@
 # pull request (`test.sh --doc-readers`).
 #
 # Prints one path relative to <root> (default: this checkout) per line,
-# sorted. A spec is listed when a line of it that is not a comment does
-# one of these. <root-ref> is `/source`, or a variable the spec assigns
-# `/source`:
-#   1. names a documentation path below <root-ref>: doc, README*,
-#      CONTEXT.md, LICENSE or CHANGELOG*;
-#   2. names a documentation path at the start of a word (`doc/...`,
-#      `README.md`), in a spec that also assigns such a variable or changes
-#      directory into the tree, so the path may be the checkout's own;
-#   3. walks the tree from <root-ref>, named or entered with cd or
-#      `git -C` (find, grep -r, git ls-files, git grep).
-# The rules read text, so they list more specs than read a document (a
-# fixture path looks the same). That is the safe direction.
+# sorted within each suite. A spec is listed when a line of it, or of a
+# `.bash` helper under test/bats whose name it mentions, that is not a
+# comment does one of these:
+#   1. names a document: a path part `doc`, `.md`, README, CONTEXT,
+#      LICENSE or CHANGELOG;
+#   2. uses the whole tree: `/source` with nothing or a glob after it, a
+#      default of `/source`, or the spec's directory climbed to the root
+#      and used as it stands.
+# The rules look for what is named and never for how the root is spelled,
+# because a spec can spell the root in any number of ways. They list many
+# specs whose document is a fixture. That is the safe direction.
 #
-# Fails when no spec is listed: an empty list would run nothing and read
-# as a pass.
+# What they cannot see is a spec that runs a script which finds the
+# documents by itself. The lint drivers are such scripts, and lint-static
+# and doc-counts run them on every pull request.
+#
+# Fails when a spec cannot be read, and when no spec is listed: an empty
+# list would run nothing and read as a pass.
 
 set -euo pipefail
 export LC_ALL=C
@@ -33,35 +36,52 @@ export LC_ALL=C
 _DRS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
 readonly _DRS_DIR
 
-# The documentation names, as an ERE.
-readonly _DRS_DOC='(doc|README[A-Za-z.*-]*|CONTEXT\.md|LICENSE|CHANGELOG[A-Za-z.]*)'
+readonly _DRS_NAMES='(^|[^A-Za-z0-9_])doc(["'\''/[:space:]]|$)|\.md|README|CONTEXT|LICENSE|CHANGELOG'
+readonly _DRS_TREE='/source/?(["'\''[:space:]);&|}]|$|/\.|\.([[:space:]]|$)|\*)|BATS_TEST_DIRNAME\}?(/\.\.)+/?(["'\''[:space:]);]|$)'
 
-# _drs_reads_docs <spec> -- succeeds when a rule above lists <spec>.
-_drs_reads_docs() {
-  local _body _vars _ref
-  _body="$(grep -vE '^[[:space:]]*#' "$1")" || return 1
-  _ref='/source'
-  _vars="$(grep -oE '(^|[[:space:];])[A-Za-z_][A-Za-z0-9_]*="?/source"?([[:space:];]|$)' <<<"${_body}" \
-    | sed -E 's/^[[:space:];]*//; s/=.*//' | sort -u | paste -sd'|')"
-  [[ -z "${_vars}" ]] || _ref="(/source|\\$\{?(${_vars})\}?)"
-  grep -qE "${_ref}\"?/${_DRS_DOC}([^A-Za-z0-9_]|\$)" <<<"${_body}" && return 0
-  if [[ -n "${_vars}" ]] || grep -qE "cd[[:space:]]+(--[[:space:]]+)?\"?/source" <<<"${_body}"; then
-    grep -qE "(^|[[:space:]\"'=(])(\./)?(doc/|README[A-Za-z.-]*\.md|CONTEXT\.md)" <<<"${_body}" && return 0
-  fi
-  local _walk='(find|grep[[:space:]]+(-[A-Za-z-]+[[:space:]]+)*-[A-Za-z]*[rR][A-Za-z]*|ls-files|git[[:space:]]+grep)'
-  grep -qE "${_walk}.*[[:space:]\"']${_ref}/?([\"'[:space:]]|\$)" <<<"${_body}" && return 0
-  grep -qE "cd[[:space:]]+(--[[:space:]]+)?\"?${_ref}/?\"?([[:space:]]|;|&).*${_walk}" <<<"${_body}" && return 0
-  grep -qE "git[[:space:]]+-C[[:space:]]+\"?${_ref}/?\"?[[:space:]]+(grep|ls-files)" <<<"${_body}"
+# _drs_grep <ere> <text> -- grep's own answer, with a grep that could not
+#   read (2 or more) ending the run.
+_drs_grep() {
+  local _rc=0
+  grep -qE -- "$1" <<<"$2" || _rc=$?
+  ((_rc < 2)) || exit 3
+  return "${_rc}"
+}
+
+# _drs_body <file> -- its lines that are not comments.
+_drs_body() {
+  local _rc=0
+  grep -vE '^[[:space:]]*#' -- "$1" || _rc=$?
+  ((_rc < 2)) || exit 3
+}
+
+# _drs_reads <file> -- succeeds when <file> names a document or the tree.
+_drs_reads() {
+  local _body
+  _body="$(_drs_body "$1")" || exit 3
+  _drs_grep "${_DRS_NAMES}" "${_body}" || _drs_grep "${_DRS_TREE}" "${_body}"
 }
 
 main() {
-  local _root="${1:-${_DRS_DIR}/../..}" _spec _n=0
+  local _root="${1:-${_DRS_DIR}/../..}" _spec _helper _n=0 _d
   _root="$(cd -- "${_root}" && pwd -P)"
-  local _d
+  # The helpers that name a document, as an ERE of their names. Only rule 1:
+  # a helper's `/source` is how it finds the code it loads.
+  local _helpers="" _body
+  while IFS= read -r -d '' _helper; do
+    _body="$(_drs_body "${_helper}")" || exit 3
+    if _drs_grep "${_DRS_NAMES}" "${_body}"; then
+      _helper="${_helper##*/}"
+      _helpers+="${_helpers:+|}${_helper%.bash}"
+    fi
+  done < <(find "${_root}/test/bats" -type f -name '*.bash' -print0 | sort -z)
   for _d in unit integration; do
     [[ -d "${_root}/test/bats/${_d}" ]] || continue
     while IFS= read -r -d '' _spec; do
-      _drs_reads_docs "${_spec}" || continue
+      if ! _drs_reads "${_spec}"; then
+        [[ -n "${_helpers}" ]] || continue
+        _drs_grep "(^|[^A-Za-z0-9_])(${_helpers})([^A-Za-z0-9_]|\$)" "$(_drs_body "${_spec}")" || continue
+      fi
       printf '%s\n' "${_spec#"${_root}/"}"
       _n=$((_n + 1))
     done < <(find "${_root}/test/bats/${_d}" -type f -name '*_spec.bats' -print0 | sort -z)
