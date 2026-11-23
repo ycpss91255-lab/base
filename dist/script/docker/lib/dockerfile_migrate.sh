@@ -967,7 +967,7 @@ _dfm_needs_dl3006() {
 # shellcheck disable=SC2016
 _DFM_AWK_PRAGMA='
   function pragma(text) {
-    return text ~ /^[ \t]*#[ \t]*hadolint[ \t]+ignore[ \t]*=[ \t]*[A-Z0-9]/
+    return text ~ /^[ \t]*#[ \t]*hadolint[ \t]+ignore[ \t]*=[ \t]*[A-Z0-9]+([ \t]*,[ \t]*[A-Z0-9]+)*[ \t\r]*(#.*)?$/
   }
   function ignores(text, rule) {
     if (!pragma(text)) { return 0 }
