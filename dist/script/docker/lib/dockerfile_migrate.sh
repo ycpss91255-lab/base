@@ -1433,18 +1433,18 @@ _migrate_nounset_source_detect() {
 #   that belongs to it. One program for both, so they cannot disagree about
 #   which source is guarded.
 #
-#   The state starts on under base's orchestrator and off otherwise, and
-#   follows the `set` commands as written, in any spelling. A `set -u` ends
-#   a bracket only when it is not nested deeper than the `set +u` that opened
-#   it -- by indentation, or by standing inside `(`, `{` or a one-line
-#   `then` / `else` / `do`: whether that one runs is not known here. An
-#   unknown state is read as off, because leaving a source as the repo wrote
-#   it is the side that cannot break a working container.
+#   The state starts on -- detect has asked _dfm_entry_runs_under_nounset
+#   for the file -- and follows the `set` commands as written, in any
+#   spelling. A `set -u` ends a bracket only when it is not nested deeper
+#   than the `set +u` that opened it -- by indentation, or by standing inside
+#   `(`, `{` or a one-line `then` / `else` / `do`: whether that one runs is
+#   not known here. A bracket that may still be open is read as open, because
+#   leaving a source as the repo wrote it is the side that cannot break a
+#   working container.
 _dfm_nounset_scan() {
-  local _entry _on=0
+  local _entry
   _entry="$(_dfm_entrypoint_path "$2")"
-  if _dfm_bringup_on_orchestrator "$2" >/dev/null; then _on=1; fi
-  awk -v mode="$1" -v on="${_on}" '
+  awk -v mode="$1" '
     # +1 turns nounset on, -1 turns it off, 0 says nothing about it.
     function toggle(cmd,    n, w, k, r, way) {
       n = split(cmd, w, /[ \t]+/)
@@ -1467,8 +1467,9 @@ _dfm_nounset_scan() {
       return cmd
     }
     function command(cmd,    way) {
+      if (cmd ~ /^((fi|done|esac)([^A-Za-z0-9_]|$)|[})])/) { nested = 0 }
       way = toggle(cmd)
-      if (way < 0 && on) { on = 0; depth = indent + nested }
+      if (way < 0 && (on || indent + nested < depth)) { on = 0; depth = indent + nested }
       if (way > 0 && indent + nested <= depth) { on = 1 }
       if (cmd !~ ros) { return }
       seen = 1
@@ -1489,9 +1490,9 @@ _dfm_nounset_scan() {
       for (i = 1; i <= n; i++) { command(bared(part[i])) }
       # A path written across the separators above.
       if (!seen && was && $0 ~ ros) { bare = 1 }
-      if ($0 ~ /^[ \t]*\([^(].*\)[ \t]*$/) { leave() }
+      if ($0 ~ /^[ \t]*\([^(].*\)[ \t]*([;&|>#0-9].*)?$/) { leave() }
     }
-    BEGIN { on += 0; depth = 1000000; ros = "/opt/ros/.*setup[.]bash" }
+    BEGIN { on = 1; ros = "/opt/ros/.*setup[.]bash" }
     {
       bare = 0
       if ($0 !~ /^[ \t]*#/) { line() }
