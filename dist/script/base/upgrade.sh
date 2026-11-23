@@ -617,6 +617,31 @@ _check() {
   esac
 }
 
+# _workers_on_changed_lines <before> <after>
+#   The worker named by the `uses:` of each line that differs between two
+#   texts of the same length, sorted and space-separated on one line; nothing
+#   when there are none.
+#
+#   Compared line by line and not through `diff`, because diff's OUTPUT
+#   FORMAT is not a contract: GNU diff defaults to normal format (`> new`)
+#   and busybox diff -- what a consumer on Alpine has -- defaults to unified
+#   (`+new`). Reading `> ` out of it worked on the author's host and reported
+#   "nothing changed" over a file it had just rewritten four lines of. Nor as
+#   a set of lines: a line rewritten into text another job already has would
+#   not show up as new.
+_workers_on_changed_lines() {
+  local -a _old _new
+  local _i _names
+  local _key="^.*uses[\"']?[[:space:]]*:[[:space:]]*[\"']?"
+  mapfile -t _old <<< "${1}"
+  mapfile -t _new <<< "${2}"
+  _names="$(for _i in "${!_new[@]}"; do
+    [[ "${_old[_i]-}" == "${_new[_i]}" ]] || printf '%s\n' "${_new[_i]}"
+  done | sed -nE "s#${_key}[^[:space:]\"'@]*/([A-Za-z0-9._-]+\.ya?ml)@.*\$#\1#p" \
+    | sort -u | tr '\n' ' ')"
+  printf '%s' "${_names% }"
+}
+
 # ── Upgrade ──────────────────────────────────────────────────────────────────
 
 _upgrade() {
@@ -813,32 +838,35 @@ _upgrade() {
     # A ref still under the slug base was published from before the org was
     # renamed (BASE_UPSTREAM_RETIRED_RE) is moved to the current slug first,
     # path and ref untouched, so the line below then bumps it like any other.
-    # Only worker paths are moved: the anchor is the same
-    # `/.github/workflows/<file>.yaml@` shape, so a retired-org reference in
-    # a comment or a URL is left alone.
-    local _before
+    #
+    # Both lines are bounded on the LEFT by a `uses` key (quoted or not) and
+    # an optional quote, with nothing between that and the slug. Without it an
+    # owner whose name merely ends in the slug matched, and the line that
+    # moves the org turned that stranger's owner into one that does not
+    # exist. It also leaves a comment that records a ref without a `uses:` as
+    # it was written; a `uses:` that is itself commented out is still
+    # rewritten, so re-enabling it is safe.
+    local _before _relocated
     _before="$(cat "${main_yaml}")"
-    sed -i -E "s|${BASE_UPSTREAM_RETIRED_RE}(/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml@)|${BASE_UPSTREAM_SLUG}\1|g" "${main_yaml}"
-    sed -i -E "s|(${BASE_UPSTREAM_SLUG//./\\.}/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)@v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?|\1@${target_ver}|g" "${main_yaml}"
+    sed -i -E "s#((^|[^A-Za-z0-9_-])uses[\"']?[[:space:]]*:[[:space:]]*[\"']?)${BASE_UPSTREAM_RETIRED_RE}(/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml@)#\1${BASE_UPSTREAM_SLUG}\3#g" "${main_yaml}"
+    _relocated="$(cat "${main_yaml}")"
+    sed -i -E "s#((^|[^A-Za-z0-9_-])uses[\"']?[[:space:]]*:[[:space:]]*[\"']?${BASE_UPSTREAM_SLUG//./\\.}/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)@v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?#\1@${target_ver}#g" "${main_yaml}"
     # What the commit message says is read off what CHANGED, not restated
     # from the rule above. The old message asserted "workflow @tag updated to
     # <ver>" unconditionally, which was false on exactly the repos whose
     # unnamed worker ref it had just left behind -- and a line that cannot be
     # wrong reports nothing.
     #
-    # The comparison is `grep -Fxv -f` (the lines present now that were not
-    # present before) rather than `diff`, because diff's OUTPUT FORMAT is not
-    # a contract: GNU diff defaults to normal format (`> new`) and busybox
-    # diff -- what a consumer on Alpine has -- defaults to unified (`+new`).
-    # Reading `> ` out of it worked on the author's host and reported "nothing
-    # changed" over a file it had just rewritten four lines of.
-    local _moved
-    _moved="$(grep -Fxv -f <(printf '%s\n' "${_before}") "${main_yaml}" \
-      | sed -nE 's|^.*/([A-Za-z0-9._-]+\.ya?ml)@.*$|\1|p' \
-      | sort -u | tr '\n' ' ' || true)"
-    _moved="${_moved% }"
+    # Two things can change a ref, and only one of them is a bump: a ref that
+    # is not a release tag (`@main`) moves off the retired org and keeps its
+    # ref, so it is listed as moved and not as updated (base#2118).
+    local _bumped _moved
+    _bumped="$(_workers_on_changed_lines "${_relocated}" "$(cat "${main_yaml}")")"
+    _moved="$(_workers_on_changed_lines "${_before}" "${_relocated}")"
     _ref_note="no base workflow @ref needed updating"
-    [[ -n "${_moved}" ]] && _ref_note="@ref updated to ${target_ver} for ${_moved}"
+    [[ -n "${_bumped}" ]] && _ref_note="@ref updated to ${target_ver} for ${_bumped}"
+    [[ -n "${_moved}" ]] \
+      && _ref_note+=$'\n'"- main.yaml: moved to ${BASE_UPSTREAM_SLUG}: ${_moved}"
     git add "${main_yaml}"
   fi
 

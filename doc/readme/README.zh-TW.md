@@ -510,7 +510,7 @@ scaffold 一次，之後永不覆寫。可以放心編輯，跑 setup 也不會�
 <!-- sync: upgrading 56de8c94ebd2 e24746b65253 -->
 ## 升級
 
-<!-- sync: updating 562337ad3245 282bcf087ce7 -->
+<!-- sync: updating 7dbd50dcb844 c92317a15ab2 -->
 ### 更新
 
 前置條件：`git config user.name` / `user.email` 必須有設，working tree
@@ -549,7 +549,7 @@ just base upgrade v0.3.0
    `git rm --cached` 已經變成 derived artifact 的舊 tracked 檔
    （`.env.generated`、`compose.yaml`、…），最後呼叫 `setup.sh apply`
    重生 `.env.generated` + `compose.yaml`
-4. `sed` 改寫 `.github/workflows/main.yaml` 裡每一個
+4. `sed` 改寫 `.github/workflows/main.yaml` 的 `uses:` 行裡每一個
    `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref，連同步驟 3
    的變更一起 commit 為 `chore: update template references to <version>`
 5. `apply_migrations`（`lib/dockerfile_migrate.sh`）修補 **repo 根目錄的

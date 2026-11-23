@@ -538,7 +538,7 @@ override は `setup.toml` に書きます。
 <!-- sync: upgrading 56de8c94ebd2 629908638ad8 -->
 ## アップグレード
 
-<!-- sync: updating 562337ad3245 95ae1c21c28d -->
+<!-- sync: updating 7dbd50dcb844 a14bb0044301 -->
 ### 更新
 
 前提条件：`git config user.name` / `user.email` が設定済みで、working tree
@@ -581,7 +581,7 @@ repo で実行する前に
    canonical entry set に同期、derived artifact になった旧 tracked ファイル
    （`.env.generated`、`compose.yaml`、…）を `git rm --cached`、最後に
    `setup.sh apply` を呼んで `.env.generated` + `compose.yaml` を再生成
-4. `sed` で `.github/workflows/main.yaml` 内のすべての
+4. `sed` で `.github/workflows/main.yaml` の `uses:` 行にあるすべての
    `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref を更新し、
    手順 3 の変更と合わせて `chore: update template references to <version>`
    として commit

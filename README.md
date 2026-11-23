@@ -561,7 +561,7 @@ running it on a repo with a live field deployment. The numbered cycle:
    `.gitignore` against the canonical entry set, `git rm --cached` any
    tracked-but-now-derived files (`.env.generated`, `compose.yaml`, …), and
    call `setup.sh apply` to regenerate `.env.generated` + `compose.yaml`
-4. `sed` rewrites every
+4. `sed` rewrites, on `uses:` lines only, every
    `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref in
    `.github/workflows/main.yaml`, committed with step 3's changes as
    `chore: update template references to <version>`
