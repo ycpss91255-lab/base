@@ -2630,10 +2630,11 @@ if true; then set +u; fi\nsource /opt/ros/a/setup.bash\nset -u
 set +o posix +u\nsource /opt/ros/a/setup.bash\nset -u
 set +u\nsort -u /dev/null\nsource /opt/ros/a/setup.bash\nset -u
 set +u\n(\nset -u\n  set +u\n)\nif false; then\n  set -u\nfi\nsource /opt/ros/a/setup.bash\nset -u
+if true; then\n  set +u\nfi\nset +u\nif false; then\n  set -u\nfi\nsource /opt/ros/a/setup.bash\nset -u
 setup_ros() { set +u; source /opt/ros/a/setup.bash; set -u; }\nsetup_ros
 (set +u; source /opt/ros/a/setup.bash)
 EOF
-  [ "${_n}" -eq 20 ]
+  [ "${_n}" -eq 21 ]
 }
 
 # why: the direction that must not be lost. A bracket ends at its `set -u`,
@@ -2669,13 +2670,14 @@ if true; then\n  set +u\n  source /opt/ros/a/setup.bash\n  set -u\nfi\nsource /o
 (\n  set +u\n  source /opt/ros/a/setup.bash\n)\nsource /opt/ros/b/setup.bash
 source /opt/ros/a/setup.bash; set +u\nsource /opt/ros/b/setup.bash\nset -u
 if true; then\n  set +u\n  (set -u; :)\n  source /opt/ros/a/setup.bash\n  set -u\nfi\nsource /opt/ros/b/setup.bash
+set +u; if true; then . /opt/ros/a/setup.bash; fi; set -u\nsource /opt/ros/b/setup.bash
+set +u; { . /opt/ros/a/setup.bash; }; set -u\nsource /opt/ros/b/setup.bash
+set +u; for _x in 1; do . /opt/ros/a/setup.bash; done; set -u\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) || true\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) # quiet\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) 2>/dev/null\nsource /opt/ros/b/setup.bash
 EOF
-  [ "${_n}" -eq 13 ]
-
-  # Nounset turned on inside a block, with no bracket before it.
-  printf '%s\n' 'if true; then' '  set -u' 'fi' 'source /opt/ros/a/setup.bash' > "${TEMP_DIR}/script/entrypoint.sh"
-  run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
-  assert_success
+  [ "${_n}" -eq 19 ]
 
   # A path put together by a pipeline is a source too.
   printf '%s\n' 'set -eu' '. "$(ls -d /opt/ros/* | tail -n 1)/setup.bash"' > "${TEMP_DIR}/script/entrypoint.sh"
@@ -2683,31 +2685,29 @@ EOF
   assert_success
 }
 
-# why: base#2149 -- with nounset only turned on further down, the source runs
-# without it today, and the closing `set -u` would turn it on for everything
-# in between. Under the orchestrator the same file starts with nounset on.
-@test "migration 8 (nounset-source): a source before nounset is turned on is left alone (base#2149)" {
+# why: where a function body stands in the file says nothing about when it
+# runs. One written above the `set -u` is called below it.
+@test "migration 8 (nounset-source): a function written before nounset is turned on is still bracketed (base#2149)" {
   mkdir -p "${TEMP_DIR}/script"
   : > "${DF}"
   cat > "${TEMP_DIR}/script/entrypoint.sh" <<'EOF'
 #!/usr/bin/env bash
-source "/opt/ros/a/setup.bash"
+setup_ros() {
+  source /opt/ros/a/setup.bash
+}
 set -euo pipefail
+setup_ros
+echo end
 EOF
-  cp "${TEMP_DIR}/script/entrypoint.sh" "${TEMP_DIR}/ep.orig"
+  _m8_run
+  assert_failure
   run bash -c "$(_src); apply_migrations '${DF}'"
   assert_success
-  diff "${TEMP_DIR}/ep.orig" "${TEMP_DIR}/script/entrypoint.sh"
-
-  printf 'ENTRYPOINT ["/usr/local/lib/base/entrypoint.sh"]\n' > "${DF}"
-  run bash -c "$(_src); apply_migrations '${DF}'"
+  _m8_run
   assert_success
-  run cat "${TEMP_DIR}/script/entrypoint.sh"
-  assert_output '#!/usr/bin/env bash
-set +u
-source "/opt/ros/a/setup.bash"
-set -u
-set -euo pipefail'
+  assert_output $'sourced\nend'
+  run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
+  assert_failure
 }
 
 @test "migration 8 (nounset-source): detect false when no set -u in entrypoint (#579)" {
