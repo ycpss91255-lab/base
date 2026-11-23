@@ -689,6 +689,22 @@ _acceptance_code() {
   assert_output --partial 'needs: [actionlint, classify, test-tools-image-amd64]'
 }
 
+# why: In an unquoted YAML value a blank followed by `#` starts a comment, so
+# a name carrying an issue number is cut off there and the check list shows
+# half of it (base#2121)
+@test "self-test.yaml: no unquoted name: is cut short by a # (base#2121)" {
+  # Opening with a quote or a block indicator, the value is not a plain
+  # scalar and its `#` is text.
+  local _re="^[[:space:]]*(- )?name:[[:space:]]+[^\"'|>[:space:]].*[[:space:]]#"
+  run grep -cE "${_re}" <<< '    name: Smoke (gate, #1)'
+  assert_output "1"
+  run grep -cE "${_re}" <<< '    name: "Smoke (gate, #1)"'
+  assert_output "0"
+  run grep -nE "${_re}" "${WF}"
+  assert_failure 1
+  assert_output ''
+}
+
 # ── Conditional gating ───────────────────────────────────
 
 @test "self-test.yaml: bats-fragile job-level if: gates on classify's select_bats_fragile (#677, base#1584)" {
