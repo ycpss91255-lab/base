@@ -1490,7 +1490,7 @@ _dfm_nounset_scan() {
       for (i = 1; i <= n; i++) { command(bared(part[i])) }
       # A path written across the separators above.
       if (!seen && was && $0 ~ ros) { bare = 1 }
-      if ($0 ~ /^[ \t]*\([^(].*\)[ \t]*([;&|>#0-9].*)?$/) { leave() }
+      if ($0 ~ /^[ \t]*\([^(].*\)[ \t]*([;&|<>#0-9].*)?$/) { leave() }
     }
     BEGIN { on = 1; ros = "/opt/ros/.*setup[.]bash" }
     {
