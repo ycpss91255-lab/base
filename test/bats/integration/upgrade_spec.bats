@@ -214,6 +214,48 @@ _seed_downstream_repo() {
     || fail "the upgrade commit claims it rewrote ${_current}, which was already at the target:${_claim}"
 }
 
+# why: A ref that is not a release tag moves to the current org but is not
+# bumped, so a commit message that lists it as updated to the new version
+# records something that did not happen (base#2118)
+@test "upgrade.sh v0.9.7: the upgrade commit tells a moved org from a bumped @ref (base#2118)" {
+  cd "${DOWN_DIR}"
+  (( ${#DOWN_WORKERS[@]} >= 3 )) \
+    || skip "base ships fewer than three reusable workers; this arm needs one moved, one moved and bumped, one bumped"
+
+  # Assembled, so this file never spells the retired slug in one piece.
+  local _retired="ycpss91255-""docker/base"
+  local _moved="${DOWN_WORKERS[0]}" _both="${DOWN_WORKERS[1]}" _bumped="${DOWN_WORKERS[2]}"
+  sed -i \
+    -e "s|${BASE_UPSTREAM_SLUG}/.github/workflows/${_moved}@v0.9.5|${_retired}/.github/workflows/${_moved}@main|" \
+    -e "s|${BASE_UPSTREAM_SLUG}/.github/workflows/${_both}@v0.9.5|${_retired}/.github/workflows/${_both}@v0.9.5 # see ${BASE_UPSTREAM_SLUG}/.github/workflows/${_moved}@v0.1.0|" \
+    .github/workflows/main.yaml
+  # A second job already reads exactly what the moved line becomes: the move
+  # must be seen on its own line, not lost because that text was there before.
+  printf '  call-twin:\n    uses: %s/.github/workflows/%s@main\n' \
+    "${BASE_UPSTREAM_SLUG}" "${_moved}" >> .github/workflows/main.yaml
+  git add .github/workflows/main.yaml
+  git commit -q -m "two refs under the retired org, one of them @main"
+
+  run env TEMPLATE_REMOTE="file://${TMPL_BARE}" ./.base/dist/script/base/upgrade.sh v0.9.7
+  assert_success
+  grep -Fxq "    uses: ${BASE_UPSTREAM_SLUG}/.github/workflows/${_moved}@main" .github/workflows/main.yaml
+  grep -Fq "    uses: ${BASE_UPSTREAM_SLUG}/.github/workflows/${_both}@v0.9.7 # see " .github/workflows/main.yaml
+
+  # Padded with spaces and tested by membership, because one worker name is a
+  # substring of another (see the arm above).
+  local _bump_line _move_line
+  _bump_line=" $(git log -1 --format=%B | grep -m1 '^- main\.yaml: @ref updated to v0\.9\.7 for ' || true) "
+  _move_line=" $(git log -1 --format=%B | grep -m1 "^- main\.yaml: moved to ${BASE_UPSTREAM_SLUG}: " || true) "
+  [[ "${_bump_line}" == *" ${_both} "* && "${_bump_line}" == *" ${_bumped} "* ]] \
+    || fail "the bumped refs are not all named as bumped:${_bump_line}"
+  [[ "${_bump_line}" != *" ${_moved} "* ]] \
+    || fail "${_moved} stayed at @main but is named as bumped:${_bump_line}"
+  [[ "${_move_line}" == *" ${_moved} "* && "${_move_line}" == *" ${_both} "* ]] \
+    || fail "the refs moved off the retired org are not all named as moved:${_move_line}"
+  [[ "${_move_line}" != *" ${_bumped} "* ]] \
+    || fail "${_bumped} was never under the retired org but is named as moved:${_move_line}"
+}
+
 # ── Step 5: declarative Dockerfile/entrypoint migrations ───────
 # upgrade.sh Step 5 sources lib/dockerfile_migrate.sh and runs the
 # apply_migrations dispatcher over the repo-root Dockerfile (and its sibling

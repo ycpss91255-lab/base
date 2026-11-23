@@ -1678,6 +1678,84 @@ EOF
   rm -rf "${_tmp}"
 }
 
+# why: An owner whose name merely ENDS in the slug is a stranger, and the
+# rewrite of a retired ref replaces part of that name, so without a left
+# boundary it turns the stranger's owner into one that does not exist
+# (base#2118)
+@test "upgrade.sh main.yaml rewrite leaves an owner that only ends in the slug alone (base#2118)" {
+  local _tmp _yaml _retired _before
+  _tmp="$(mktemp -d)"
+  _yaml="${_tmp}/main.yaml"
+  _retired="ycpss91255-""docker/base"
+  cat > "${_yaml}" <<EOF
+jobs:
+  a:
+    uses: x${_retired}/.github/workflows/build-worker.yaml@v9.9.9
+  b:
+    uses: "my-${_retired}/.github/workflows/build-worker.yaml@v9.9.9"
+  c:
+    uses: xycpss91255-lab/base/.github/workflows/build-worker.yaml@v9.9.9
+  d:
+    uses: my.ycpss91255-lab/base/.github/workflows/build-worker.yaml@v9.9.9
+EOF
+  _before="$(cat "${_yaml}")"
+  _apply_main_yaml_rewrite "${_yaml}" v0.43.0-rc7
+
+  run cat "${_yaml}"
+  assert_output "${_before}"
+
+  rm -rf "${_tmp}"
+}
+
+# why: Only the value of a `uses:` is a ref an upgrade owns: a note that
+# records which ref a repo came from is the repo's own history, and rewriting
+# it makes the note false. A ref that is quoted, inline or commented out is
+# still a `uses:` and still moves (base#2118)
+@test "upgrade.sh main.yaml rewrite acts on inline uses: values only (base#2118)" {
+  local _tmp _yaml _retired _want
+  _tmp="$(mktemp -d)"
+  _yaml="${_tmp}/main.yaml"
+  _retired="ycpss91255-""docker/base"
+  cat > "${_yaml}" <<EOF
+# old: ${_retired}/.github/workflows/build-worker.yaml@v0.1.0
+# was: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.1.0
+# this job reuses: ${_retired}/.github/workflows/build-worker.yaml@v0.1.0
+jobs:
+  a:
+    uses: "${_retired}/.github/workflows/build-worker.yaml@v0.41.0"
+  b:
+    uses: 'ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.41.0'
+  c: {uses: ${_retired}/.github/workflows/publish-worker.yaml@v0.41.0}
+  # d:
+  #   uses: ${_retired}/.github/workflows/publish-worker.yaml@v0.41.0
+  e:
+    "uses": ${_retired}/.github/workflows/build-worker.yaml@v0.41.0
+  f:
+    uses : ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.41.0
+EOF
+  _want="# old: ${_retired}/.github/workflows/build-worker.yaml@v0.1.0
+# was: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.1.0
+# this job reuses: ${_retired}/.github/workflows/build-worker.yaml@v0.1.0
+jobs:
+  a:
+    uses: \"ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.43.0-rc7\"
+  b:
+    uses: 'ycpss91255-lab/base/.github/workflows/release-worker.yaml@v0.43.0-rc7'
+  c: {uses: ycpss91255-lab/base/.github/workflows/publish-worker.yaml@v0.43.0-rc7}
+  # d:
+  #   uses: ycpss91255-lab/base/.github/workflows/publish-worker.yaml@v0.43.0-rc7
+  e:
+    \"uses\": ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.43.0-rc7
+  f:
+    uses : ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.43.0-rc7"
+  _apply_main_yaml_rewrite "${_yaml}" v0.43.0-rc7
+
+  run cat "${_yaml}"
+  assert_output "${_want}"
+
+  rm -rf "${_tmp}"
+}
+
 # ════════════════════════════════════════════════════════════════════
 # build-worker.yaml: GHCR test-tools migration (D plan)
 # ════════════════════════════════════════════════════════════════════
