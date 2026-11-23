@@ -566,8 +566,8 @@ running it on a repo with a live field deployment. The numbered cycle:
    `.github/workflows/main.yaml` that directly follows a `uses:` on the same
    line (inside a comment too), committed with step 3's changes as
    `chore: update template references to <version>`. A base ref written any
-   other way is left as it is, and reported at the end unless it is in a
-   comment
+   other way is left as it is; outside a comment it is reported at the end
+   when it is still under the old org or at another release
 5. `apply_migrations` (`lib/dockerfile_migrate.sh`) heals the **repo-root
    `Dockerfile`** and **`script/entrypoint.sh`** where a base contract
    changed under them, and stages the result into the same commit as steps

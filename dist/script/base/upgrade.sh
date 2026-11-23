@@ -654,11 +654,13 @@ _workers_with_changed_ref() {
 }
 
 # _collect_left_worker_refs <main.yaml> <target version>
-#   Record in _UPGRADE_LEFT_REFS each base worker ref, comments aside, that
-#   is still under the retired slug or at another release after Step 4. The
-#   rewrite needs the ref directly behind its `uses:`; YAML also allows it on
-#   the next line, in a block scalar, or behind an anchor or a tag, and those
-#   are left to the user rather than guessed at.
+#   Record in _UPGRADE_LEFT_REFS the base worker refs that are still under
+#   the retired slug, or at another release, after Step 4. The rewrite needs
+#   the ref directly behind its `uses:`; YAML also allows it on the next
+#   line, in a block scalar, or behind an anchor or a tag, and those are left
+#   to the user rather than guessed at. Read as text: whatever follows a
+#   blank and a `#` counts as a comment, even inside a quoted value, and a
+#   ref in a value that is not a `uses:` is recorded too.
 _collect_left_worker_refs() {
   local _file="${1}" _target="${2}" _line _ref
   local _slugs="(${BASE_UPSTREAM_RETIRED_RE}|${BASE_UPSTREAM_SLUG//./\\.})"
@@ -682,7 +684,7 @@ _collect_left_worker_refs() {
 _warn_left_worker_refs() {
   (( ${#_UPGRADE_LEFT_REFS[@]} > 0 )) || return 0
   _log_warn upgrade upgrade_worker_refs_left \
-    "display=WARNING: ${#_UPGRADE_LEFT_REFS[@]} base worker ref(s) in .github/workflows/main.yaml could not be rewritten; set each to ${BASE_UPSTREAM_SLUG}/...@${1} by hand, or it keeps calling what it names now." \
+    "display=WARNING: ${#_UPGRADE_LEFT_REFS[@]} base worker ref(s) in .github/workflows/main.yaml are not at ${1} after the rewrite. If a job calls one, set it to ${BASE_UPSTREAM_SLUG}/...@${1} by hand, or the job keeps calling what it names now." \
     "count=${#_UPGRADE_LEFT_REFS[@]}"
   local _entry
   for _entry in "${_UPGRADE_LEFT_REFS[@]}"; do

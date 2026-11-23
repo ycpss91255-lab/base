@@ -538,7 +538,7 @@ override は `setup.toml` に書きます。
 <!-- sync: upgrading 56de8c94ebd2 629908638ad8 -->
 ## アップグレード
 
-<!-- sync: updating e31bfac6328d 188fea49ff23 -->
+<!-- sync: updating fd94f9918e1b 3a426a8863f9 -->
 ### 更新
 
 前提条件：`git config user.name` / `user.email` が設定済みで、working tree
@@ -585,8 +585,8 @@ repo で実行する前に
    ある（コメント内も含む）すべての
    `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref を更新し、
    手順 3 の変更と合わせて `chore: update template references to <version>`
-   として commit。それ以外の書き方の base ref はそのまま残し、コメント内の
-   ものを除いて最後に一覧表示します
+   として commit。それ以外の書き方の base ref はそのまま残し、コメント外で
+   旧 org または別バージョンのままのものを最後に一覧表示します
 5. `apply_migrations`（`lib/dockerfile_migrate.sh`）が、base contract の
    変更に追随できていない **repo ルートの `Dockerfile`** と
    **`script/entrypoint.sh`** を修復し、手順 3-4 と同じ commit に含めます

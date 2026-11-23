@@ -269,9 +269,9 @@ _seed_downstream_repo() {
 jobs:
   a:
     uses: ${_path}/${DOWN_WORKERS[0]}@v0.9.5 # reuses: other/x/.github/workflows/foo.yaml@v1
-  b: {uses: ${_path}/${DOWN_WORKERS[1]}@v0.9.5}, c: {uses: ${_path}/${DOWN_WORKERS[2]}@v0.9.5}
+  b: {uses: ${_path}/${DOWN_WORKERS[1]}@v0.9.5}, c: {uses: ${_path}/${DOWN_WORKERS[0]}@v0.9.5}
   d:
-    uses: ${_path}/${DOWN_WORKERS[2]}@v0.9.5
+    "uses" : '${_path}/${DOWN_WORKERS[2]}@v0.9.5'
   e:
     uses: ${_path}/${DOWN_WORKERS[3]}@v0.9.7
 EOF
@@ -320,7 +320,7 @@ EOF
 
   run env TEMPLATE_REMOTE="file://${TMPL_BARE}" ./.base/dist/script/base/upgrade.sh v0.9.7
   assert_success
-  assert_output --partial '2 base worker ref(s) in .github/workflows/main.yaml'
+  assert_output --partial '2 base worker ref(s) in .github/workflows/main.yaml are not at v0.9.7'
   assert_output --partial "main.yaml:5: ${_retired}/${_w}@main"
   assert_output --partial "main.yaml:7: ${_path}/${_w}@v0.9.5"
   refute_output --partial 'main.yaml:1:'
