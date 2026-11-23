@@ -32,6 +32,10 @@ setup() {
     "the upstream definition every consumer's .base/ resolves base through"
   # Spelled as an alternation so this file's own text never matches it.
   RETIRED_RE='ycpss91255-(docker|research)'
+  # Run output, editor and agent state: directories .gitignore lists, so a
+  # file lives in one untracked unless forced in. Held to that below.
+  IGNORED_DIRS=(log coverage coverage-shards multi_run .config-gen-bin
+    __pycache__ .prev-release .claude .vscode .idea)
 }
 
 # _scan_retired
@@ -45,13 +49,7 @@ _scan_retired() {
     --exclude-dir=.git \
     --exclude-dir=adr \
     --exclude-dir=changelog \
-    --exclude-dir=log \
-    --exclude-dir=coverage \
-    --exclude-dir=coverage-shards \
-    --exclude-dir=multi_run \
-    --exclude-dir=.config-gen-bin \
-    --exclude-dir=__pycache__ \
-    --exclude-dir=.prev-release \
+    "${IGNORED_DIRS[@]/#/--exclude-dir=}" \
     --exclude='.env' --exclude='.env.local' --exclude='.setup.conf.local' \
     --exclude='CLAUDE.md'
 }
