@@ -1646,7 +1646,7 @@ EOF
 # Heal the mechanical violations the fanout fixed by hand:
 #   DL3007  FROM bats/bats:latest / alpine:latest -> pinned tags
 #   DL3046  useradd -u -> useradd -l -u
-#   DL3003  RUN cd /lint && hadolint -> WORKDIR /lint + RUN hadolint
+#   DL3003  RUN cd /lint && hadolint gains an inline ignore
 #   DL3042  pip install -r -> pip install --no-cache-dir -r
 #   DL4006  alpine lint-tools stage gains SHELL ash -o pipefail
 #   DL3006  parameterized FROM ${BASE_IMAGE} gains an inline ignore
@@ -1672,15 +1672,72 @@ EOF
   grep -Fq 'useradd -l -u "${UID}"' "${DF}"
 }
 
-@test "migration 5 (hadolint): DL3003 cd /lint -> WORKDIR /lint + RUN (#567)" {
+# why: base#2150 -- the rewrite to `WORKDIR /lint` moved every later
+# instruction of the stage, and the image's own working directory, into
+# /lint: `RUN cd` ends with its line and WORKDIR does not. The line has to
+# keep running what it ran, so it is kept and the rule is answered beside
+# it. hadolint also looks for .hadolint.yaml in its working directory, so
+# the `cd` cannot be dropped for a path either.
+@test "migration 5 (hadolint): DL3003 answers RUN cd /lint without moving the stage (base#2150)" {
   cat > "${DF}" <<'EOF'
+FROM busybox AS devel-test
+WORKDIR /root/demo
+COPY Dockerfile /lint/Dockerfile
 RUN cd /lint && hadolint Dockerfile
+RUN echo "hadolint ignore=DL3059"
+  RUN  cd  /lint  &&  hadolint Dockerfile && cd / && ls
+RUN pwd
+EOF
+  run bash -c "$(_src); _migrate_hadolint_detect '${DF}' && _migrate_hadolint_apply '${DF}'"
+  assert_success
+  run cat "${DF}"
+  assert_output 'FROM busybox AS devel-test
+WORKDIR /root/demo
+COPY Dockerfile /lint/Dockerfile
+# hadolint ignore=DL3003
+RUN cd /lint && hadolint Dockerfile
+RUN echo "hadolint ignore=DL3059"
+  # hadolint ignore=DL3003
+  RUN  cd  /lint  &&  hadolint Dockerfile && cd / && ls
+RUN pwd'
+}
+
+# why: the migration pass runs on every upgrade, and a pragma binds to the
+# next line only, so one that is already there is extended, not displaced.
+@test "migration 5 (hadolint): DL3003 extends an existing pragma and settles (base#2150)" {
+  cat > "${DF}" <<'EOF'
+FROM busybox AS devel-test
+# hadolint ignore=DL3059
+RUN cd /lint && hadolint Dockerfile
+# hadolint ignore=DL3003,DL3059
+RUN cd /lint && hadolint Dockerfile.b
 EOF
   run bash -c "$(_src); _migrate_hadolint_apply '${DF}'"
   assert_success
-  grep -Fxq 'WORKDIR /lint' "${DF}"
-  grep -Fxq 'RUN hadolint Dockerfile' "${DF}"
-  refute grep -q 'cd /lint &&' "${DF}"
+  run cat "${DF}"
+  assert_output 'FROM busybox AS devel-test
+# hadolint ignore=DL3059,DL3003
+RUN cd /lint && hadolint Dockerfile
+# hadolint ignore=DL3003,DL3059
+RUN cd /lint && hadolint Dockerfile.b'
+  run bash -c "$(_src); _migrate_hadolint_detect '${DF}'"
+  assert_failure
+  cp "${DF}" "${DF}.before"
+  run bash -c "$(_src); apply_migrations '${DF}'"
+  assert_success
+  diff "${DF}.before" "${DF}"
+}
+
+# why: a Dockerfile already in the template's shape is the consumer's own
+# and stays as it is.
+@test "migration 5 (hadolint): WORKDIR /lint + RUN hadolint is left alone (base#2150)" {
+  printf '%s\n' 'FROM busybox AS devel-test' 'WORKDIR /lint' 'RUN hadolint Dockerfile' > "${DF}"
+  cp "${DF}" "${DF}.before"
+  run bash -c "$(_src); _migrate_hadolint_detect '${DF}'"
+  assert_failure
+  run bash -c "$(_src); apply_migrations '${DF}'"
+  assert_success
+  diff "${DF}.before" "${DF}"
 }
 
 @test "migration 5 (hadolint): DL3042 adds pip --no-cache-dir (#567)" {
