@@ -3177,7 +3177,7 @@ to escape.
 | `_sync_doc_counts: a second run over a generated catalogue changes nothing` | "Regenerating from scratch reproduces what is committed" is the gate check_test_md_drift.sh applies to the real tree, so a second run that moved a byte would make every branch red for a reason no diff explains. |
 | `_sync_doc_counts: a shipped smoke spec lands in smoke.md` | A shipped smoke spec is the one level whose glob leaves test/ for dist/, and it was the case that caught the doc-to-glob map going stale before. It stays because the map is still hand-written. |
 
-### test/bats/unit/dockerfile_migrate_spec.bats (181)
+### test/bats/unit/dockerfile_migrate_spec.bats (183)
 
 Unit tests for the declarative Dockerfile-migration list
 `lib/dockerfile_migrate.sh` (#567, folds #579 facet B). The lib exposes a
@@ -3249,6 +3249,8 @@ force-rewrite).
 | `migration (smoke-copy): a hand-listed COPY is rewritten the same under every awk (base#2138)` | base#2138 -- under mawk every shipped spec read as shipped at two paths, so a hand-listed COPY was left naming the deleted tree, the upgrade exited 0 and the consumer's next build failed. The input is the issue's. The two refusals are the control: they must stay refusals. |
 | `apply_migrations writes the same files and messages under every awk (base#2138)` | base#2138's inventory, kept as a test. Each awk program in the migration list runs under every engine over one old-layout repo; the files and the messages must be the same whichever awk the host has. |
 | `apply_migrations: a migration that changes nothing reports no patch (base#2138)` | base#2138 -- the line said a Dockerfile was patched when no byte had changed, so the one report of a failed rewrite read as a success. The warning that names the problem stays. |
+| `apply_migrations: an earlier migration's rewrite is not a later one's patch (base#2138)` | base#2138 -- the notice of one migration's rewrite is used up by it. Left pending, it would stand for a later migration that changed nothing. |
+| `apply_migrations: a run does not inherit a pending patch notice (base#2138)` | a run starts with no notice pending, whatever an earlier write in the same shell left behind. |
 | `apply_migrations: a file that changed is reported as patched, and only that file (base#2138)` | the other direction of the case above: a rewrite is still reported, once, and an entrypoint rewrite does not stand in for a Dockerfile one. |
 | `migration (repo-smoke-copy): rewrites the flat COPY into shared + the stage's own folder (#1044)` | Wholesale rewrite: shared baseline plus the enclosing stage folder |
 | `migration (repo-smoke-copy): emits only the shared baseline when the repo ships no stage folder (#1044)` | A stage the repo has no folder for gets no COPY of its own |

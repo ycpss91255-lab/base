@@ -1249,6 +1249,10 @@ $(diff <(printf '%s\n' "${_want}") <(printf '%s\n' "${_got}"))"
     [[ "${_want}" =~ matched\ \(([^\)]*) && " ${BASH_REMATCH[1]} " == *" ${_m} "* ]] \
       || fail "${_m} did not fire: ${_want}"
   done
+  # An awk-driven rewrite is reported, not only the sed-driven ones.
+  for _m in '(#567 m3)' '(#928)' '(#1044)' '(#971)' '(#567 m8'; do
+    grep -F ' patched: ' <<< "${_want}" | grep -qF -- "${_m}" || fail "no patched line ${_m}: ${_want}"
+  done
   run cat "${DF}"
   refute_output --partial ' .base/test/smoke'
   assert_output --partial 'useradd -l -m'
@@ -1286,6 +1290,32 @@ DOCKERFILE
   cmp "${DF}" "${DF}.before"
   refute_output --partial 'Dockerfile patched'
   assert_output --partial 'collapse it by hand'
+}
+
+# why: base#2138 -- the notice of one migration's rewrite is used up by it.
+# Left pending, it would stand for a later migration that changed nothing.
+@test "apply_migrations: an earlier migration's rewrite is not a later one's patch (base#2138)" {
+  mkdir -p "${TEMP_DIR}/.base/dist/test/bats/smoke/shared"
+  cat > "${DF}" <<'DOCKERFILE'
+FROM devel AS devel-test
+COPY .base/downstream/script/docker/lib /lint/lib
+COPY .base/test/smoke/retired.bats /smoke_test/
+DOCKERFILE
+  run bash -c "$(_src); apply_migrations '${DF}' 2>&1"
+  assert_success
+  assert_output --partial 'Dockerfile patched: .base/downstream/'
+  refute grep -F '(#928)' <<< "$(grep -F 'Dockerfile patched' <<< "${output}")"
+  assert_output --partial 'resolve it by hand (#928)'
+}
+
+# why: a run starts with no notice pending, whatever an earlier write in the
+# same shell left behind.
+@test "apply_migrations: a run does not inherit a pending patch notice (base#2138)" {
+  mkdir -p "${TEMP_DIR}/.base/dist/test/bats/smoke/shared"
+  printf '%s\n' 'FROM devel AS devel-test' 'COPY .base/test/smoke/retired.bats /smoke_test/' > "${DF}"
+  run bash -c "$(_src); _DFM_CHANGED=('${DF}'); apply_migrations '${DF}' 2>&1"
+  assert_success
+  refute_output --partial 'Dockerfile patched'
 }
 
 # why: the other direction of the case above: a rewrite is still reported,
