@@ -6937,7 +6937,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (162)
+### test/bats/unit/self_test_yaml_spec.bats (163)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7280,6 +7280,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: acceptance shards run on the matrix runner (#603)` | - |
 | `self-test.yaml: acceptance Obtain step pulls the matrix platform, not a hardcoded amd64 (#603)` | - |
 | `self-test.yaml: system job declares needs on actionlint AND classify (#317)` | - |
+| `self-test.yaml: no unquoted name: is cut short by a # (base#2121)` | In an unquoted YAML value a blank followed by `#` starts a comment, so a name carrying an issue number is cut off there and the check list shows half of it (base#2121) |
 | `self-test.yaml: bats-fragile job-level if: gates on classify's select_bats_fragile (#677, base#1584)` | - |
 | `self-test.yaml: no monolithic 'test:' job remains after #377 split` | - |
 | `self-test.yaml: acceptance job-level if: gates on classify's select_acceptance (#317, base#1584)` | #317 gated acceptance on code_changed. base#1584 narrows it to classify's map: the consumer gets the whole checkout (script/ci/acceptance.sh:90), so only docs and `*_spec.bats` leaves drop it, and a spec-only PR no longer pays for both arch legs. |
