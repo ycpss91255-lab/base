@@ -961,14 +961,31 @@ _dfm_needs_dl3006() {
   ' "${_file}"
 }
 
+# _DFM_AWK_PRAGMA
+#   awk functions reading a hadolint pragma as hadolint does: alone in its
+#   comment, with optional blanks around `=` and the commas.
+# shellcheck disable=SC2016
+_DFM_AWK_PRAGMA='
+  function pragma(text) {
+    return text ~ /^[ \t]*#[ \t]*hadolint[ \t]+ignore[ \t]*=[ \t]*[A-Z0-9]/
+  }
+  function ignores(text, rule) {
+    if (!pragma(text)) { return 0 }
+    match(text, /=[ \t]*[A-Z0-9]+([ \t]*,[ \t]*[A-Z0-9]+)*/)
+    return (substr(text, RSTART, RLENGTH) ",") ~ ("[=, \t]" rule "[, \t]")
+  }
+  function lint_run(text) {
+    return text ~ /^[ \t]*RUN[ \t]+cd[ \t]+\/lint[ \t]+&&[ \t]+hadolint[ \t]/
+  }
+'
+
 # _dfm_needs_dl3003 <file>
 #   True when a `RUN cd /lint && hadolint ...` is present whose preceding
 #   line does not already ignore DL3003.
 _dfm_needs_dl3003() {
   local _file="$1"
-  awk '
-    /^[[:space:]]*RUN[[:space:]]+cd[[:space:]]+\/lint[[:space:]]+&&[[:space:]]+hadolint[[:space:]]/ &&
-      prev !~ /hadolint ignore=[A-Za-z0-9,]*DL3003/ { found=1 }
+  awk "${_DFM_AWK_PRAGMA}"'
+    lint_run($0) && !ignores(prev, "DL3003") { found=1 }
     { prev=$0 }
     END { exit (found ? 0 : 1) }
   ' "${_file}"
@@ -1066,27 +1083,18 @@ _migrate_hadolint_apply() {
   if _dfm_needs_dl3003 "${_file}"; then
     local _tmp3003
     _tmp3003="$(mktemp)"
-    awk '
-      function flush(  ) { if (have) { print held; have = 0 } }
-      {
-        if ($0 ~ /^[[:space:]]*RUN[[:space:]]+cd[[:space:]]+\/lint[[:space:]]+&&[[:space:]]+hadolint[[:space:]]/) {
-          if (have && held ~ /^[[:space:]]*#.*hadolint ignore=/) {
-            if (held !~ /hadolint ignore=[A-Za-z0-9,]*DL3003/) {
-              sub(/hadolint ignore=[A-Za-z0-9,]+/, "&,DL3003", held)
-            }
-          } else {
-            flush()
-            match($0, /^[[:space:]]*/)
-            print substr($0, 1, RLENGTH) "# hadolint ignore=DL3003"
-          }
-          flush()
-          print
-          next
-        }
+    awk "${_DFM_AWK_PRAGMA}"'
+      function flush() { if (have) { print held; have = 0 } }
+      lint_run($0) && pragma(held) && !ignores(held, "DL3003") {
+        sub(/=[ \t]*[A-Z0-9]+/, "&,DL3003", held)
+      }
+      lint_run($0) && !pragma(held) {
         flush()
-        held = $0
+        match($0, /^[ \t]*/)
+        held = substr($0, 1, RLENGTH) "# hadolint ignore=DL3003"
         have = 1
       }
+      { flush(); held = $0; have = 1 }
       END { flush() }
     ' "${_file}" > "${_tmp3003}"
     _dfm_install "${_file}" "${_tmp3003}"
