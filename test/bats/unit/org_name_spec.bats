@@ -83,6 +83,33 @@ ${ROOT}/doc/changelog"
   refute_output --partial '/doc/adr/'
 }
 
+# why: A checkout can hold untracked editor and agent state, whole stale
+# worktrees under .claude included; reporting a name found there fails a
+# local run over files that are not in the tree (base#2119)
+@test "org name: the scan passes over ignored editor and agent state (base#2119)" {
+  ROOT="${BATS_TEST_TMPDIR}/tree"
+  local _stale="ycpss91255-""docker/base" _dir
+  for _dir in .claude/worktrees/x .vscode .idea dist/claude; do
+    mkdir -p "${ROOT}/${_dir}"
+    printf '%s\n' "${_stale}" > "${ROOT}/${_dir}/stale.txt"
+  done
+  run _scan_retired
+  assert_success
+  assert_output "${ROOT}/dist/claude/stale.txt:1:${_stale}"
+}
+
+# why: A directory may be passed over because git ignores it and for no other
+# reason; an excluded name .gitignore does not list could be a tracked
+# directory, and the scan would silently stop covering it (base#2119)
+@test "org name: every excluded run or editor directory is one .gitignore lists (base#2119)" {
+  local _dir
+  (( ${#IGNORED_DIRS[@]} > 0 )) || fail "IGNORED_DIRS is empty, so this checks nothing"
+  for _dir in "${IGNORED_DIRS[@]}"; do
+    grep -qxF -e "${_dir}" -e "${_dir}/" "${ROOT}/.gitignore" \
+      || fail "${_dir} is excluded from the scan but .gitignore does not list it"
+  done
+}
+
 # why: The live tree names only the current org: no file outside the
 # historical record carries a retired one.
 @test "org name: the tree outside the historical record names no retired org (base#2106)" {
