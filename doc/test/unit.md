@@ -5513,7 +5513,7 @@ list of job names.
 | `obtain: --artifact without TEST_TOOLS_ARTIFACT_TAG is a usage error, never loaded (base#1588)` | base#1588. The loaded image is found by the run-scoped tag the builder gave it, TEST_TOOLS_ARTIFACT_TAG. A caller that passes an artifact without that tag would re-tag an empty name, so it is a usage error, refused before the tar is touched. |
 | `workflows: no job obtains the rolling test-tools tag by hand (#1010)` | The structural half of the same defect, and the half that stops it recurring. While the decision was shell pasted into each consuming job, nothing could tell a job that probes from a job that does not -- no single copy looked wrong, and the one without a probe read like the others. A job that reaches the rolling tag without going through the script is that copy, whoever writes it next. |
 
-### test/bats/unit/org_name_spec.bats (3)
+### test/bats/unit/org_name_spec.bats (5)
 
 The org was renamed and the old names no longer resolve, so a retired org
 name anywhere in the shipped or tested tree is a clone, an action call or an
@@ -5525,6 +5525,8 @@ cache output a run leaves behind.
 |------|-------------|
 | `org name: only doc/adr and doc/changelog are named adr or changelog (base#2106)` | The exemption is the historical record and nothing else -- an exclusion that also matched a live directory named the same would hide exactly what this spec looks for. |
 | `org name: the scan reports a retired name it is shown (base#2106)` | The scan itself must be able to find a hit, or a green result says nothing: a fixture tree carrying one retired name has to be reported with its path. |
+| `org name: the scan passes over ignored editor and agent state (base#2119)` | A checkout can hold untracked editor and agent state, whole stale worktrees under .claude included; reporting a name found there fails a local run over files that are not in the tree (base#2119) |
+| `org name: every excluded run or editor directory is one .gitignore lists (base#2119)` | A directory may be passed over because git ignores it and for no other reason; an excluded name .gitignore does not list could be a tracked directory, and the scan would silently stop covering it (base#2119) |
 | `org name: the tree outside the historical record names no retired org (base#2106)` | The live tree names only the current org: no file outside the historical record carries a retired one. |
 
 ### test/bats/unit/per_test_timeout_spec.bats (8)
