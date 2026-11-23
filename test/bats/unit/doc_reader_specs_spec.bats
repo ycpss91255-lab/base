@@ -105,6 +105,21 @@ exec "'"$(command -v grep)"'" "$@"'
   assert_failure
 }
 
+# why: a suite that cannot be walked is specs nobody listed, whichever of
+# the walks fails.
+@test "doc_reader_specs: a tree it cannot walk fails the list (base#2110)" {
+  local _real _part
+  _real="$(command -v find)"
+  _spec unit/a_spec.bats "cat ${SRC}/doc/a.md"
+  _spec integration/b_spec.bats "cat ${SRC}/doc/a.md"
+  for _part in '.bash ' '/test/bats/unit ' '/test/bats/integration '; do
+    mock_cmd find 'case "$* " in *"'"${_part}"'"*) exit 1 ;; esac
+exec "'"${_real}"'" "$@"'
+    run bash "${LIST_SH}" "${TREE}"
+    assert_failure || fail "with find failing on ${_part}"
+  done
+}
+
 # why: an empty list would run nothing and read as a pass.
 @test "doc_reader_specs: no listed spec is a failure (base#2110)" {
   _spec unit/a_spec.bats 'true'

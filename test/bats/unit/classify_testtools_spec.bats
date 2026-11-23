@@ -124,7 +124,7 @@ _classify_pr() {
   (
     cd "${_d}" || return 2
     env EVENT_NAME=pull_request BASE_REF=main IS_FORK_PR="${CLASSIFY_IS_FORK-false}" \
-        BASE_IS_DEFAULT="${CLASSIFY_BASE_DEFAULT-true}" \
+        DEFAULT_BRANCH="${CLASSIFY_DEFAULT_BRANCH-main}" \
         GITHUB_OUTPUT="${BATS_TEST_TMPDIR}/out" bash "${BATS_TEST_TMPDIR}/step.sh"
   ) >/dev/null 2>"${BATS_TEST_TMPDIR}/step.err"
   cat "${BATS_TEST_TMPDIR}/out"
@@ -390,16 +390,17 @@ release"
 # why: base#2110. A pull request into any other branch can be retargeted at
 # the default branch without a new run, so its diff against the other branch
 # would stand for the one that merges. Only a pull request into the default
-# branch is narrowed, and not knowing is not being one.
+# branch is narrowed, and not knowing is not being one. A branch whose name
+# differs only in case is another branch (GitHub's own == ignores case).
 @test "classify: a pull request not known to target the default branch selects every gated job (base#2110)" {
   local _v
-  for _v in false ''; do
-    CLASSIFY_BASE_DEFAULT="${_v}" run _classify_pr doc/x.md
+  for _v in other Main ''; do
+    CLASSIFY_DEFAULT_BRANCH="${_v}" run _classify_pr doc/x.md
     assert_success
     _assert_keys "${output}" true
   done
-  run yq '.jobs.classify.steps[] | select(.id == "diff") | .env.BASE_IS_DEFAULT' "${SELF_WF}"
-  assert_output "\${{ github.event_name == 'pull_request' && github.base_ref == github.event.repository.default_branch }}"
+  run yq '.jobs.classify.steps[] | select(.id == "diff") | .env.DEFAULT_BRANCH' "${SELF_WF}"
+  assert_output "\${{ github.event.repository.default_branch }}"
 }
 
 # _pr_shadows_base_with_a_tag -- the PR side changes code, and a tag named

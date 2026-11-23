@@ -1624,7 +1624,7 @@ reads the output the step writes.
 | `classify: a docs-only pull request writes every gated job's selection as false (base#1584)` | cycle 21 (RR3-F1). A docs path selects nothing: the map's doc row is the code_changed allow-list (doc/**, README.md, LICENSE, CONTEXT.md). The base commit holds a real copy of /source/script, so the real map and deny list are read from the base through `git show`. Each value is exact: a classify that never carries a `false` through fails here. |
 | `classify: a pull request changing one unit spec selects coverage and the code checks only (base#1584)` | cycle 22 (RR3-F1). A unit spec is a leaf (row E1): coverage and the code checks run; config-gen, acceptance, system and worker-selftest do not. |
 | `classify: a fork pull request, or one not known to be same-repo, selects every gated job (base#2110)` | base#2110. A fork's pull request is never narrowed: classify answers `true` for every key, and so does a run that cannot say whether it is a fork. |
-| `classify: a pull request not known to target the default branch selects every gated job (base#2110)` | base#2110. A pull request into any other branch can be retargeted at the default branch without a new run, so its diff against the other branch would stand for the one that merges. Only a pull request into the default branch is narrowed, and not knowing is not being one. |
+| `classify: a pull request not known to target the default branch selects every gated job (base#2110)` | base#2110. A pull request into any other branch can be retargeted at the default branch without a new run, so its diff against the other branch would stand for the one that merges. Only a pull request into the default branch is narrowed, and not knowing is not being one. A branch whose name differs only in case is another branch (GitHub's own == ignores case). |
 | `classify: a tag named like the base branch does not stand in for it (base#2110)` | base#2110. `origin/main` as a bare name resolves to a tag of that name before the remote branch, so a pushed tag could stand in for the base. The step names the remote branch in full. |
 | `classify: a pull request's own selection_at_base.sh does not judge it (base#2110)` | base#2110. The script that runs the base side's map is read from the base too: one read from the pull request could answer without the map. |
 | `classify: a base map that fails or leaves a job out selects it (base#1584)` | cycle 23. A selection that exits non-zero gave no answer, and a line the selection leaves out is no `false`: classify writes `true` for both, and keeps the map's own values for every line it did print. |
@@ -3189,7 +3189,7 @@ to escape.
 | `_sync_doc_counts: a second run over a generated catalogue changes nothing` | "Regenerating from scratch reproduces what is committed" is the gate check_test_md_drift.sh applies to the real tree, so a second run that moved a byte would make every branch red for a reason no diff explains. |
 | `_sync_doc_counts: a shipped smoke spec lands in smoke.md` | A shipped smoke spec is the one level whose glob leaves test/ for dist/, and it was the case that caught the doc-to-glob map going stale before. It stays because the map is still hand-written. |
 
-### test/bats/unit/doc_reader_specs_spec.bats (6)
+### test/bats/unit/doc_reader_specs_spec.bats (7)
 
 A documentation-only pull request skips coverage, the one job that runs
 these specs, so a doc edit that breaks one was first seen in the merge
@@ -3203,6 +3203,7 @@ listing.
 | `doc_reader_specs: a helper that names a document lists the specs that load it (base#2110)` | a helper's read is a read by every spec that loads it. |
 | `doc_reader_specs: a comment, another part of the tree and a system spec are not listed (base#2110)` | a comment, a name that only contains a document's and another part of the checkout are not reads of a document, so the list does not grow into the whole suite. The system suite needs a docker socket and is never listed. |
 | `doc_reader_specs: a spec it cannot read fails the list (base#2110)` | a spec that cannot be read is not known to leave the documents alone. |
+| `doc_reader_specs: a tree it cannot walk fails the list (base#2110)` | a suite that cannot be walked is specs nobody listed, whichever of the walks fails. |
 | `doc_reader_specs: no listed spec is a failure (base#2110)` | an empty list would run nothing and read as a pass. |
 | `doc_reader_specs: the real tree's known document readers are listed, and each path exists (base#2110)` | the list over the real tree. Each of these specs opens a document of the checkout (read from its body), so a rule that stops seeing one of them fails here. The list may hold more. |
 
