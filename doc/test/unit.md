@@ -3177,7 +3177,7 @@ to escape.
 | `_sync_doc_counts: a second run over a generated catalogue changes nothing` | "Regenerating from scratch reproduces what is committed" is the gate check_test_md_drift.sh applies to the real tree, so a second run that moved a byte would make every branch red for a reason no diff explains. |
 | `_sync_doc_counts: a shipped smoke spec lands in smoke.md` | A shipped smoke spec is the one level whose glob leaves test/ for dist/, and it was the case that caught the doc-to-glob map going stale before. It stays because the map is still hand-written. |
 
-### test/bats/unit/dockerfile_migrate_spec.bats (177)
+### test/bats/unit/dockerfile_migrate_spec.bats (182)
 
 Unit tests for the declarative Dockerfile-migration list
 `lib/dockerfile_migrate.sh` (#567, folds #579 facet B). The lib exposes a
@@ -3324,6 +3324,11 @@ force-rewrite).
 | `migration 8 (nounset-source): brackets the ROS source with set +u/-u (#579)` | - |
 | `migration 8 (nounset-source): the rewritten entrypoint keeps its exact mode under umask 077 (base#1323)` | _dfm_install lands the awk output with mv, so the rewritten file would carry the mktemp's 0600 instead of the original's mode -- a committed entrypoint must keep exactly its mode, executable or not. Several modes under a restrictive umask (077) so a hardcoded 0755 or a umask-derived mode cannot pass (base#1323). |
 | `migration 8 (nounset-source): idempotent — already-guarded source untouched (#579)` | - |
+| `migration 8 (nounset-source): one bracket around several sources is left alone (base#2149)` | base#2149 -- ros1_bridge's shape. The `set -u` written between the sources turned nounset back on inside the repo's own bracket, and the container died in the file sourced after it. |
+| `migration 8 (nounset-source): only the bare source of a mixed file is bracketed (base#2149)` | base#2149 -- apply skipped a guard whose source carries a shellcheck directive, so it bracketed the guarded source a second time. |
+| `migration 8 (nounset-source): every spelling of a bracket is read as one (base#2149)` | base#2149 -- a bracket is whatever turns nounset off, not the one spelling on the line above. Each body is guarded as written. |
+| `migration 8 (nounset-source): a source after the bracket ends is still bracketed (base#2149)` | the direction that must not be lost. A bracket ends at its `set -u`, and a source after it is bare whatever was guarded above. |
+| `migration 8 (nounset-source): a source before nounset is turned on is left alone (base#2149)` | base#2149 -- with nounset only turned on further down, the source runs without it today, and the closing `set -u` would turn it on for everything in between. Under the orchestrator the same file starts with nounset on. |
 | `migration 8 (nounset-source): detect false when no set -u in entrypoint (#579)` | - |
 | `migration 8 (nounset-source): fires under the orchestrator when the bringup sets nothing (#945)` | The gap the branch's own README migration opens. Keying the guard on an in-file `set -u` covers nothing here -- the bringup seeded before this release has no `set` line at all, and the orchestrator imposes nounset from outside it. This is the FAILS-at-HEAD case; without it the migration stays silent on exactly the path base tells people to take |
 | `migration 8 (nounset-source): brackets that bringup's source, directive and all (#945)` | Detecting is half of it; the write has to be correct for a file that never set nounset itself. The trailing `set -u` must RESTORE the mode the orchestrator was already in, which is checked by re-running detect on the rewritten file rather than by eyeballing the diff |
