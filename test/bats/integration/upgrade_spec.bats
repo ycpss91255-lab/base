@@ -256,6 +256,84 @@ _seed_downstream_repo() {
     || fail "${_bumped} was never under the retired org but is named as moved:${_move_line}"
 }
 
+# why: The message names what changed, so it has to read the ref that changed:
+# a comment behind it, or a second ref on the same line, must not stand in for
+# it, and a worker two jobs call is still one worker (base#2118)
+@test "upgrade.sh v0.9.7: the upgrade commit names every bumped worker and no other (base#2118)" {
+  cd "${DOWN_DIR}"
+  (( ${#DOWN_WORKERS[@]} >= 4 )) \
+    || skip "base ships fewer than four reusable workers; this arm needs three bumped and one already current"
+
+  local _path="${BASE_UPSTREAM_SLUG}/.github/workflows"
+  cat > .github/workflows/main.yaml <<EOF
+jobs:
+  a:
+    uses: ${_path}/${DOWN_WORKERS[0]}@v0.9.5 # reuses: other/x/.github/workflows/foo.yaml@v1
+  b: {uses: ${_path}/${DOWN_WORKERS[1]}@v0.9.5}, c: {uses: ${_path}/${DOWN_WORKERS[2]}@v0.9.5}
+  d:
+    uses: ${_path}/${DOWN_WORKERS[2]}@v0.9.5
+  e:
+    uses: ${_path}/${DOWN_WORKERS[3]}@v0.9.7
+EOF
+  git add .github/workflows/main.yaml
+  git commit -q -m "refs sharing a line with something else"
+
+  run env TEMPLATE_REMOTE="file://${TMPL_BARE}" ./.base/dist/script/base/upgrade.sh v0.9.7
+  assert_success
+  refute_output --partial 'base worker ref(s)'
+
+  local _want
+  _want="$(printf '%s\n' "${DOWN_WORKERS[@]:0:3}" | sort -u | tr '\n' ' ')"
+  run bash -c "git log -1 --format=%B | grep '^- main\.yaml:'"
+  assert_output "- main.yaml: @ref updated to v0.9.7 for ${_want% }"
+}
+
+# why: A ref the rewrite cannot reach stays at an org that no longer resolves,
+# or at the old release. Exiting 0 over it and recording that nothing needed
+# updating hides a job that will fail on the next run (base#2118)
+@test "upgrade.sh v0.9.7: a worker ref the rewrite cannot reach is reported (base#2118)" {
+  cd "${DOWN_DIR}"
+  local _retired="ycpss91255-""docker/base/.github/workflows"
+  local _path="${BASE_UPSTREAM_SLUG}/.github/workflows" _w="${DOWN_WORKERS[0]}"
+  cat > .github/workflows/main.yaml <<EOF
+# was: ${_retired}/${_w}@v0.1.0
+jobs:
+  a:
+    uses:
+      ${_retired}/${_w}@main
+  b:
+    uses: &w ${_path}/${_w}@v0.9.5
+  c:
+    uses: !!str "${_path}/${_w}@v0.9.7" # was ${_path}/${_w}@v0.9.5
+  d:
+    uses:
+      my-${_path}/${_w}@v0.9.5
+  e:
+    uses: &m ${_path}/${_w}@main
+  f:
+    uses: ${_retired}/${_w}@main
+EOF
+  git add .github/workflows/main.yaml
+  git commit -q -m "refs the rewrite cannot reach"
+  local _before
+  _before="$(cat .github/workflows/main.yaml)"
+
+  run env TEMPLATE_REMOTE="file://${TMPL_BARE}" ./.base/dist/script/base/upgrade.sh v0.9.7
+  assert_success
+  assert_output --partial '2 base worker ref(s) in .github/workflows/main.yaml'
+  assert_output --partial "main.yaml:5: ${_retired}/${_w}@main"
+  assert_output --partial "main.yaml:7: ${_path}/${_w}@v0.9.5"
+  refute_output --partial 'main.yaml:1:'
+  refute_output --partial 'main.yaml:9:'
+  refute_output --partial 'main.yaml:12:'
+  refute_output --partial 'main.yaml:14:'
+  # Job f is the one ref within reach, and it moves without a bump.
+  [ "$(cat .github/workflows/main.yaml)" = "${_before/uses: ${_retired}/uses: ${_path}}" ]
+  run bash -c "git log -1 --format=%B | grep '^- main\.yaml:'"
+  assert_output "- main.yaml: no base workflow @ref was updated
+- main.yaml: moved to ${BASE_UPSTREAM_SLUG}: ${_w}"
+}
+
 # ── Step 5: declarative Dockerfile/entrypoint migrations ───────
 # upgrade.sh Step 5 sources lib/dockerfile_migrate.sh and runs the
 # apply_migrations dispatcher over the repo-root Dockerfile (and its sibling
