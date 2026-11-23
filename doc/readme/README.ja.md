@@ -538,7 +538,7 @@ override は `setup.toml` に書きます。
 <!-- sync: upgrading 56de8c94ebd2 629908638ad8 -->
 ## アップグレード
 
-<!-- sync: updating 7dbd50dcb844 a14bb0044301 -->
+<!-- sync: updating e31bfac6328d 188fea49ff23 -->
 ### 更新
 
 前提条件：`git config user.name` / `user.email` が設定済みで、working tree
@@ -581,10 +581,12 @@ repo で実行する前に
    canonical entry set に同期、derived artifact になった旧 tracked ファイル
    （`.env.generated`、`compose.yaml`、…）を `git rm --cached`、最後に
    `setup.sh apply` を呼んで `.env.generated` + `compose.yaml` を再生成
-4. `sed` で `.github/workflows/main.yaml` の `uses:` 行にあるすべての
+4. `sed` で `.github/workflows/main.yaml` のうち、同じ行の `uses:` の直後に
+   ある（コメント内も含む）すべての
    `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref を更新し、
    手順 3 の変更と合わせて `chore: update template references to <version>`
-   として commit
+   として commit。それ以外の書き方の base ref はそのまま残し、コメント内の
+   ものを除いて最後に一覧表示します
 5. `apply_migrations`（`lib/dockerfile_migrate.sh`）が、base contract の
    変更に追随できていない **repo ルートの `Dockerfile`** と
    **`script/entrypoint.sh`** を修復し、手順 3-4 と同じ commit に含めます

@@ -561,10 +561,13 @@ running it on a repo with a live field deployment. The numbered cycle:
    `.gitignore` against the canonical entry set, `git rm --cached` any
    tracked-but-now-derived files (`.env.generated`, `compose.yaml`, …), and
    call `setup.sh apply` to regenerate `.env.generated` + `compose.yaml`
-4. `sed` rewrites, on `uses:` lines only, every
+4. `sed` rewrites every
    `ycpss91255-lab/base/.github/workflows/<file>@vX.Y.Z` ref in
-   `.github/workflows/main.yaml`, committed with step 3's changes as
-   `chore: update template references to <version>`
+   `.github/workflows/main.yaml` that directly follows a `uses:` on the same
+   line (inside a comment too), committed with step 3's changes as
+   `chore: update template references to <version>`. A base ref written any
+   other way is left as it is, and reported at the end unless it is in a
+   comment
 5. `apply_migrations` (`lib/dockerfile_migrate.sh`) heals the **repo-root
    `Dockerfile`** and **`script/entrypoint.sh`** where a base contract
    changed under them, and stages the result into the same commit as steps
