@@ -530,7 +530,7 @@ teardown() {
   # fails. Clear the whole ambient dispatch so this exercises the full-gate
   # branch (lint, then the suite) the test is named for.
   run env LOG_FORMAT=json BATS_ONLY=0 BATS_FILE= BATS_FILTER= \
-    BATS_UNIT_SHARD= BATS_FRAGILE=0 BATS_INTEGRATION=0 \
+    BATS_UNIT_SHARD= BATS_FRAGILE=0 DOC_READERS=0 BATS_INTEGRATION=0 \
     COVERAGE=0 COVERAGE_PATH= COVERAGE_SHARD= LINT_ONLY=0 bash -c '
     source /source/script/test/test.sh
     set -eo pipefail
@@ -3190,7 +3190,7 @@ _kcov_slice_mock() {
     # (No apostrophes in this block: it lives inside a single-quoted
     # bash -c string, where one ends the program.)
     COVERAGE=1 COVERAGE_SHARD=1/4 COVERAGE_PATH= COVERAGE_LOCAL_JOBS= \
-      BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 BATS_INTEGRATION=0 \
+      BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 DOC_READERS=0 BATS_INTEGRATION=0 \
       BATS_FILE= BATS_FILTER= LINT_ONLY=0 LINT_TOOL= LINT_GROUP= PER_TEST_TIMEOUT= \
       COVERAGE_JOBS= SHARD_WEIGHTS_BLOB= main --ci
   '
@@ -4064,7 +4064,7 @@ $(bash /source/script/ci/doc_reader_specs.sh /source | sed 's|^|/source/|')"
     # flight. LINT_ONLY earns its place too -- set, it returns from this
     # dispatch before the coverage branch is read.
     COVERAGE=1 COVERAGE_PATH=test/bats/unit/ci_spec.bats COVERAGE_SHARD= \
-      COVERAGE_LOCAL_JOBS= BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 \
+      COVERAGE_LOCAL_JOBS= BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 DOC_READERS=0 \
       BATS_INTEGRATION=0 BATS_FILE= BATS_FILTER= LINT_ONLY=0 LINT_TOOL= LINT_GROUP= PER_TEST_TIMEOUT= \
       COVERAGE_JOBS= SHARD_WEIGHTS_BLOB= \
       main --ci
@@ -5137,9 +5137,8 @@ _host_direct_lint_arms() {
   # back into the dispatcher.
   local _fn
   for _fn in _run_unit_tests _run_integration_tests _run_unit_shard \
-             _run_bats_fragile _run_doc_readers _run_bats_path _run_system \
-             _run_coverage \
-             _bats_args_with_label; do
+             _run_bats_fragile _run_doc_readers _run_bats_path \
+             _run_system _run_coverage _bats_args_with_label; do
     run grep -E "^${_fn}\(\) \{" /source/script/test/drivers/bats.sh
     assert_success
     run grep -E "^${_fn}\(\) \{" /source/script/test/test.sh
