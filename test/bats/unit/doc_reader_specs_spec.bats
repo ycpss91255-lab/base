@@ -13,6 +13,7 @@ bats_require_minimum_version 1.5.0
 
 setup() {
   load "${BATS_TEST_DIRNAME}/test_helper"
+  create_mock_dir
   LIST_SH=/source/script/ci/doc_reader_specs.sh
   # Spelled in two parts so this file's fixtures are not read as a
   # reference to the checkout itself.
@@ -28,9 +29,10 @@ _spec() {
   printf '%s\n' '#!/usr/bin/env bats' "$@" > "${_p}"
 }
 
-# why: each way a spec can reach a live document, by the document's kind:
-# a literal path, a variable holding the checkout, a glob, a directory, a
-# relative path after entering the tree, and a walk of the whole tree.
+# why: each way a spec can reach a live document. The list is decided by
+# what is named, not by how the checkout's root is spelled, because a spec
+# can spell the root in any number of ways: a document name anywhere lists
+# the spec, and so does the whole tree used as one argument.
 @test "doc_reader_specs: every way of reading a live document lists the spec (base#2110)" {
   local -a _lines=(
     "run cat ${SRC}/doc/guide/a.md"
@@ -39,37 +41,68 @@ _spec() {
     "[ -f ${SRC}/LICENSE ]"
     "for f in ${SRC}/doc/readme/README.*.md; do"
     "[ -d ${SRC}/doc ]"
-    "done < <(find ${SRC} -name '*.md')"
+    "done < <(find ${SRC} -name '*.txt')"
     "run grep -rlF x ${SRC}"
-    "run git -C \"${SRC}\" grep -n x \"${SRC}\""
+    "run grep --recursive x '${SRC}'"
+    "run git -C \"${SRC}\" ls-files"
+    "cd ${SRC} && git ls-files"
+    "pushd ${SRC}"
+    "cp -a ${SRC}/. x"
+    "for f in ${SRC}/*; do"
+    "root=\"\${X:-${SRC}}\""
+    "run cat \"\${BATS_TEST_DIRNAME}/../../../doc/guide/a.md\""
+    "root=\"\$(cd \"\${BATS_TEST_DIRNAME}/../../..\" && pwd)\""
+    "for f in \"\${A}\"/**/*.md; do"
+    "for n in LICENSE setup; do [ -f \"${SRC}/\${n}\" ]; done"
+    "run cat ${SRC}/./doc/a.txt"
+    "run changelog CHANGELOG"
   )
   local _i
   for _i in "${!_lines[@]}"; do
     _spec "unit/r${_i}_spec.bats" "${_lines[${_i}]}"
   done
-  _spec unit/var_spec.bats "  REPO=${SRC}" '  run cat "${REPO}/doc/adr/1.md"'
-  _spec unit/walk_spec.bats "  ROOT=\"${SRC}\"" '  run find "${ROOT}" -type f'
   _spec unit/cd_spec.bats "cd ${SRC}" 'run cat README.md'
   _spec integration/i_spec.bats "cat ${SRC}/doc/a.md"
   _spec unit/sub/nested_spec.bats "cat ${SRC}/doc/a.md"
   run bash "${LIST_SH}" "${TREE}"
   assert_success
-  assert_output "$(cd "${TREE}" && find test/bats/unit test/bats/integration -name '*_spec.bats' | LC_ALL=C sort | sed -n '/unit/p')
+  assert_output "$(cd "${TREE}" && find test/bats/unit -name '*_spec.bats' | LC_ALL=C sort)
 test/bats/integration/i_spec.bats"
 }
 
-# why: a comment, a fixture's own doc path and another part of the checkout
-# are not reads of a document, so the list does not grow into the whole
-# suite. The system suite needs a docker socket and is never listed.
-@test "doc_reader_specs: a comment, a fixture path, another tree and a system spec are not listed (base#2110)" {
+# why: a helper's read is a read by every spec that loads it.
+@test "doc_reader_specs: a helper that names a document lists the specs that load it (base#2110)" {
+  printf '%s\n' "cat ${SRC}/doc/a.md" > "${TREE}/test/bats/unit/reads_helper.bash"
+  printf '%s\n' "true" > "${TREE}/test/bats/unit/plain_helper.bash"
+  _spec unit/a_spec.bats 'load "${BATS_TEST_DIRNAME}/reads_helper"'
+  _spec unit/b_spec.bats 'load "${BATS_TEST_DIRNAME}/plain_helper"'
+  run bash "${LIST_SH}" "${TREE}"
+  assert_success
+  assert_output test/bats/unit/a_spec.bats
+}
+
+# why: a comment, a name that only contains a document's and another part of
+# the checkout are not reads of a document, so the list does not grow into
+# the whole suite. The system suite needs a docker socket and is never
+# listed.
+@test "doc_reader_specs: a comment, another part of the tree and a system spec are not listed (base#2110)" {
   _spec unit/reader_spec.bats "cat ${SRC}/doc/a.md"
   _spec unit/comment_spec.bats "# reads ${SRC}/doc/a.md"
-  _spec unit/fixture_spec.bats 'cat "${SCRATCH}/doc/a.md"'
-  _spec unit/code_spec.bats "cat ${SRC}/script/ci/doctor.sh ${SRC}/docs"
+  _spec unit/code_spec.bats "cat ${SRC}/script/ci/doctor.sh ${SRC}/script/docker/lib/x.sh \${A}/docs"
   _spec system/s_spec.bats "cat ${SRC}/doc/a.md"
   run bash "${LIST_SH}" "${TREE}"
   assert_success
   assert_output test/bats/unit/reader_spec.bats
+}
+
+# why: a spec that cannot be read is not known to leave the documents alone.
+@test "doc_reader_specs: a spec it cannot read fails the list (base#2110)" {
+  _spec unit/reader_spec.bats "cat ${SRC}/doc/a.md"
+  _spec unit/unreadable_spec.bats 'true'
+  mock_cmd grep 'case "$*" in *unreadable_spec*) exit 2 ;; esac
+exec "'"$(command -v grep)"'" "$@"'
+  run bash "${LIST_SH}" "${TREE}"
+  assert_failure
 }
 
 # why: an empty list would run nothing and read as a pass.
@@ -91,9 +124,10 @@ test/bats/integration/i_spec.bats"
   for _s in adr_doc_claims changelog_entry_lint compose_emit/overlay_guard \
             coverage_badge doc_counts init org_name publish_worker_yaml \
             readme_file_table readme_sync release_notes self_test_yaml \
-            template triage_label_yaml; do
+            template tool_pins triage_label_yaml; do
     assert_line "test/bats/unit/${_s}_spec.bats"
   done
+  assert_line test/bats/integration/init_existing_repo_signals_spec.bats
   while IFS= read -r _s; do
     assert [ -f "/source/${_s}" ]
   done <<<"${output}"

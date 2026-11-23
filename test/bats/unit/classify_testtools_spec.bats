@@ -124,6 +124,7 @@ _classify_pr() {
   (
     cd "${_d}" || return 2
     env EVENT_NAME=pull_request BASE_REF=main IS_FORK_PR="${CLASSIFY_IS_FORK-false}" \
+        BASE_IS_DEFAULT="${CLASSIFY_BASE_DEFAULT-true}" \
         GITHUB_OUTPUT="${BATS_TEST_TMPDIR}/out" bash "${BATS_TEST_TMPDIR}/step.sh"
   ) >/dev/null 2>"${BATS_TEST_TMPDIR}/step.err"
   cat "${BATS_TEST_TMPDIR}/out"
@@ -384,6 +385,54 @@ release"
   done
   run yq '.jobs.classify.steps[] | select(.id == "diff") | .env.IS_FORK_PR' "${SELF_WF}"
   assert_output "\${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}"
+}
+
+# why: base#2110. A pull request into any other branch can be retargeted at
+# the default branch without a new run, so its diff against the other branch
+# would stand for the one that merges. Only a pull request into the default
+# branch is narrowed, and not knowing is not being one.
+@test "classify: a pull request not known to target the default branch selects every gated job (base#2110)" {
+  local _v
+  for _v in false ''; do
+    CLASSIFY_BASE_DEFAULT="${_v}" run _classify_pr doc/x.md
+    assert_success
+    _assert_keys "${output}" true
+  done
+  run yq '.jobs.classify.steps[] | select(.id == "diff") | .env.BASE_IS_DEFAULT' "${SELF_WF}"
+  assert_output "\${{ github.event_name == 'pull_request' && github.base_ref == github.event.repository.default_branch }}"
+}
+
+# _pr_shadows_base_with_a_tag -- the PR side changes code, and a tag named
+# like the base's remote branch points at that code.
+_pr_shadows_base_with_a_tag() {
+  printf 'x\n' > zz-code.sh
+  git add zz-code.sh
+  git commit -q -m code
+  git tag origin/main
+}
+
+# why: base#2110. `origin/main` as a bare name resolves to a tag of that name
+# before the remote branch, so a pushed tag could stand in for the base. The
+# step names the remote branch in full.
+@test "classify: a tag named like the base branch does not stand in for it (base#2110)" {
+  CLASSIFY_PR_HOOK=_pr_shadows_base_with_a_tag run _classify_pr doc/x.md
+  assert_success
+  _assert_keys "${output}" true
+}
+
+# _pr_edits_selection_at_base -- the PR side's selection_at_base.sh answers
+# `false` for every job.
+_pr_edits_selection_at_base() {
+  printf '%s\n' 'for j in $(bash script/ci/check_selection.sh --jobs); do echo "$j=false"; done' \
+    > script/ci/selection_at_base.sh
+}
+
+# why: base#2110. The script that runs the base side's map is read from the
+# base too: one read from the pull request could answer without the map.
+@test "classify: a pull request's own selection_at_base.sh does not judge it (base#2110)" {
+  CLASSIFY_PR_HOOK=_pr_edits_selection_at_base run _classify_pr doc/x.md
+  assert_success
+  _assert_keys "${output}" true
 }
 
 # _base_map_fails -- the base side's map exits 1.

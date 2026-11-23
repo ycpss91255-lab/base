@@ -239,6 +239,51 @@ _commit() {
   _assert_all_selected no_merge_base
 }
 
+# why: base#2110. With two merge bases the three-dot diff is taken from one
+# of them, so it can hide a change the merge would make (a pull request that
+# holds a commit already on the base and its revert, seen from a criss-cross
+# history). More than one merge base selects every job.
+@test "check_selection: more than one merge base selects every gated job with its reason (base#2110)" {
+  _scratch_repo
+  git checkout -q -b side
+  printf 'side\n' > doc/side.md
+  _commit side
+  git checkout -q main
+  printf 'x\n' > script/ci/x.sh
+  _commit code
+  git checkout -q -b one main
+  git -c user.name=t -c user.email=t@t merge -q --no-edit side
+  git checkout -q side
+  git -c user.name=t -c user.email=t@t merge -q --no-edit main
+  git rm -q script/ci/x.sh
+  _commit revert
+  git branch -q -f main one
+  [ "$(git merge-base --all main HEAD | wc -l)" -eq 2 ]
+  run bash -c "bash '${SELECTION_SH}' --event pull_request --base main 2>&1"
+  _assert_all_selected many_merge_bases
+}
+
+# why: base#2110. `ignore = all` in .gitmodules hides a submodule's new
+# commit from a plain diff, so the diff must ask for it.
+@test "check_selection: a submodule bump hidden by .gitmodules selects every gated job (base#2110)" {
+  _scratch_repo
+  local _a _b
+  _a="$(git rev-parse HEAD)"
+  printf '[submodule "s"]\n\tpath = s\n\turl = ./s\n\tignore = all\n' > .gitmodules
+  git add .gitmodules
+  git update-index --add --cacheinfo "160000,${_a},s"
+  git -c user.name=t -c user.email=t@t commit -q -m sub
+  _b="$(git rev-parse HEAD)"
+  git checkout -q -b case
+  printf 'more\n' >> doc/seed.md
+  git add doc/seed.md
+  git update-index --cacheinfo "160000,${_b},s"
+  git -c user.name=t -c user.email=t@t commit -q -m bump
+  run _diff_select
+  assert_success
+  assert_output "$(_expect all)"
+}
+
 # why: cycle 20. A deny list that exits non-zero or prints nothing cannot
 # say which paths config-gen ignores, so nothing may be dropped.
 @test "check_selection: an unreadable deny list selects every gated job (base#1584)" {
