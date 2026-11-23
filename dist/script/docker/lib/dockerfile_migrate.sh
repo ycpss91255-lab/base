@@ -321,6 +321,7 @@ migrated_files() {
 apply_migrations() {
   local _file="${1:?apply_migrations requires a Dockerfile path}"
   _DFM_TOUCHED=()
+  _DFM_CHANGED=()
 
   if [[ ! -f "${_file}" ]]; then
     _log_info upgrade dockerfile_migration_skipped "display=  no Dockerfile at ${_file} — skip migrations"
@@ -1728,8 +1729,8 @@ _dfm_smoke_rewrite() {
         b = spec[j]
         sub(/.*\//, "", b)
         # A basename at two paths cannot be resolved from the name alone.
-        # Two statements: in one assignment mawk creates seen[b] before it
-        # evaluates `b in seen`, so every name read as a duplicate
+        # Two statements: in one assignment mawk and busybox create seen[b]
+        # before they evaluate `b in seen`, so every name read as a duplicate
         # (base#2138).
         if (b in seen) { seen[b] = "?" } else { seen[b] = spec[j] }
       }
