@@ -1728,6 +1728,36 @@ RUN cd /lint && hadolint Dockerfile.b'
   diff "${DF}.before" "${DF}"
 }
 
+# why: hadolint allows spaces around every part of a pragma, and one it
+# cannot parse ignores nothing. Prose that mentions a pragma is not one.
+@test "migration 5 (hadolint): DL3003 reads a pragma the way hadolint does (base#2150)" {
+  local _before _after _n=0
+  while IFS='|' read -r _before _after; do
+    printf '%s\n' 'FROM busybox AS devel-test' "${_before}" 'RUN cd /lint && hadolint Dockerfile' > "${DF}"
+    run bash -c "$(_src); apply_migrations '${DF}'"
+    assert_success
+    run cat "${DF}"
+    assert_output "FROM busybox AS devel-test
+$(printf '%b' "${_after}")
+RUN cd /lint && hadolint Dockerfile" || fail "from: ${_before}"
+    run bash -c "$(_src); _migrate_hadolint_detect '${DF}'"
+    assert_failure || fail "not settled: ${_before}"
+    (( ++_n ))
+  done <<'EOF'
+# hadolint ignore=DL3059, DL3003|# hadolint ignore=DL3059, DL3003
+# hadolint ignore=DL3003 , DL3059|# hadolint ignore=DL3003 , DL3059
+# hadolint ignore=DL3059, DL3025|# hadolint ignore=DL3059,DL3003, DL3025
+# hadolint ignore = DL3059|# hadolint ignore = DL3059,DL3003
+#  hadolint  ignore= DL3059|#  hadolint  ignore= DL3059,DL3003
+# hadolint ignore=DL3059 # not DL3003|# hadolint ignore=DL3059,DL3003 # not DL3003
+# hadolint ignore=DL30031|# hadolint ignore=DL30031,DL3003
+# see hadolint ignore=DL3003|# see hadolint ignore=DL3003\n# hadolint ignore=DL3003
+# hadolint global ignore=DL3059|# hadolint global ignore=DL3059\n# hadolint ignore=DL3003
+RUN echo "hadolint ignore=DL3003"|RUN echo "hadolint ignore=DL3003"\n# hadolint ignore=DL3003
+EOF
+  [ "${_n}" -eq 10 ]
+}
+
 # why: a Dockerfile already in the template's shape is the consumer's own
 # and stays as it is.
 @test "migration 5 (hadolint): WORKDIR /lint + RUN hadolint is left alone (base#2150)" {
