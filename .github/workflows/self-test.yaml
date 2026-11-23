@@ -697,7 +697,11 @@ jobs:
     # gate predict this job.
     needs: [actionlint, classify, test-tools-image-amd64]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45, for the documentation specs a docs-only pull request runs here
+    # (base#2110): the weights of run 45085075243 give them 5092 of the
+    # suite's 9305 kcov seconds, about 35 minutes at that run's parallelism,
+    # and a plain run is shorter. The count gate alone takes under a minute.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v7
