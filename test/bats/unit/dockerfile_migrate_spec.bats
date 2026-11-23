@@ -2668,8 +2668,14 @@ if true; then\n  set +u\n  source /opt/ros/a/setup.bash\n  set -u\nfi\nsource /o
 (set +u; source /opt/ros/a/setup.bash)\nsource /opt/ros/b/setup.bash
 (\n  set +u\n  source /opt/ros/a/setup.bash\n)\nsource /opt/ros/b/setup.bash
 source /opt/ros/a/setup.bash; set +u\nsource /opt/ros/b/setup.bash\nset -u
+if true; then\n  set +u\n  (set -u; :)\n  source /opt/ros/a/setup.bash\n  set -u\nfi\nsource /opt/ros/b/setup.bash
 EOF
-  [ "${_n}" -eq 12 ]
+  [ "${_n}" -eq 13 ]
+
+  # Nounset turned on inside a block, with no bracket before it.
+  printf '%s\n' 'if true; then' '  set -u' 'fi' 'source /opt/ros/a/setup.bash' > "${TEMP_DIR}/script/entrypoint.sh"
+  run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
+  assert_success
 
   # A path put together by a pipeline is a source too.
   printf '%s\n' 'set -eu' '. "$(ls -d /opt/ros/* | tail -n 1)/setup.bash"' > "${TEMP_DIR}/script/entrypoint.sh"
