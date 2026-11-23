@@ -242,7 +242,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
           IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-          BASE_IS_DEFAULT: ${{ github.event_name == 'pull_request' && github.base_ref == github.event.repository.default_branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         # `-e` is intentionally omitted. The `test` job is the only branch-
         # protection-required check, and the chain `test needs classify`
         # means any non-zero exit here blocks every PR merge (Q4 fail-closed
@@ -349,7 +349,8 @@ jobs:
           # cannot say it is neither (base#2110).
           sel_event="${EVENT_NAME}"
           [[ "${IS_FORK_PR:-}" == "false" ]] || sel_event=fork_pull_request
-          [[ "${BASE_IS_DEFAULT:-}" == "true" ]] || sel_event=other_base_pull_request
+          [[ -n "${DEFAULT_BRANCH:-}" && "${BASE_REF}" == "${DEFAULT_BRANCH}" ]] \
+            || sel_event=other_base_pull_request
           sel_out=""
           if sel_sh="$(git show "${BASE}:script/ci/selection_at_base.sh")"; then
             sel_out="$(bash -c "${sel_sh}" sel --base "${BASE}" \

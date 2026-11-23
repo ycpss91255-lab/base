@@ -27,7 +27,7 @@
 # documents by itself. The lint drivers are such scripts, and lint-static
 # and doc-counts run them on every pull request.
 #
-# Fails when a spec cannot be read, and when no spec is listed: an empty
+# Fails when a spec cannot be read or a suite cannot be walked, and when no spec is listed: an empty
 # list would run nothing and read as a pass.
 
 set -euo pipefail
@@ -46,6 +46,14 @@ _drs_grep() {
   grep -qE -- "$1" <<<"$2" || _rc=$?
   ((_rc < 2)) || exit 3
   return "${_rc}"
+}
+
+# _drs_find <dir> <name glob> -- the files below <dir>, sorted; fails when
+#   the walk does.
+_drs_find() {
+  local _found
+  _found="$(find "$1" -type f -name "$2" -print)" || return 1
+  [[ -z "${_found}" ]] || sort <<<"${_found}"
 }
 
 # _drs_body <file> -- its lines that are not comments.
@@ -67,24 +75,29 @@ main() {
   _root="$(cd -- "${_root}" && pwd -P)"
   # The helpers that name a document, as an ERE of their names. Only rule 1:
   # a helper's `/source` is how it finds the code it loads.
-  local _helpers="" _body
-  while IFS= read -r -d '' _helper; do
+  local _helpers="" _body _files
+  _files="$(_drs_find "${_root}/test/bats" '*.bash')" || exit 3
+  while IFS= read -r _helper; do
+    [[ -n "${_helper}" ]] || continue
     _body="$(_drs_body "${_helper}")" || exit 3
     if _drs_grep "${_DRS_NAMES}" "${_body}"; then
       _helper="${_helper##*/}"
       _helpers+="${_helpers:+|}${_helper%.bash}"
     fi
-  done < <(find "${_root}/test/bats" -type f -name '*.bash' -print0 | sort -z)
+  done <<<"${_files}"
   for _d in unit integration; do
     [[ -d "${_root}/test/bats/${_d}" ]] || continue
-    while IFS= read -r -d '' _spec; do
+    _files="$(_drs_find "${_root}/test/bats/${_d}" '*_spec.bats')" || exit 3
+    while IFS= read -r _spec; do
+      [[ -n "${_spec}" ]] || continue
       if ! _drs_reads "${_spec}"; then
         [[ -n "${_helpers}" ]] || continue
-        _drs_grep "(^|[^A-Za-z0-9_])(${_helpers})([^A-Za-z0-9_]|\$)" "$(_drs_body "${_spec}")" || continue
+        _body="$(_drs_body "${_spec}")" || exit 3
+        _drs_grep "(^|[^A-Za-z0-9_])(${_helpers})([^A-Za-z0-9_]|\$)" "${_body}" || continue
       fi
       printf '%s\n' "${_spec#"${_root}/"}"
       _n=$((_n + 1))
-    done < <(find "${_root}/test/bats/${_d}" -type f -name '*_spec.bats' -print0 | sort -z)
+    done <<<"${_files}"
   done
   ((_n > 0)) || {
     printf 'doc_reader_specs: no spec under %s reads documentation\n' "${_root}/test/bats" >&2
