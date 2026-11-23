@@ -515,6 +515,32 @@ _run_bats_fragile() {
     "${_pools[@]}"
 }
 
+# ── documentation-reading specs ────────────────────────────────────────
+
+_run_doc_readers() {
+  # Run the specs that read the checkout's documentation in PLAIN mode, for
+  # the doc-counts job of a docs-only pull request: those specs run only
+  # inside coverage, which such a pull request skips (base#2110). A list
+  # that fails or is empty runs nothing and fails.
+  local _list
+  _list="$(bash "${REPO_ROOT}/script/ci/doc_reader_specs.sh" "${REPO_ROOT}")" \
+    || _die ci_doc_readers_unlisted \
+    "script/ci/doc_reader_specs.sh failed, so which specs read documentation is unknown and none ran."
+  [[ -n "${_list}" ]] || _die ci_doc_readers_unlisted \
+    "script/ci/doc_reader_specs.sh listed no spec, so no documentation check ran."
+  local -a _specs=()
+  local _spec
+  while IFS= read -r _spec; do
+    _specs+=("${REPO_ROOT}/${_spec}")
+  done <<<"${_list}"
+  local -a _bats_args
+  local _label
+  _bats_args_with_label _bats_args _label
+  echo "--- Running the specs that read documentation (plain; ${_label}) ---"
+  printf '  spec:%s\n' "${_specs[@]}"
+  bats "${_bats_args[@]}" "${_specs[@]}"
+}
+
 # _junit_case_pairs <junit_xml> <mode>
 #   Echo one `<testsuite>\t<testcase>` line per test case in a bats junit
 #   report, sorted and unique. <mode> `skipped` keeps only the cases that
