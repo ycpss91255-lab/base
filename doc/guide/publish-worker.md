@@ -53,8 +53,8 @@ jobs:
 
 A run may call the worker once per variant, as above: each call keeps its
 intermediate digest artifacts apart by `registry`, `image_name` and
-`tag_suffix`. Two calls in one run that share all three would publish the same
-tag, and their artifact names collide.
+`tag_suffix`. Two calls in one run must not share all three: they would
+publish the same tag, and their artifacts collide or mix.
 
 ### Tag contract
 

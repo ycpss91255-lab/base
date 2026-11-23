@@ -365,8 +365,9 @@ jobs:
   # and it is attached last.
   # ────────────────────────────────────────────────────────────────
   merge:
-    # `compute-matrix` is needed for its matrix, not for its ordering:
-    # `runs-on` below reads it. `publish` is the real predecessor.
+    # `compute-matrix` is needed for what it derives, not for its ordering:
+    # `runs-on` below reads its matrix and the download its artifact key.
+    # `publish` is the real predecessor.
     needs: [compute-matrix, publish]
     # DERIVED FROM THE MATRIX, not pinned to a hosted label. This job now
     # RUNS an image, and a runner can only run its own architecture, so

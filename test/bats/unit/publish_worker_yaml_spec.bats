@@ -724,10 +724,15 @@ _confirm_step_for() {
   assert_output --partial 'REGISTRY: ${{ inputs.registry }}'
   assert_output --partial 'IMAGE: ${{ inputs.image_name }}'
   assert_output --partial 'SUFFIX: ${{ inputs.tag_suffix }}'
+  run _artifact_key_for ghcr.io ros_distro -noetic
+  assert_success
+  assert_output --regexp '^[0-9a-f]{16}$'
   local _job
   for _job in publish merge; do
     run yaml_job_lines "${WF}" "${_job}"
-    assert_output --regexp 'needs: .*compute-matrix'
+    # One line at a time: across lines the read of the output below would
+    # itself satisfy this.
+    assert_line --regexp '^    needs: (compute-matrix|\[.*compute-matrix.*\])$'
     assert_output --partial 'needs.compute-matrix.outputs.artifact_key'
   done
 }
