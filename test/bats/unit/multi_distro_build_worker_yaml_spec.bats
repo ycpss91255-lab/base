@@ -291,8 +291,8 @@ readonly _SINGLE='[{"name":"humble","build_args":"ROS2_DISTRO=humble"}]'
   assert_success
   assert_output --partial 'EVENT_NAME: ${{ github.event_name }}'
   assert_output --partial '"${EVENT_NAME}" == "pull_request"'
-  assert_output --partial 'matrix=${PR_MATRIX}'
-  assert_output --partial 'matrix=${TAG_MATRIX}'
+  assert_output --partial 'PR_MATRIX: ${{ inputs.pr_matrix }}'
+  assert_output --partial 'TAG_MATRIX: ${{ inputs.tag_matrix }}'
 }
 
 # why: base#2160. app/ros1_bridge writes tag_matrix as a block scalar, and the
