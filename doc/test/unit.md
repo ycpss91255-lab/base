@@ -5168,7 +5168,7 @@ directory is a no-op).
 | `_run_lint_tools: the lint phase reaches the moving-tag driver and fails on an added test-tools:latest (base#1647)` | A driver nothing calls passes every test above and gates nothing: `just test lint`, the lint-static CI groups and the host --<tool>-only arm all go through test.sh's _LINT_TOOLS table and its dispatch case. The scratch tree carries a copy of test.sh and what it sources, so its REPO_ROOT is the scratch tree and the phase scans the fixture, not the live checkout. |
 | `test.sh --moving-tag-only: runs the moving-tag driver on the host and fails on an added test-tools:latest (base#1647)` | The host arm is the other entry point the help text and CI's dedicated-job check name; it must run the same driver. main is what `bash test.sh --moving-tag-only` runs once the source guard passes. |
 
-### test/bats/unit/multi_distro_build_worker_yaml_spec.bats (17)
+### test/bats/unit/multi_distro_build_worker_yaml_spec.bats (23)
 
 Structural assertions for `.github/workflows/multi-distro-build-worker.yaml`
 (#325 B-1 dispatcher, extended to N-D matrix-mode via #344 in v0.32.0). The
@@ -5178,11 +5178,11 @@ dispatcher fans a per-event `include`-shape matrix across
 copy-pasting a `${{ github.event_name == 'pull_request' && ... || ... }}`
 expression. Three jobs:
 
-1. **`resolve-matrix`** — pure-shell selector emitting a `matrix` JSON-array
-output (`include`-shape, each entry has `name` + `build_args` plus arbitrary
-additional fields). `pull_request` -> `pr_matrix` (subset); anything else
-(tag push, main push, `workflow_dispatch`) -> `tag_matrix` (release
-validation matrix).
+1. **`resolve-matrix`** — shell and jq selector emitting a `matrix`
+JSON-array output (`include`-shape, each entry has `name` + `build_args`
+plus arbitrary additional fields). `pull_request` -> `pr_matrix` (subset);
+anything else (tag push, main push, `workflow_dispatch`) -> `tag_matrix`
+(release validation matrix).
 
 2. **`call-build`** — strategy.matrix job invoking the local
 `build-worker.yaml` per matrix cell. Derives per-shard `image_name` as
@@ -5256,6 +5256,12 @@ builds nothing and pushes nothing)
 | `multi-distro-build-worker.yaml: passthrough inputs mirror build-worker (build_runtime / platforms / context_path / dockerfile_path / build_contexts) (closes #1122)` | - |
 | `multi-distro-build-worker.yaml: resolve-matrix job emits matrix output (#344 include-shape)` | - |
 | `multi-distro-build-worker.yaml: resolve-matrix branches on github.event_name == pull_request (#344)` | - |
+| `multi-distro-build-worker.yaml: a multi-line tag_matrix reaches fromJSON on push and workflow_dispatch (base#2160)` | base#2160. app/ros1_bridge writes tag_matrix as a block scalar, and the runner refused the multi-line `matrix=` line with "Invalid format ']'", so every push to main and every release failed while pull requests passed. |
+| `multi-distro-build-worker.yaml: a multi-line pr_matrix reaches fromJSON on pull_request (base#2160)` | base#2160. The same write on the other branch of the event check. |
+| `multi-distro-build-worker.yaml: a single-line matrix reaches fromJSON, from the input the event selects (base#2160)` | base#2160. The single-line spelling worked before and must keep its value, and each event must still pick its own input. |
+| `multi-distro-build-worker.yaml: an entry's own characters survive the hand-over (base#2160)` | base#2160. A fix that joins or rewrites the lines as text can damage a value: an escaped newline in build_args, spaces, and the characters the GITHUB_OUTPUT format itself uses. |
+| `multi-distro-build-worker.yaml: an input that is not one JSON array is refused by name (base#2160)` | base#2160. An unreadable matrix must fail in this job, naming the input the caller wrote, and not as an empty matrix in call-build. A second JSON document and a non-array are refused for the same reason: `include:` takes one array. |
+| `multi-distro-build-worker.yaml: the input the event does not select is not judged (base#2160)` | base#2160. The event selects one input; what the other holds must not fail a run that never uses it. |
 | `multi-distro-build-worker.yaml: call-build uses local build-worker via ./.github/workflows/build-worker.yaml (#325 B-1)` | - |
 | `multi-distro-build-worker.yaml: call-build matrix is include: fromJSON(needs.resolve-matrix.outputs.matrix) (#344 N-D)` | - |
 | `multi-distro-build-worker.yaml: call-build derives per-shard image_name as <image_name>-<matrix.name> (hyphen, #344)` | - |
