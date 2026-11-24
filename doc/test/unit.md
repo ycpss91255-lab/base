@@ -6010,7 +6010,7 @@ fallback is present.
 | `prune.sh --help mentions --worktree-orphans (#388)` | - |
 | `prune.sh aborts on a failing pre-prune hook and skips docker prune (#690)` | - |
 
-### test/bats/unit/publish_worker_yaml_spec.bats (38)
+### test/bats/unit/publish_worker_yaml_spec.bats (40)
 
 Structural assertions for the `.github/workflows/publish-worker.yaml`
 reusable `call-publish` workflow (foundational image repos push their
@@ -6056,6 +6056,8 @@ acquiring it, and to any other scope beside it
 | `publish-worker.yaml: build shards push per-platform BY DIGEST (#602)` | - |
 | `publish-worker.yaml: shards do NOT push the same tag per shard (#602 regression guard)` | - |
 | `publish-worker.yaml: each shard exports + uploads its digest as an artifact (#602)` | - |
+| `publish-worker.yaml: no two variants of one run share or reach each other's digest artifacts (base#2130)` | Artifacts belong to the workflow RUN, not to one call of a reusable workflow, and the caller this worker is written for calls it once per variant from a matrix. A name two variants share fails the second upload, and a download that reaches another variant's digests assembles that variant's image under this one's tag (base#2130) |
+| `publish-worker.yaml: the artifact key is an output of compute-matrix read from its step (base#2130)` | The key has to reach both jobs as an output of the job that computes it; an output that names no step expands to nothing, and every variant is back to one shared name (base#2130) |
 | `publish-worker.yaml: merge job assembles the multi-arch manifest via imagetools (#602)` | - |
 | `publish-worker.yaml: merge resolves tags from inputs (version + optional latest) once (#602)` | - |
 | `publish-worker.yaml: merge login uses the parameterised registry (not hardcoded ghcr.io)` | - |
