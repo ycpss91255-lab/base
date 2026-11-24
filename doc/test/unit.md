@@ -3186,7 +3186,7 @@ to escape.
 | `_sync_doc_counts: a second run over a generated catalogue changes nothing` | "Regenerating from scratch reproduces what is committed" is the gate check_test_md_drift.sh applies to the real tree, so a second run that moved a byte would make every branch red for a reason no diff explains. |
 | `_sync_doc_counts: a shipped smoke spec lands in smoke.md` | A shipped smoke spec is the one level whose glob leaves test/ for dist/, and it was the case that caught the doc-to-glob map going stale before. It stays because the map is still hand-written. |
 
-### test/bats/unit/dockerfile_migrate_spec.bats (188)
+### test/bats/unit/dockerfile_migrate_spec.bats (191)
 
 Unit tests for the declarative Dockerfile-migration list
 `lib/dockerfile_migrate.sh` (#567, folds #579 facet B). The lib exposes a
@@ -3289,7 +3289,10 @@ force-rewrite).
 | `apply_migrations heals the runtime COPYs every real consumer actually carries (#971)` | - |
 | `migration 5 (hadolint): DL3007 pins bats/alpine :latest tags (#567)` | - |
 | `migration 5 (hadolint): DL3046 adds useradd -l (#567)` | - |
-| `migration 5 (hadolint): DL3003 cd /lint -> WORKDIR /lint + RUN (#567)` | - |
+| `migration 5 (hadolint): DL3003 answers RUN cd /lint without moving the stage (base#2150)` | base#2150 -- the rewrite to `WORKDIR /lint` moved every later instruction of the stage, and the image's own working directory, into /lint: `RUN cd` ends with its line and WORKDIR does not. The line has to keep running what it ran, so it is kept and the rule is answered beside it. hadolint also looks for .hadolint.yaml in its working directory, so the `cd` cannot be dropped for a path either. |
+| `migration 5 (hadolint): DL3003 extends an existing pragma and settles (base#2150)` | the migration pass runs on every upgrade, and a pragma binds to the next line only, so one that is already there is extended, not displaced. |
+| `migration 5 (hadolint): DL3003 reads a pragma the way hadolint does (base#2150)` | hadolint allows spaces around every part of a pragma, and one it cannot parse ignores nothing. Prose that mentions a pragma is not one. |
+| `migration 5 (hadolint): WORKDIR /lint + RUN hadolint is left alone (base#2150)` | a Dockerfile already in the template's shape is the consumer's own and stays as it is. |
 | `migration 5 (hadolint): DL3042 adds pip --no-cache-dir (#567)` | - |
 | `migration 5 (hadolint): DL4006 adds SHELL pipefail to alpine lint-tools (#567)` | - |
 | `migration 5 (hadolint): DL3006 inline ignore before parameterized FROM (#567)` | - |

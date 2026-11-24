@@ -925,7 +925,11 @@ _migrate_logging_rename_apply() {
 # violations the ad-hoc fanout fixed by hand (each sub-fix is idempotent):
 #   DL3007  pin `FROM bats/bats:latest` / `FROM alpine:latest` helper stages
 #   DL3046  `useradd -u`  -> `useradd -l -u`
-#   DL3003  `RUN cd /lint && hadolint ...` -> `WORKDIR /lint` + `RUN hadolint`
+#   DL3003  `RUN cd /lint && hadolint ...` gains an inline
+#           `# hadolint ignore=DL3003`. Rewriting it to `WORKDIR /lint` would
+#           move every later instruction of the stage, and the image, into
+#           /lint (base#2150); dropping the `cd` would lose the
+#           .hadolint.yaml hadolint reads from its working directory
 #   DL3042  `pip install -r` -> `pip install --no-cache-dir -r`
 #   DL4006  alpine lint-tools stage gains a `SHELL [ash -o pipefail]`
 #   DL3006  parameterized `FROM ${BASE_IMAGE}` / `${TEST_TOOLS_IMAGE}` gains
@@ -938,7 +942,7 @@ _migrate_hadolint_detect() {
   local _file="$1"
   grep -Eq '^FROM (bats/bats|alpine):latest' "${_file}" && return 0
   _dfm_needs_dl3046 "${_file}" && return 0
-  grep -Eq '^[[:space:]]*RUN[[:space:]]+cd[[:space:]]+/lint[[:space:]]+&&[[:space:]]+hadolint' "${_file}" && return 0
+  _dfm_needs_dl3003 "${_file}" && return 0
   grep -Eq 'pip install[[:space:]]+-r' "${_file}" && return 0
   _dfm_needs_dl4006 "${_file}" && return 0
   _dfm_needs_dl3006 "${_file}" && return 0
@@ -988,6 +992,36 @@ _dfm_needs_dl3006() {
   local _file="$1"
   awk '
     /^FROM \$\{[A-Za-z_]+\}/ && prev !~ /hadolint ignore=DL3006/ { found=1 }
+    { prev=$0 }
+    END { exit (found ? 0 : 1) }
+  ' "${_file}"
+}
+
+# _DFM_AWK_PRAGMA
+#   awk functions reading a hadolint pragma as hadolint does: alone in its
+#   comment, with optional blanks around `=` and the commas.
+# shellcheck disable=SC2016
+_DFM_AWK_PRAGMA='
+  function pragma(text) {
+    return text ~ /^[ \t]*#[ \t]*hadolint[ \t]+ignore[ \t]*=[ \t]*[A-Z0-9]+([ \t]*,[ \t]*[A-Z0-9]+)*[ \t\r]*(#.*)?$/
+  }
+  function ignores(text, rule) {
+    if (!pragma(text)) { return 0 }
+    match(text, /=[ \t]*[A-Z0-9]+([ \t]*,[ \t]*[A-Z0-9]+)*/)
+    return (substr(text, RSTART, RLENGTH) ",") ~ ("[=, \t]" rule "[, \t]")
+  }
+  function lint_run(text) {
+    return text ~ /^[ \t]*RUN[ \t]+cd[ \t]+\/lint[ \t]+&&[ \t]+hadolint[ \t]/
+  }
+'
+
+# _dfm_needs_dl3003 <file>
+#   True when a `RUN cd /lint && hadolint ...` is present whose preceding
+#   line does not already ignore DL3003.
+_dfm_needs_dl3003() {
+  local _file="$1"
+  awk "${_DFM_AWK_PRAGMA}"'
+    lint_run($0) && !ignores(prev, "DL3003") { found=1 }
     { prev=$0 }
     END { exit (found ? 0 : 1) }
   ' "${_file}"
@@ -1080,8 +1114,27 @@ _migrate_hadolint_apply() {
   # DL3042: pip --no-cache-dir (idempotent).
   _dfm_sed "${_file}" -E 's|pip install[[:space:]]+-r|pip install --no-cache-dir -r|'
   _dfm_sed "${_file}" -E 's|pip install --no-cache-dir --no-cache-dir|pip install --no-cache-dir|'
-  # DL3003: cd /lint -> WORKDIR /lint + RUN.
-  _dfm_sed "${_file}" -E 's|^([[:space:]]*)RUN[[:space:]]+cd[[:space:]]+/lint[[:space:]]+&&[[:space:]]+hadolint[[:space:]]+(.*)$|\1WORKDIR /lint\n\1RUN hadolint \2|'
+  # DL3003: inline ignore before each unguarded `RUN cd /lint && hadolint`,
+  # extending a pragma that is already there for the reason given at DL3066.
+  if _dfm_needs_dl3003 "${_file}"; then
+    local _tmp3003
+    _tmp3003="$(mktemp)"
+    awk "${_DFM_AWK_PRAGMA}"'
+      function flush() { if (have) { print held; have = 0 } }
+      lint_run($0) && pragma(held) && !ignores(held, "DL3003") {
+        sub(/=[ \t]*[A-Z0-9]+/, "&,DL3003", held)
+      }
+      lint_run($0) && !pragma(held) {
+        flush()
+        match($0, /^[ \t]*/)
+        held = substr($0, 1, RLENGTH) "# hadolint ignore=DL3003"
+        have = 1
+      }
+      { flush(); held = $0; have = 1 }
+      END { flush() }
+    ' "${_file}" > "${_tmp3003}"
+    _dfm_install "${_file}" "${_tmp3003}"
+  fi
 
   # DL4006: SHELL ash-pipefail right after the alpine lint-tools FROM.
   if _dfm_needs_dl4006 "${_file}"; then
