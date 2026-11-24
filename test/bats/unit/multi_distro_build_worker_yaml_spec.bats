@@ -7,7 +7,7 @@
 # The dispatcher is a two-job reusable workflow on top of
 # build-worker.yaml:
 #
-# 1. `resolve-matrix` — pure-shell selector that emits a `matrix`
+# 1. `resolve-matrix` — shell and jq selector that emits a `matrix`
 #    `include`-shape JSON array output based on `github.event_name`.
 #    `pull_request` -> `pr_matrix` (subset); everything else (tag push,
 #    main push, workflow_dispatch) -> `tag_matrix` (full release matrix).
@@ -41,7 +41,7 @@
 # github.event_name == 'pull_request' && ... || ... }}` expression. Three
 # jobs:
 #
-# 1. **`resolve-matrix`** — pure-shell selector emitting a `matrix`
+# 1. **`resolve-matrix`** — shell and jq selector emitting a `matrix`
 # JSON-array output (`include`-shape, each entry has `name` + `build_args`
 # plus arbitrary additional fields). `pull_request` -> `pr_matrix` (subset);
 # anything else (tag push, main push, `workflow_dispatch`) -> `tag_matrix`
@@ -180,7 +180,9 @@ _runner_output() {
 
 # _resolved_matrix <event> <pr_matrix> <tag_matrix> -- RUN the resolve-matrix
 # step for one call of the worker and print the `matrix` output the runner
-# hands to call-build.
+# hands to call-build. 1 when the step fails, 3 when it succeeds and the runner
+# has no matrix to hand over: the job is green then, and only one of the two
+# is a refusal.
 _resolved_matrix() {
   local _body _status=0
   _body="$(yaml_step_run "${WF}" resolve-matrix r)" || _status=$?
@@ -192,7 +194,7 @@ _resolved_matrix() {
   : > "${SCRATCH}/output"
   EVENT_NAME="${1}" PR_MATRIX="${2}" TAG_MATRIX="${3}" \
     GITHUB_OUTPUT="${SCRATCH}/output" bash "${SCRATCH}/step.sh" || return 1
-  _runner_output "${SCRATCH}/output" matrix
+  _runner_output "${SCRATCH}/output" matrix || return 3
 }
 
 # _assert_resolves <event> <pr_matrix> <tag_matrix> <expected> -- the step
@@ -211,7 +213,7 @@ _assert_resolves() {
 # naming <input>, and leaves no matrix output behind.
 _assert_refuses() {
   run _resolved_matrix "${1}" "${2}" "${3}"
-  assert_failure
+  assert_failure 1
   assert_output --partial '::error::'
   assert_output --partial "${4}"
   run cat "${SCRATCH}/output"

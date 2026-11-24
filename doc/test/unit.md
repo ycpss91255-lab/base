@@ -5175,11 +5175,11 @@ dispatcher fans a per-event `include`-shape matrix across
 copy-pasting a `${{ github.event_name == 'pull_request' && ... || ... }}`
 expression. Three jobs:
 
-1. **`resolve-matrix`** — pure-shell selector emitting a `matrix` JSON-array
-output (`include`-shape, each entry has `name` + `build_args` plus arbitrary
-additional fields). `pull_request` -> `pr_matrix` (subset); anything else
-(tag push, main push, `workflow_dispatch`) -> `tag_matrix` (release
-validation matrix).
+1. **`resolve-matrix`** — shell and jq selector emitting a `matrix`
+JSON-array output (`include`-shape, each entry has `name` + `build_args`
+plus arbitrary additional fields). `pull_request` -> `pr_matrix` (subset);
+anything else (tag push, main push, `workflow_dispatch`) -> `tag_matrix`
+(release validation matrix).
 
 2. **`call-build`** — strategy.matrix job invoking the local
 `build-worker.yaml` per matrix cell. Derives per-shard `image_name` as
