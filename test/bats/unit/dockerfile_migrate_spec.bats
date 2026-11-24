@@ -1119,6 +1119,225 @@ EOF
   [[ "${stderr}" != *"escape sequence"* ]]
 }
 
+# ── every awk a consumer's host may run ─────────────────────────────────────
+# The upgrade runs on the consumer's host, where `awk` is whatever the
+# distribution installed: mawk on Debian and Ubuntu, gawk or busybox
+# elsewhere. POSIX leaves the order in which an assignment evaluates its two
+# sides open, and the three differ there.
+
+# _awk_engines -- the awk programs to run the migrations under. The
+#   test-tools image installs mawk and gawk beside busybox for this; a run
+#   with no mawk would compare nothing, so its absence fails.
+_awk_engines() {
+  command -v mawk >/dev/null 2>&1 || fail "no mawk: the test-tools image carries one"
+  echo mawk
+  if command -v gawk >/dev/null 2>&1; then echo gawk; fi
+  if command -v busybox >/dev/null 2>&1; then echo busybox; fi
+}
+
+# _use_awk <engine> -- puts an `awk` that is <engine> first on PATH.
+_use_awk() {
+  local _dir="${TEMP_DIR}/engine-$1" _cmd
+  _cmd="$(command -v "$1")"
+  [[ "$1" == busybox ]] && _cmd+=" awk"
+  mkdir -p "${_dir}"
+  printf '#!/bin/sh\nexec %s "$@"\n' "${_cmd}" > "${_dir}/awk"
+  chmod +x "${_dir}/awk"
+  PATH="${_dir}:${PATH}"
+}
+
+# why: base#2138 -- under mawk every shipped spec read as shipped at two
+# paths, so a hand-listed COPY was left naming the deleted tree, the upgrade
+# exited 0 and the consumer's next build failed. The input is the issue's.
+# The two refusals are the control: they must stay refusals.
+@test "migration (smoke-copy): a hand-listed COPY is rewritten the same under every awk (base#2138)" {
+  local _engine _engines _path="${PATH}"
+  _engines="$(_awk_engines)" || fail "${_engines}"
+  mkdir -p "${TEMP_DIR}/.base/dist/test/bats/smoke/shared" \
+    "${TEMP_DIR}/.base/dist/test/bats/smoke/devel-test"
+  : > "${TEMP_DIR}/.base/dist/test/bats/smoke/shared/test_helper.bash"
+  : > "${TEMP_DIR}/.base/dist/test/bats/smoke/devel-test/script_help.bats"
+  : > "${TEMP_DIR}/.base/dist/test/bats/smoke/shared/ambiguous.bats"
+  : > "${TEMP_DIR}/.base/dist/test/bats/smoke/devel-test/ambiguous.bats"
+  while IFS= read -r _engine; do
+    PATH="${_path}"
+    _use_awk "${_engine}"
+    cat > "${DF}" <<'DOCKERFILE'
+FROM devel AS devel-test
+COPY .base/test/smoke/test_helper.bash .base/test/smoke/script_help.bats /smoke_test/
+COPY .base/test/smoke/ambiguous.bats /smoke_test/
+COPY .base/test/smoke/retired.bats /smoke_test/
+DOCKERFILE
+    run bash -c "$(_src); _migrate_smoke_copy_apply '${DF}'"
+    assert_success
+    run cat "${DF}"
+    assert_output "FROM devel AS devel-test
+COPY .base/dist/test/bats/smoke/shared/test_helper.bash .base/dist/test/bats/smoke/devel-test/script_help.bats /smoke_test/
+COPY .base/test/smoke/ambiguous.bats /smoke_test/
+COPY .base/test/smoke/retired.bats /smoke_test/" || fail "under ${_engine}"
+  done <<< "${_engines}"
+}
+
+# _old_layout_repo -- a repo whose Dockerfile and entrypoint fire every
+#   migration that runs an awk program.
+_old_layout_repo() {
+  mkdir -p "${TEMP_DIR}/script" "${TEMP_DIR}/test/bats/smoke/shared" \
+    "${TEMP_DIR}/test/bats/smoke/devel-test" \
+    "${TEMP_DIR}/.base/dist/test/bats/smoke/shared" \
+    "${TEMP_DIR}/.base/dist/test/bats/smoke/devel-test"
+  : > "${TEMP_DIR}/.base/dist/test/bats/smoke/shared/test_helper.bash"
+  : > "${TEMP_DIR}/.base/dist/test/bats/smoke/devel-test/script_help.bats"
+  : > "${TEMP_DIR}/test/bats/smoke/devel-test/own.bats"
+  cat > "${DF}" <<'DOCKERFILE'
+FROM bats/bats:latest AS bats-src
+FROM alpine:latest AS lint-tools
+FROM ${BASE_IMAGE} AS sys
+ARG USER="initial"
+USER root
+RUN useradd -m -s /bin/bash -u "${UID}" "${USER}" && usermod -l a b
+# hadolint ignore=DL3002
+USER root
+COPY --chmod=0755 .base/script/docker/runtime/logging.sh /usr/local/lib/base/logging.sh
+COPY --chmod=0755 .base/script/docker/runtime/logrotate.sh /usr/local/lib/base/logrotate.sh
+FROM sys AS lint
+COPY .base/script/docker/build.sh \
+     .base/script/docker/run.sh \
+     /lint/
+COPY .base/script/docker/lib /lint/lib
+FROM sys AS devel-test
+COPY .base/test/smoke/ /smoke_test/
+COPY .base/test/smoke/test_helper.bash \
+     .base/test/smoke/script_help.bats /smoke_test/
+COPY test/smoke/ /smoke_test/
+COPY test/smoke/own.bats /smoke_test/
+DOCKERFILE
+  cat > "${TEMP_DIR}/script/entrypoint.sh" <<'ENTRY'
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck disable=SC1091
+source /opt/ros/humble/setup.bash
+exec "$@"
+ENTRY
+}
+
+# why: base#2138's inventory, kept as a test. Each awk program in the
+# migration list runs under every engine over one old-layout repo; the
+# files and the messages must be the same whichever awk the host has.
+@test "apply_migrations writes the same files and messages under every awk (base#2138)" {
+  local _engine _engines _path="${PATH}" _first="" _got _want=""
+  _engines="$(_awk_engines)" || fail "${_engines}"
+  while IFS= read -r _engine; do
+    PATH="${_path}"
+    _use_awk "${_engine}"
+    _old_layout_repo
+    run bash -c "$(_src); apply_migrations '${DF}' 2>&1"
+    assert_success
+    _got="$(sed -E 's/^[0-9TZ:.+-]+ //' <<< "${output}")
+$(cat "${DF}" "${TEMP_DIR}/script/entrypoint.sh")"
+    if [[ -z "${_first}" ]]; then
+      _first="${_engine}"
+      _want="${_got}"
+    else
+      [[ "${_got}" == "${_want}" ]] \
+        || fail "${_engine} differs from ${_first}:
+$(diff <(printf '%s\n' "${_want}") <(printf '%s\n' "${_got}"))"
+    fi
+  done <<< "${_engines}"
+  # Non-vacuity: the awk-driven migrations all fired and did their work.
+  local _m
+  for _m in explicit_copy hadolint nounset_source smoke_copy repo_smoke_copy runtime_dir_copy; do
+    [[ "${_want}" =~ matched\ \(([^\)]*) && " ${BASH_REMATCH[1]} " == *" ${_m} "* ]] \
+      || fail "${_m} did not fire: ${_want}"
+  done
+  # An awk-driven rewrite is reported, not only the sed-driven ones.
+  for _m in '(#567 m3)' '(#928)' '(#1044)' '(#971)' '(#567 m8'; do
+    grep -F ' patched: ' <<< "${_want}" | grep -qF -- "${_m}" || fail "no patched line ${_m}: ${_want}"
+  done
+  run cat "${DF}"
+  refute_output --partial ' .base/test/smoke'
+  assert_output --partial 'useradd -l -m'
+  assert_output --partial '# hadolint ignore=DL3006'
+  assert_output --partial 'DL3002,DL3066'
+  run cat "${TEMP_DIR}/script/entrypoint.sh"
+  assert_line 'set +u'
+}
+
+# why: base#2138 -- the line said a Dockerfile was patched when no byte had
+# changed, so the one report of a failed rewrite read as a success. The
+# warning that names the problem stays.
+@test "apply_migrations: a migration that changes nothing reports no patch (base#2138)" {
+  mkdir -p "${TEMP_DIR}/.base/dist/test/bats/smoke/shared"
+  cat > "${DF}" <<'DOCKERFILE'
+FROM devel AS devel-test
+COPY .base/test/smoke/retired.bats /smoke_test/
+DOCKERFILE
+  cp "${DF}" "${DF}.before"
+  run bash -c "$(_src); apply_migrations '${DF}' 2>&1"
+  assert_success
+  cmp "${DF}" "${DF}.before"
+  refute_output --partial 'Dockerfile patched'
+  assert_output --partial 'resolve it by hand'
+  assert_output --partial '0 file(s) rewritten'
+
+  cat > "${DF}" <<'DOCKERFILE'
+FROM devel AS devel
+COPY .base/dist/script/docker/runtime/logging.sh \
+     /usr/local/lib/base/logging.sh
+DOCKERFILE
+  cp "${DF}" "${DF}.before"
+  run bash -c "$(_src); _migrate_runtime_dir_copy_apply '${DF}' 2>&1"
+  assert_success
+  cmp "${DF}" "${DF}.before"
+  refute_output --partial 'Dockerfile patched'
+  assert_output --partial 'collapse it by hand'
+}
+
+# why: base#2138 -- the notice of one migration's rewrite is used up by it.
+# Left pending, it would stand for a later migration that changed nothing.
+@test "apply_migrations: an earlier migration's rewrite is not a later one's patch (base#2138)" {
+  mkdir -p "${TEMP_DIR}/.base/dist/test/bats/smoke/shared"
+  cat > "${DF}" <<'DOCKERFILE'
+FROM devel AS devel-test
+COPY .base/downstream/script/docker/lib /lint/lib
+COPY .base/test/smoke/retired.bats /smoke_test/
+DOCKERFILE
+  run bash -c "$(_src); apply_migrations '${DF}' 2>&1"
+  assert_success
+  assert_output --partial 'Dockerfile patched: .base/downstream/'
+  refute grep -F '(#928)' <<< "$(grep -F 'Dockerfile patched' <<< "${output}")"
+  assert_output --partial 'resolve it by hand (#928)'
+}
+
+# why: a run starts with no notice pending, whatever an earlier write in the
+# same shell left behind.
+@test "apply_migrations: a run does not inherit a pending patch notice (base#2138)" {
+  mkdir -p "${TEMP_DIR}/.base/dist/test/bats/smoke/shared"
+  printf '%s\n' 'FROM devel AS devel-test' 'COPY .base/test/smoke/retired.bats /smoke_test/' > "${DF}"
+  run bash -c "$(_src); _DFM_CHANGED=('${DF}'); apply_migrations '${DF}' 2>&1"
+  assert_success
+  refute_output --partial 'Dockerfile patched'
+}
+
+# why: the other direction of the case above: a rewrite is still reported,
+# once, and an entrypoint rewrite does not stand in for a Dockerfile one.
+@test "apply_migrations: a file that changed is reported as patched, and only that file (base#2138)" {
+  mkdir -p "${TEMP_DIR}/script"
+  printf '%s\n' 'FROM busybox AS sys' \
+    'COPY .base/script/docker/runtime/_entrypoint_logging.sh /usr/local/lib/base/_entrypoint_logging.sh' > "${DF}"
+  printf '%s\n' '#!/bin/bash' 'source /usr/local/lib/base/_entrypoint_logging.sh' > "${TEMP_DIR}/script/entrypoint.sh"
+  run bash -c "$(_src); _migrate_logging_rename_apply '${DF}' 2>&1"
+  assert_success
+  [ "$(grep -c 'Dockerfile patched' <<< "${output}")" -eq 1 ]
+  [ "$(grep -c 'entrypoint patched' <<< "${output}")" -eq 1 ]
+
+  printf '%s\n' 'FROM busybox AS sys' > "${DF}"
+  printf '%s\n' '#!/bin/bash' 'source /usr/local/lib/base/_entrypoint_logging.sh' > "${TEMP_DIR}/script/entrypoint.sh"
+  run bash -c "$(_src); _migrate_logging_rename_apply '${DF}' 2>&1"
+  assert_success
+  refute_output --partial 'Dockerfile patched'
+  assert_output --partial 'entrypoint patched'
+}
+
 # ── migration (repo-smoke-copy): repo-owned test/smoke/ -> per-stage ────────
 # The sibling of smoke-copy. That one heals the path into base's SHIPPED
 # tree; this one heals the path into the repo's OWN. Both moved in the same

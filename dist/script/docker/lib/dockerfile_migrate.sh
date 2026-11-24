@@ -120,6 +120,7 @@ _dfm_join_copy_statements() {
 # the dispatcher answers it, and a migration author cannot get it wrong by
 # writing in an unanticipated way.
 _DFM_TOUCHED=()
+_DFM_CHANGED=()
 _DFM_TARGETS=()
 _DFM_BEFORE_DIR=""
 
@@ -135,6 +136,28 @@ _dfm_record() {
   return 0
 }
 
+# _dfm_changed <path>
+#   Note that a write helper just changed <path>: the record above, and the
+#   pending notice _dfm_take_changed reads.
+_dfm_changed() {
+  _dfm_record "$1"
+  _DFM_CHANGED+=("$1")
+}
+
+# _dfm_take_changed <path>
+#   True when a write helper changed <path> since this was last asked, and
+#   forgets it. A migration reports a file as patched only then: a detect
+#   that fired and a rewrite that changed no byte is not a patch (base#2138).
+_dfm_take_changed() {
+  local _path _found=1
+  local -a _rest=()
+  for _path in ${_DFM_CHANGED[@]+"${_DFM_CHANGED[@]}"}; do
+    if [[ "${_path}" == "$1" ]]; then _found=0; else _rest+=("${_path}"); fi
+  done
+  _DFM_CHANGED=(${_rest[@]+"${_rest[@]}"})
+  return "${_found}"
+}
+
 # _dfm_sed <file> <sed_arg>...
 #   `sed -i` over <file>, recorded when it actually changed the bytes. The
 #   file comes FIRST so the record cannot be skipped by an argument order
@@ -146,7 +169,7 @@ _dfm_sed() {
   _before="$(mktemp)"
   cp -- "${_file}" "${_before}"
   sed -i "$@" "${_file}"
-  cmp -s -- "${_before}" "${_file}" || _dfm_record "${_file}"
+  cmp -s -- "${_before}" "${_file}" || _dfm_changed "${_file}"
   rm -f -- "${_before}"
   return 0
 }
@@ -164,7 +187,7 @@ _dfm_install() {
   cmp -s -- "${_file}" "${_new}" || _changed=1
   chmod --reference="${_file}" -- "${_new}"
   mv -- "${_new}" "${_file}"
-  (( _changed )) && _dfm_record "${_file}"
+  (( _changed )) && _dfm_changed "${_file}"
   return 0
 }
 
@@ -298,6 +321,7 @@ migrated_files() {
 apply_migrations() {
   local _file="${1:?apply_migrations requires a Dockerfile path}"
   _DFM_TOUCHED=()
+  _DFM_CHANGED=()
 
   if [[ ! -f "${_file}" ]]; then
     _log_info upgrade dockerfile_migration_skipped "display=  no Dockerfile at ${_file} — skip migrations"
@@ -349,7 +373,9 @@ _migrate_downstream_to_dist_detect() {
 _migrate_downstream_to_dist_apply() {
   local _file="$1"
   _dfm_sed "${_file}" 's#\.base/downstream/#.base/dist/#g'
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: .base/downstream/ -> .base/dist/ (#714)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: .base/downstream/ -> .base/dist/ (#714)"
+  fi
 }
 
 # ── Migration 1: wrapper COPY shape A/B -> wrapper/*.sh ─────────────────────
@@ -374,7 +400,9 @@ _migrate_wrapper_copy_apply() {
   _dfm_sed "${_file}" -E 's|^([[:space:]]*)COPY[[:space:]]+\*\.sh[[:space:]]+/lint/|\1COPY .base/script/docker/wrapper/*.sh /lint/|'
   # Shape B: flat top-level .base glob.
   _dfm_sed "${_file}" -E 's|^([[:space:]]*)COPY[[:space:]]+\.base/script/docker/\*\.sh[[:space:]]+/lint/|\1COPY .base/script/docker/wrapper/*.sh /lint/|'
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: wrapper COPY -> .base/script/docker/wrapper/*.sh (#567 m1)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: wrapper COPY -> .base/script/docker/wrapper/*.sh (#567 m1)"
+  fi
 }
 
 # ── Migration 2: retired .base/dockerfile/setup pip helper ──────────────────
@@ -786,7 +814,9 @@ _migrate_pip_helper_apply() {
 
   _dfm_sed "${_file}" -E "\\%${_DFM_PIP_HELPER_RE}%d"
   _dfm_sed "${_file}" '/^# Setup pip packages$/d'
-  _log_warn upgrade dockerfile_patched "display=  Dockerfile patched: dropped retired CONFIG_DIR pip helper line (#567 m2) — re-add an explicit pip step if you ship a real requirements file"
+  if _dfm_take_changed "${_file}"; then
+    _log_warn upgrade dockerfile_patched "display=  Dockerfile patched: dropped retired CONFIG_DIR pip helper line (#567 m2) — re-add an explicit pip step if you ship a real requirements file"
+  fi
 }
 
 # ── Migration 3: explicit hand-listed lib/wrapper COPYs ─────────────────────
@@ -836,7 +866,9 @@ _migrate_explicit_copy_apply() {
     { print }
   ' "${_file}" > "${_tmp}"
   _dfm_install "${_file}" "${_tmp}"
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: dropped redundant explicit lib/wrapper COPY(s) (#567 m3)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: dropped redundant explicit lib/wrapper COPY(s) (#567 m3)"
+  fi
 }
 
 # ── Migration 4: _entrypoint_logging.sh -> runtime/logging.sh rename ────────
@@ -876,9 +908,13 @@ _migrate_logging_rename_apply() {
   _entry="$(_dfm_entrypoint_path "${_file}")"
   if [[ -f "${_entry}" ]] && grep -q '_entrypoint_logging\.sh' "${_entry}"; then
     _dfm_sed "${_entry}" 's|/usr/local/lib/base/_entrypoint_logging\.sh|/usr/local/lib/base/logging.sh|g'
-    _log_info upgrade entrypoint_patched "display=  entrypoint patched: _entrypoint_logging.sh -> logging.sh source (#567 m4)"
+    if _dfm_take_changed "${_entry}"; then
+      _log_info upgrade entrypoint_patched "display=  entrypoint patched: _entrypoint_logging.sh -> logging.sh source (#567 m4)"
+    fi
   fi
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: _entrypoint_logging.sh -> runtime/logging.sh (#567 m4)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: _entrypoint_logging.sh -> runtime/logging.sh (#567 m4)"
+  fi
 }
 
 # ── Migration 5: hadolint rules surfaced by the slimmed .hadolint.yaml ──────
@@ -1100,7 +1136,9 @@ _migrate_hadolint_apply() {
     ' "${_file}" > "${_tmp3066}"
     _dfm_install "${_file}" "${_tmp3066}"
   fi
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: hadolint DL3007/DL3046/DL3003/DL3042/DL4006/DL3006/DL3066 (#567 m5, #946)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: hadolint DL3007/DL3046/DL3003/DL3042/DL4006/DL3006/DL3066 (#567 m5, #946)"
+  fi
 }
 
 # ── Migration 6: noetic entrypoint SC1090 directive ─────────────────────────
@@ -1120,7 +1158,9 @@ _migrate_sc1090_apply() {
   local _entry
   _entry="$(_dfm_entrypoint_path "$1")"
   _dfm_sed "${_entry}" -E 's|^([[:space:]]*#[[:space:]]*shellcheck disable=)SC1091([[:space:]]*)$|\1SC1090,SC1091\2|'
-  _log_info upgrade entrypoint_patched "display=  entrypoint patched: shellcheck SC1091 -> SC1090,SC1091 (#567 m6)"
+  if _dfm_take_changed "${_entry}"; then
+    _log_info upgrade entrypoint_patched "display=  entrypoint patched: shellcheck SC1091 -> SC1090,SC1091 (#567 m6)"
+  fi
 }
 
 # ── Migration 7 (facet B): ARG USER is reported, never rewritten ─────
@@ -1458,7 +1498,9 @@ _migrate_nounset_source_apply() {
     END { if (held != "") print held }
   ' "${_entry}" > "${_tmp}"
   _dfm_install "${_entry}" "${_tmp}"
-  _log_info upgrade entrypoint_patched "display=  entrypoint patched: nounset-guard ROS setup.bash source (#567 m8 / #579)"
+  if _dfm_take_changed "${_entry}"; then
+    _log_info upgrade entrypoint_patched "display=  entrypoint patched: nounset-guard ROS setup.bash source (#567 m8 / #579)"
+  fi
 }
 
 # ── Migration (smoke-copy): flat .base/test/smoke/ -> per-stage dist tree ────
@@ -1687,7 +1729,10 @@ _dfm_smoke_rewrite() {
         b = spec[j]
         sub(/.*\//, "", b)
         # A basename at two paths cannot be resolved from the name alone.
-        seen[b] = (b in seen) ? "?" : spec[j]
+        # Two statements: in one assignment mawk and busybox create seen[b]
+        # before they evaluate `b in seen`, so every name read as a duplicate
+        # (base#2138).
+        if (b in seen) { seen[b] = "?" } else { seen[b] = spec[j] }
       }
     }
     {
@@ -1702,7 +1747,9 @@ _dfm_smoke_rewrite() {
     END { flush() }
   ' "${_file}" > "${_tmp}"
   _dfm_install "${_file}" "${_tmp}"
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: ${_retired}/ -> per-stage smoke COPYs under ${_new} (${_ref})"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: ${_retired}/ -> per-stage smoke COPYs under ${_new} (${_ref})"
+  fi
 
   # Anything still naming the retired tree is a spec the pulled subtree no
   # longer ships under that name, or ships twice. Say so: the build will
@@ -1785,7 +1832,9 @@ _migrate_flat_to_dist_apply() {
   local _file="$1"
   _dfm_sed "${_file}" -e 's#\.base/config#.base/dist/config#g' \
     -e 's#\.base/script#.base/dist/script#g'
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: flat .base/{config,script} -> .base/dist/ (#915)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: flat .base/{config,script} -> .base/dist/ (#915)"
+  fi
 }
 
 # ── Migration (runtime-moved-files): the two non-helpers leaving runtime/ ───
@@ -1819,7 +1868,9 @@ _migrate_runtime_moved_files_apply() {
   _dfm_sed "${_file}" -E \
     -e 's#\.base/(downstream/|dist/)?script/docker/runtime/entrypoint\.sh#.base/dist/dockerfile/entrypoint.sh#g' \
     -e 's#\.base/(downstream/|dist/)?script/docker/runtime/smoke\.sh#.base/dist/test/bats/smoke/smoke.sh#g'
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: runtime/{entrypoint,smoke}.sh moved out of the helper dir (#971)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: runtime/{entrypoint,smoke}.sh moved out of the helper dir (#971)"
+  fi
 }
 
 # ── Migration (runtime-dir-copy): per-file helper COPYs -> one dir COPY ──────
@@ -1911,7 +1962,9 @@ _migrate_runtime_dir_copy_apply() {
     }
   ' "${_file}" > "${_tmp}"
   _dfm_install "${_file}" "${_tmp}"
-  _log_info upgrade dockerfile_patched "display=  Dockerfile patched: runtime helper COPYs collapsed into one directory COPY (#971)"
+  if _dfm_take_changed "${_file}"; then
+    _log_info upgrade dockerfile_patched "display=  Dockerfile patched: runtime helper COPYs collapsed into one directory COPY (#971)"
+  fi
 
   # Anything still naming a helper file is a shape the rewrite declined --
   # a backslash-continued statement. It still builds; say so rather than
