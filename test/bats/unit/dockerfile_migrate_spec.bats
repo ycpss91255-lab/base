@@ -2721,6 +2721,219 @@ EOF
   diff "${TEMP_DIR}/script/entrypoint.sh" "${TEMP_DIR}/ep.orig"
 }
 
+# The two halves have to agree on what is guarded. Detect answers for the
+# file, apply rewrites every source in it: a source detect reads as guarded
+# and apply does not is rewritten the moment another source in the same file
+# is bare.
+
+# _m8_run -- run the entrypoint under test with every /opt/ros/<x>/setup.bash
+#   replaced by a file that, as the real one does, reads an unset variable.
+_m8_run() {
+  printf '%s\n' ': "${M8_UNSET}"' 'echo "sourced"' > "${TEMP_DIR}/third_party.bash"
+  sed -E "s|\"?/opt/ros/[^ \"]*setup\.bash\"?|\"${TEMP_DIR}/third_party.bash\"|" \
+    "${TEMP_DIR}/script/entrypoint.sh" > "${TEMP_DIR}/run.sh"
+  run env -u M8_UNSET bash "${TEMP_DIR}/run.sh"
+}
+
+# why: base#2149 -- ros1_bridge's shape. The `set -u` written between the
+# sources turned nounset back on inside the repo's own bracket, and the
+# container died in the file sourced after it.
+@test "migration 8 (nounset-source): one bracket around several sources is left alone (base#2149)" {
+  mkdir -p "${TEMP_DIR}/script"
+  : > "${DF}"
+  cat > "${TEMP_DIR}/script/entrypoint.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+set +u
+# shellcheck source=/dev/null
+source "/opt/ros/\${ROS1_DISTRO}/setup.bash" --
+# shellcheck source=/dev/null
+source "/opt/ros/\${ROS2_DISTRO}/setup.bash" --
+# an overlay built elsewhere
+if [[ -f "${TEMP_DIR}/third_party.bash" ]]; then
+    # shellcheck source=/dev/null
+    source "${TEMP_DIR}/third_party.bash" --
+fi
+set -u
+[[ "\$-" == *u* ]] && echo "nounset restored"
+EOF
+  cp "${TEMP_DIR}/script/entrypoint.sh" "${TEMP_DIR}/ep.orig"
+  run bash -c "$(_src); apply_migrations '${DF}'"
+  assert_success
+  _m8_run
+  assert_success
+  assert_line --index 2 'sourced'
+  assert_line --index 3 'nounset restored'
+  diff "${TEMP_DIR}/ep.orig" "${TEMP_DIR}/script/entrypoint.sh"
+  run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
+  assert_failure
+}
+
+# why: base#2149 -- apply skipped a guard whose source carries a shellcheck
+# directive, so it bracketed the guarded source a second time.
+@test "migration 8 (nounset-source): only the bare source of a mixed file is bracketed (base#2149)" {
+  mkdir -p "${TEMP_DIR}/script"
+  : > "${DF}"
+  cat > "${TEMP_DIR}/script/entrypoint.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+set +u
+# shellcheck source=/dev/null
+source "/opt/ros/a/setup.bash"
+set -u
+# shellcheck source=/dev/null
+source "/opt/ros/b/setup.bash"
+# source "/opt/ros/c/setup.bash"
+echo end
+# shellcheck disable=SC2034
+EOF
+  run bash -c "$(_src); apply_migrations '${DF}'"
+  assert_success
+  run cat "${TEMP_DIR}/script/entrypoint.sh"
+  assert_output '#!/usr/bin/env bash
+set -euo pipefail
+set +u
+# shellcheck source=/dev/null
+source "/opt/ros/a/setup.bash"
+set -u
+set +u
+# shellcheck source=/dev/null
+source "/opt/ros/b/setup.bash"
+set -u
+# source "/opt/ros/c/setup.bash"
+echo end
+# shellcheck disable=SC2034'
+  _m8_run
+  assert_success
+  assert_output 'sourced
+sourced
+end'
+}
+
+# why: base#2149 -- a bracket is whatever turns nounset off, not the one
+# spelling on the line above. Each body is guarded as written.
+@test "migration 8 (nounset-source): every spelling of a bracket is read as one (base#2149)" {
+  mkdir -p "${TEMP_DIR}/script"
+  : > "${DF}"
+  local _body _n=0
+  while IFS= read -r _body; do
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n%b\necho end\n' "${_body}" \
+      > "${TEMP_DIR}/script/entrypoint.sh"
+    _m8_run
+    assert_success || fail "the case itself is not guarded: ${_body}"
+    cp "${TEMP_DIR}/script/entrypoint.sh" "${TEMP_DIR}/ep.orig"
+    run bash -c "$(_src); apply_migrations '${DF}'"
+    assert_success
+    diff "${TEMP_DIR}/ep.orig" "${TEMP_DIR}/script/entrypoint.sh" || fail "rewritten: ${_body}"
+    # Detect aside: apply on its own leaves a guarded source alone too.
+    run bash -c "$(_src); _migrate_nounset_source_apply '${DF}'"
+    assert_success
+    diff "${TEMP_DIR}/ep.orig" "${TEMP_DIR}/script/entrypoint.sh" || fail "apply rewrote: ${_body}"
+    (( ++_n ))
+  done <<'EOF'
+set +u\n# a note\n\nexport A=1\nsource /opt/ros/a/setup.bash\nset -u
+set +u  # ROS reads unset variables\nsource /opt/ros/a/setup.bash\nset -u
+set +eu\nsource /opt/ros/a/setup.bash\nsource /opt/ros/b/setup.bash\nset -eu
+set +o nounset\nsource /opt/ros/a/setup.bash\nsource /opt/ros/b/setup.bash\nset -o nounset
+set +e +u\nsource /opt/ros/a/setup.bash\nset -e -u
+set +u; source /opt/ros/a/setup.bash; set -u
+set +u && . /opt/ros/a/setup.bash\n. /opt/ros/b/setup.bash\nset -u
+set +u\nset -e\nset -o pipefail\nsource /opt/ros/a/setup.bash\nset -u
+if true; then\n  set +u\n  # shellcheck source=/dev/null\n  source /opt/ros/a/setup.bash\n  source /opt/ros/b/setup.bash\n  set -u\nfi
+set +u\nif false; then\n  set -u\nfi\nsource /opt/ros/a/setup.bash\nsource /opt/ros/b/setup.bash\nset -u
+set +u\n  # set -u\nsource /opt/ros/a/setup.bash\nset -u
+set +u\n(set -u; echo quiet >/dev/null)\nsource /opt/ros/a/setup.bash\nset -u
+set +u\n(\n  set -u\n  :\n)\nsource /opt/ros/a/setup.bash\nset -u
+set +u\nif false; then set -u; fi\nsource /opt/ros/a/setup.bash\nset -u
+if true; then set +u; fi\nsource /opt/ros/a/setup.bash\nset -u
+set +o posix +u\nsource /opt/ros/a/setup.bash\nset -u
+set +u\nsort -u /dev/null\nsource /opt/ros/a/setup.bash\nset -u
+set +u\n(\nset -u\n  set +u\n)\nif false; then\n  set -u\nfi\nsource /opt/ros/a/setup.bash\nset -u
+if true; then\n  set +u\nfi\nset +u\nif false; then\n  set -u\nfi\nsource /opt/ros/a/setup.bash\nset -u
+setup_ros() { set +u; source /opt/ros/a/setup.bash; set -u; }\nsetup_ros
+(set +u; source /opt/ros/a/setup.bash)
+EOF
+  [ "${_n}" -eq 21 ]
+}
+
+# why: the direction that must not be lost. A bracket ends at its `set -u`,
+# and a source after it is bare whatever was guarded above.
+@test "migration 8 (nounset-source): a source after the bracket ends is still bracketed (base#2149)" {
+  mkdir -p "${TEMP_DIR}/script"
+  : > "${DF}"
+  local _body _n=0
+  while IFS= read -r _body; do
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n%b\necho end\n' "${_body}" \
+      > "${TEMP_DIR}/script/entrypoint.sh"
+    _m8_run
+    assert_failure || fail "the case itself is guarded: ${_body}"
+    run bash -c "$(_src); apply_migrations '${DF}'"
+    assert_success
+    _m8_run
+    assert_success || fail "still bare: ${_body}"
+    assert_output --partial $'sourced\nsourced\nend'
+    run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
+    assert_failure || fail "not settled: ${_body}"
+    (( ++_n ))
+  done <<'EOF'
+source /opt/ros/a/setup.bash\nsource /opt/ros/b/setup.bash
+set +u\nsource /opt/ros/a/setup.bash\nset -u\nsource /opt/ros/b/setup.bash
+set +u\nsource /opt/ros/a/setup.bash\nset -eu -o pipefail\nsource /opt/ros/b/setup.bash
+set +o nounset\nsource /opt/ros/a/setup.bash\nset -o nounset\nsource /opt/ros/b/setup.bash
+set +u; source /opt/ros/a/setup.bash; set -u\nsource /opt/ros/b/setup.bash
+set +e\nsource /opt/ros/a/setup.bash\nsource /opt/ros/b/setup.bash
+# set +u\nsource /opt/ros/a/setup.bash\nsource /opt/ros/b/setup.bash
+echo "set +u"\nsource /opt/ros/a/setup.bash\nsource /opt/ros/b/setup.bash
+if true; then\n  set +u\n  source /opt/ros/a/setup.bash\n  set -u\nfi\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash)\nsource /opt/ros/b/setup.bash
+(\n  set +u\n  source /opt/ros/a/setup.bash\n)\nsource /opt/ros/b/setup.bash
+source /opt/ros/a/setup.bash; set +u\nsource /opt/ros/b/setup.bash\nset -u
+if true; then\n  set +u\n  (set -u; :)\n  source /opt/ros/a/setup.bash\n  set -u\nfi\nsource /opt/ros/b/setup.bash
+set +u; if true; then . /opt/ros/a/setup.bash; fi; set -u\nsource /opt/ros/b/setup.bash
+set +u; { . /opt/ros/a/setup.bash; }; set -u\nsource /opt/ros/b/setup.bash
+set +u; for _x in 1; do . /opt/ros/a/setup.bash; done; set -u\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) || true\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) # quiet\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) </dev/null\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) >&1\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash); :\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) & wait\nsource /opt/ros/b/setup.bash
+set +u; case x in x) . /opt/ros/a/setup.bash; esac; set -u\nsource /opt/ros/b/setup.bash
+(set +u; source /opt/ros/a/setup.bash) 2>/dev/null\nsource /opt/ros/b/setup.bash
+EOF
+  [ "${_n}" -eq 24 ]
+
+  # A path put together by a pipeline is a source too.
+  printf '%s\n' 'set -eu' '. "$(ls -d /opt/ros/* | tail -n 1)/setup.bash"' > "${TEMP_DIR}/script/entrypoint.sh"
+  run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
+  assert_success
+}
+
+# why: where a function body stands in the file says nothing about when it
+# runs. One written above the `set -u` is called below it.
+@test "migration 8 (nounset-source): a function written before nounset is turned on is still bracketed (base#2149)" {
+  mkdir -p "${TEMP_DIR}/script"
+  : > "${DF}"
+  cat > "${TEMP_DIR}/script/entrypoint.sh" <<'EOF'
+#!/usr/bin/env bash
+setup_ros() {
+  source /opt/ros/a/setup.bash
+}
+set -euo pipefail
+setup_ros
+echo end
+EOF
+  _m8_run
+  assert_failure
+  run bash -c "$(_src); apply_migrations '${DF}'"
+  assert_success
+  _m8_run
+  assert_success
+  assert_output $'sourced\nend'
+  run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
+  assert_failure
+}
+
 @test "migration 8 (nounset-source): detect false when no set -u in entrypoint (#579)" {
   mkdir -p "${TEMP_DIR}/script"
   : > "${DF}"
