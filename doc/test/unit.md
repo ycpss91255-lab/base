@@ -1385,7 +1385,7 @@ code, base#1562.
 | `workflows: every ACTIONLINT_IMAGE step pulls via script/ci/retry.sh before a --pull never run (base#1562)` | A Docker Hub 502 on the actionlint image pull failed the lint job because the only pull was the implicit `--pull missing` of the `docker run`, with no retry. Every step that names ACTIONLINT_IMAGE must pre-pull it through retry.sh (more than one attempt) before the run, and the run must say `--pull never`, so dropping the pre-pull or its retry fails loud instead of falling back to the unretried pull, base#1562. |
 | `workflows: every just-pin job installs just via script/ci/install-just.sh and none uses extractions/setup-just (base#1562)` | A GitHub API 504 in extractions/setup-just failed the just install after three quick tries a `uses:` step gives the workflow no way to extend. Every job that checks the just on PATH is the pin must install it through script/ci/install-just.sh (which fetches through retry.sh), fed the pin step's output, and no workflow may keep the unretried action -- so one job (the self-hosted coverage-local one included) reverting to setup-just is a finding, base#1562. |
 
-### test/bats/unit/ci_spec.bats (201)
+### test/bats/unit/ci_spec.bats (198)
 
 | Test | Description |
 |------|-------------|
@@ -1492,9 +1492,6 @@ code, base#1562.
 | `_run_bats_fragile: runs exactly the kcov-fragile tagged tests of the unit and integration pools (base#1573)` | base#1573 the plain leg runs the tagged tests, not their files |
 | `_run_bats_fragile: does NOT set COVERAGE=1 so the kcov-skip guards fall through (#677)` | #677 plain mode runs the skipped tests |
 | `main --bats-fragile: routes to the ci service with BATS_FRAGILE=1 + BATS_ONLY=1, no COVERAGE (#677)` | #677 fragile flag dispatch |
-| `_run_doc_readers: runs exactly the specs doc_reader_specs.sh lists (base#2110)` | base#2110. doc-counts runs, for a docs-only pull request, exactly the specs doc_reader_specs.sh lists, in plain mode and each once. |
-| `_run_doc_readers: fails and runs nothing when the list cannot be read (base#2110)` | base#2110. A list that cannot be read is no list, so nothing ran and the run must not pass. |
-| `main --doc-readers: routes to the ci service with DOC_READERS=1 + BATS_ONLY=1, no COVERAGE (base#2110)` | base#2110. The outer flag reaches the ci service as DOC_READERS=1 with ShellCheck and kcov off, as --bats-fragile does. |
 | `main --bats-path: dispatches a single spec to the ci service with BATS_FILE + BATS_ONLY=1` | #523 single-file dispatch |
 | `main --bats-path: accepts a directory` | #523 directory path |
 | `main --bats-path: non-existent path dies with ci_bats_path_not_found` | #523 missing-path guard |
@@ -3188,24 +3185,6 @@ to escape.
 | `_sync_doc_counts: FAILS naming the document when the generated fence is missing` | A catalogue that lost its fence must be an ERROR. Generating nothing into a document with no region is how a level silently stops being covered while the drift gate keeps reporting "in sync" -- the exact failure this whole mechanism exists to remove, one layer up. |
 | `_sync_doc_counts: a second run over a generated catalogue changes nothing` | "Regenerating from scratch reproduces what is committed" is the gate check_test_md_drift.sh applies to the real tree, so a second run that moved a byte would make every branch red for a reason no diff explains. |
 | `_sync_doc_counts: a shipped smoke spec lands in smoke.md` | A shipped smoke spec is the one level whose glob leaves test/ for dist/, and it was the case that caught the doc-to-glob map going stale before. It stays because the map is still hand-written. |
-
-### test/bats/unit/doc_reader_specs_spec.bats (7)
-
-A documentation-only pull request skips coverage, the one job that runs
-these specs, so a doc edit that breaks one was first seen in the merge
-queue. The doc-counts job runs the list instead. A spec the list misses is a
-check nobody runs on that pull request, so the rules must err towards
-listing.
-
-| Test | Description |
-|------|-------------|
-| `doc_reader_specs: every way of reading a live document lists the spec (base#2110)` | each way a spec can reach a live document. The list is decided by what is named, not by how the checkout's root is spelled, because a spec can spell the root in any number of ways: a document name anywhere lists the spec, and so does the whole tree used as one argument. |
-| `doc_reader_specs: a helper that names a document lists the specs that load it (base#2110)` | a helper's read is a read by every spec that loads it. |
-| `doc_reader_specs: a comment, another part of the tree and a system spec are not listed (base#2110)` | a comment, a name that only contains a document's and another part of the checkout are not reads of a document, so the list does not grow into the whole suite. The system suite needs a docker socket and is never listed. |
-| `doc_reader_specs: a spec it cannot read fails the list (base#2110)` | a spec that cannot be read is not known to leave the documents alone. |
-| `doc_reader_specs: a tree it cannot walk fails the list (base#2110)` | a suite that cannot be walked is specs nobody listed, whichever of the walks fails. |
-| `doc_reader_specs: no listed spec is a failure (base#2110)` | an empty list would run nothing and read as a pass. |
-| `doc_reader_specs: the real tree's known document readers are listed, and each path exists (base#2110)` | the list over the real tree. Each of these specs opens a document of the checkout (read from its body), so a rule that stops seeing one of them fails here. The list may hold more. |
 
 ### test/bats/unit/dockerfile_migrate_spec.bats (177)
 
@@ -7381,7 +7360,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: declares doc-counts job (#864)` | - |
 | `self-test.yaml: doc-counts job runs test.sh --lint --doc-counts inside the test-tools image (#864, base#1412)` | - |
 | `self-test.yaml: doc-counts carries NO code_changed gate (#864)` | - |
-| `self-test.yaml: doc-counts runs the documentation-reading specs unless coverage is selected (base#2110)` | base#2110. The specs that read the checkout's documents run only inside coverage, which a docs-only pull request skips, so doc-counts runs them for exactly that case. The step runs on anything but an explicit `true`, and it is the job's only step with a condition on classify, so the count gate above it stays unconditional. |
+| `self-test.yaml: the jobs a docs-only pull request runs start no bats (base#2110)` | base#2110. A docs-only pull request runs the jobs that carry no classify gate, and none of them may run bats, coverage or a mutation row: those run in the merge queue, where classify selects every job. What such a job calls of the test driver is a lint. |
 | `self-test.yaml: ci-rollup treats doc-counts as hard-mandatory, not SKIPPED-tolerant (#864)` | - |
 | `self-test.yaml: declares lint-static job (#866)` | - |
 | `self-test.yaml: lint-static carries NO code_changed gate (#866)` | - |

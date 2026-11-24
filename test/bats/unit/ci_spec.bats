@@ -530,7 +530,7 @@ teardown() {
   # fails. Clear the whole ambient dispatch so this exercises the full-gate
   # branch (lint, then the suite) the test is named for.
   run env LOG_FORMAT=json BATS_ONLY=0 BATS_FILE= BATS_FILTER= \
-    BATS_UNIT_SHARD= BATS_FRAGILE=0 DOC_READERS=0 BATS_INTEGRATION=0 \
+    BATS_UNIT_SHARD= BATS_FRAGILE=0 BATS_INTEGRATION=0 \
     COVERAGE=0 COVERAGE_PATH= COVERAGE_SHARD= LINT_ONLY=0 bash -c '
     source /source/script/test/test.sh
     set -eo pipefail
@@ -3190,7 +3190,7 @@ _kcov_slice_mock() {
     # (No apostrophes in this block: it lives inside a single-quoted
     # bash -c string, where one ends the program.)
     COVERAGE=1 COVERAGE_SHARD=1/4 COVERAGE_PATH= COVERAGE_LOCAL_JOBS= \
-      BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 DOC_READERS=0 BATS_INTEGRATION=0 \
+      BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 BATS_INTEGRATION=0 \
       BATS_FILE= BATS_FILTER= LINT_ONLY=0 LINT_TOOL= LINT_GROUP= PER_TEST_TIMEOUT= \
       COVERAGE_JOBS= SHARD_WEIGHTS_BLOB= main --ci
   '
@@ -3632,66 +3632,6 @@ ok unit tagged fragile"
   refute_output --partial "COVERAGE=1"
 }
 
-# why: base#2110. doc-counts runs, for a docs-only pull request, exactly the
-# specs doc_reader_specs.sh lists, in plain mode and each once.
-@test "_run_doc_readers: runs exactly the specs doc_reader_specs.sh lists (base#2110)" {
-  local _log="${BATS_TEST_TMPDIR}/bats.log"
-  mock_cmd "bats" '
-    printf "COVERAGE=[%s]\n" "${COVERAGE:-unset}" >> "'"${_log}"'"
-    for _a in "$@"; do [[ "${_a}" == *.bats ]] && printf "%s\n" "${_a}" >> "'"${_log}"'"; done
-    exit 0'
-  run bash -c '
-    unset COVERAGE
-    source /source/script/test/test.sh
-    _run_doc_readers
-  '
-  assert_success
-  run cat "${_log}"
-  assert_output "COVERAGE=[unset]
-$(bash /source/script/ci/doc_reader_specs.sh /source | sed 's|^|/source/|')"
-}
-
-# why: base#2110. A list that cannot be read is no list, so nothing ran and
-# the run must not pass.
-@test "_run_doc_readers: fails and runs nothing when the list cannot be read (base#2110)" {
-  local _log="${BATS_TEST_TMPDIR}/bats.log" _body
-  mock_cmd "bats" 'echo ran >> "'"${_log}"'"; exit 0'
-  # The runner starts the list script with `bash`; the function stands in
-  # for a script that fails, prints nothing, or prints and then fails.
-  for _body in 'return 1' 'return 0' 'echo a_spec.bats; return 1'; do
-    run bash -c '
-      source /source/script/test/test.sh
-      eval "bash() { $1; }"
-      _run_doc_readers
-    ' _ "${_body}"
-    assert_failure
-    assert_output --partial 'doc_reader_specs.sh'
-    assert [ ! -e "${_log}" ]
-  done
-}
-
-# why: base#2110. The outer flag reaches the ci service as DOC_READERS=1
-# with ShellCheck and kcov off, as --bats-fragile does.
-@test "main --doc-readers: routes to the ci service with DOC_READERS=1 + BATS_ONLY=1, no COVERAGE (base#2110)" {
-  local _log="${BATS_TEST_TMPDIR}/docker.log"
-  mock_cmd "docker" '
-    printf "%s\n" "$*" >> "'"${_log}"'"
-    exit 0'
-  mock_cmd "id" 'echo 1000'
-  run bash -c '
-    source /source/script/test/test.sh
-    export PATH="'"${MOCK_DIR}"'"
-    main --doc-readers
-  '
-  assert_success
-  run cat "${_log}"
-  assert_output --partial " ci"
-  assert_output --partial "DOC_READERS=1"
-  assert_output --partial "BATS_ONLY=1"
-  assert_output --partial "COVERAGE=0"
-  refute_output --partial "COVERAGE=1"
-}
-
 # ════════════════════════════════════════════════════════════════════
 # --bats-path / --filter single-path inner loop
 # ════════════════════════════════════════════════════════════════════
@@ -4064,7 +4004,7 @@ $(bash /source/script/ci/doc_reader_specs.sh /source | sed 's|^|/source/|')"
     # flight. LINT_ONLY earns its place too -- set, it returns from this
     # dispatch before the coverage branch is read.
     COVERAGE=1 COVERAGE_PATH=test/bats/unit/ci_spec.bats COVERAGE_SHARD= \
-      COVERAGE_LOCAL_JOBS= BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 DOC_READERS=0 \
+      COVERAGE_LOCAL_JOBS= BATS_ONLY=0 BATS_UNIT_SHARD= BATS_FRAGILE=0 \
       BATS_INTEGRATION=0 BATS_FILE= BATS_FILTER= LINT_ONLY=0 LINT_TOOL= LINT_GROUP= PER_TEST_TIMEOUT= \
       COVERAGE_JOBS= SHARD_WEIGHTS_BLOB= \
       main --ci
@@ -5137,8 +5077,8 @@ _host_direct_lint_arms() {
   # back into the dispatcher.
   local _fn
   for _fn in _run_unit_tests _run_integration_tests _run_unit_shard \
-             _run_bats_fragile _run_doc_readers _run_bats_path \
-             _run_system _run_coverage _bats_args_with_label; do
+             _run_bats_fragile _run_bats_path _run_system _run_coverage \
+             _bats_args_with_label; do
     run grep -E "^${_fn}\(\) \{" /source/script/test/drivers/bats.sh
     assert_success
     run grep -E "^${_fn}\(\) \{" /source/script/test/test.sh

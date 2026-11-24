@@ -2483,26 +2483,31 @@ EOF
   # Non-vacuity: an absent job yields an empty block, against which the
   # refute below would pass while asserting nothing.
   assert_output --partial './script/test/test.sh --lint --doc-counts'
-  # Read from the parsed job: neither the job nor the step that runs the
-  # gate has an `if:` (the job's other steps may, base#2110).
-  run yq '.jobs["doc-counts"] | has("if")' "${WF}"
-  assert_output false
-  run yq '.jobs["doc-counts"].steps[] | select((.run // "") | test("--lint --doc-counts")) | has("if")' "${WF}"
-  assert_output false
+  # The gate form its sibling lint jobs use. Matching on that rather than
+  # the bare word keeps the job's own comment (which explains WHY it is
+  # ungated, and so names the gate) from satisfying the refutation.
+  refute_output --partial 'if: needs.classify.outputs'
 }
 
-# why: base#2110. The specs that read the checkout's documents run only
-# inside coverage, which a docs-only pull request skips, so doc-counts runs
-# them for exactly that case. The step runs on anything but an explicit
-# `true`, and it is the job's only step with a condition on classify, so
-# the count gate above it stays unconditional.
-@test "self-test.yaml: doc-counts runs the documentation-reading specs unless coverage is selected (base#2110)" {
-  run yq '.jobs["doc-counts"].steps[] | select((.run // "") | test("--doc-readers")) | .if' "${WF}"
-  assert_output "needs.classify.outputs.select_coverage != 'true'"
-  run yq '.jobs["doc-counts"].steps[] | select((.run // "") | test("--doc-readers")) | .run' "${WF}"
-  assert_output './script/test/test.sh --doc-readers'
-  run yq '.jobs["doc-counts"].steps[] | select((.if // "") | test("classify")) | .name' "${WF}"
-  assert_output 'Run the specs that read documentation'
+# why: base#2110. A docs-only pull request runs the jobs that carry no
+# classify gate, and none of them may run bats, coverage or a mutation row:
+# those run in the merge queue, where classify selects every job. What such
+# a job calls of the test driver is a lint.
+@test "self-test.yaml: the jobs a docs-only pull request runs start no bats (base#2110)" {
+  local _job _calls _all=""
+  while IFS= read -r _job; do
+    # The two that run after the others: they wait on jobs and start none.
+    case "${_job}" in ci-rollup|release) continue ;; esac
+    [[ "$(yq ".jobs[\"${_job}\"].if // \"\"" "${WF}")" != *needs.classify.outputs.select_* ]] || continue
+    _calls="$(yq ".jobs[\"${_job}\"].steps[].run // \"\"" "${WF}" | grep -v '^[[:space:]]*#' \
+      | grep -E 'test\.sh|just test|(^|[[:space:];&|(])bats[[:space:]]' || true)"
+    [[ -z "${_calls}" ]] || _all+="$(sed "s|^[[:space:]]*|${_job}: |" <<< "${_calls}")"$'\n'
+  done < <(yq '.jobs | keys | .[]' "${WF}")
+  # Non-vacuity: the two lint jobs are read.
+  grep -q '^doc-counts: .*--lint --doc-counts' <<< "${_all}" || fail "doc-counts not read: ${_all}"
+  grep -q '^lint-static: .*--lint --group' <<< "${_all}" || fail "lint-static not read: ${_all}"
+  run grep -vE -- '^$|test\.sh --lint( |-group-members )' <<< "${_all}"
+  assert_output ''
 }
 
 @test "self-test.yaml: ci-rollup treats doc-counts as hard-mandatory, not SKIPPED-tolerant (#864)" {

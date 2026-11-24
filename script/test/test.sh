@@ -47,10 +47,6 @@
 #                                  # plain mode (the tests the coverage matrix
 #                                  # skips). Used by the bats-fragile job in
 #                                  # self-test.yaml
-#   ./test.sh --doc-readers          # Run ONLY the specs that read the
-#                                  # checkout's documentation, in plain mode.
-#                                  # Used by the doc-counts job in
-#                                  # self-test.yaml for a docs-only PR
 #   ./test.sh --bats-integration     # Run integration tests only (skip
 #                                  # ShellCheck + unit). A local entry
 #                                  # point: in CI the coverage shards run
@@ -661,8 +657,6 @@ Options:
                           $BATS_ONLY=1 to skip the ShellCheck phase,
                           $BATS_UNIT_SHARD to run only one matrix shard,
                           $BATS_FRAGILE=1 to run only the kcov-fragile tests,
-                          $DOC_READERS=1 to run only the specs that read
-                          documentation,
                           $BATS_INTEGRATION=1 to run integration only
   --lint                  All linters (ShellCheck + Hadolint) via docker
                           compose; the ci/test-tools image bakes in hadolint.
@@ -947,12 +941,6 @@ Options:
                           matrix skips; the bats-fragile job in
                           self-test.yaml runs them so no test goes unrun
                           (#677, base#1573)
-  --doc-readers           Run ONLY the unit and integration specs that read
-                          the checkout's documentation, in plain mode (skip
-                          ShellCheck). script/ci/doc_reader_specs.sh lists
-                          them; the doc-counts job in self-test.yaml runs
-                          them for a docs-only pull request, which runs no
-                          coverage (base#2110)
   --bats-integration      Run integration tests only (skip ShellCheck +
                           unit). A local entry point: in CI the coverage
                           shards run these specs (#377, base#1573)
@@ -1147,7 +1135,6 @@ Examples:
   ./test.sh --bats-only           # Compose-bats only, skip ShellCheck
   ./test.sh --bats-unit-shard 1/2 # Compose-bats unit shard 1 of 2
   ./test.sh --bats-fragile        # Compose-bats kcov-fragile specs (plain)
-  ./test.sh --doc-readers         # Compose-bats doc-reading specs (plain)
   ./test.sh --bats-integration    # Compose-bats integration only
   ./test.sh --bats-path test/bats/unit/ci_spec.bats          # one spec, fast
   ./test.sh --bats-path test/bats/unit/                       # one directory
@@ -1353,13 +1340,6 @@ _dispatch_needs_prev_release() {
   # of the two guesses, only "not needed" can end in a vacuous spec.
   if [[ "${BATS_FRAGILE:-0}" == "1" ]]; then
     grep -qF 'kcov-fragile' "${REPO_ROOT}/${_PREV_RELEASE_SPEC}" 2>/dev/null
-    return
-  fi
-  # --doc-readers runs the listed specs; a list that cannot be read is
-  # answered by the run itself, which refuses it.
-  if [[ "${DOC_READERS:-0}" == "1" ]]; then
-    bash "${REPO_ROOT}/script/ci/doc_reader_specs.sh" "${REPO_ROOT}" 2>/dev/null \
-      | grep -xF -- "${_PREV_RELEASE_SPEC}" >/dev/null
     return
   fi
   # --bats-integration, --bats-only and bare `just test` all run the whole
@@ -2682,8 +2662,8 @@ _run_via_compose() {
   # covering it in parallel. Default 0 keeps the local `just test`
   # path unchanged (full shellcheck + bats).
   #
-  # BATS_UNIT_SHARD / BATS_FRAGILE / DOC_READERS / BATS_INTEGRATION route the
-  # coverage-slice / bats-fragile / doc-counts GHA jobs and the local --bats-integration
+  # BATS_UNIT_SHARD / BATS_FRAGILE / BATS_INTEGRATION route the
+  # coverage-slice / bats-fragile GHA jobs and the local --bats-integration
   # run to the right subset inside the container; empty / 0 keep the
   # local `just test` path unchanged (full unit + integration).
   #
@@ -2834,7 +2814,6 @@ _run_via_compose() {
     -e BATS_ONLY="${BATS_ONLY:-0}" \
     -e BATS_UNIT_SHARD="${BATS_UNIT_SHARD:-}" \
     -e BATS_FRAGILE="${BATS_FRAGILE:-0}" \
-    -e DOC_READERS="${DOC_READERS:-0}" \
     -e BATS_INTEGRATION="${BATS_INTEGRATION:-0}" \
     -e BATS_FILE="${BATS_FILE:-}" \
     -e BATS_FILTER="${BATS_FILTER:-}" \
@@ -2884,7 +2863,6 @@ main() {
   local host_lint_group=""
   local bats_unit_shard=""
   local bats_fragile=0
-  local doc_readers=0
   local bats_integration=0
   local bats_path=""
   local coverage_path=""
@@ -2992,7 +2970,6 @@ main() {
       --bats-only) bats_only=1; shift ;;
       --bats-unit-shard) bats_unit_shard="${2:?--bats-unit-shard expects <n>/<total>}"; shift 2 ;;
       --bats-fragile) bats_fragile=1; shift ;;
-      --doc-readers) doc_readers=1; shift ;;
       --bats-integration) bats_integration=1; shift ;;
       --bats-path) bats_path="${2:?--bats-path expects <path>}"; shift 2 ;;
       --coverage-path) coverage_path="${2:?--coverage-path expects <path>}"; shift 2 ;;
@@ -3403,8 +3380,6 @@ main() {
         _run_unit_shard "${BATS_UNIT_SHARD}"
       elif [[ "${BATS_FRAGILE:-0}" == "1" ]]; then
         _run_bats_fragile
-      elif [[ "${DOC_READERS:-0}" == "1" ]]; then
-        _run_doc_readers
       elif [[ "${BATS_INTEGRATION:-0}" == "1" ]]; then
         _run_integration_tests
       else
@@ -3514,8 +3489,6 @@ main() {
         BATS_ONLY=1 BATS_UNIT_SHARD="${bats_unit_shard}" _run_via_compose ci 0
       elif [[ "${bats_fragile}" == "1" ]]; then
         BATS_ONLY=1 BATS_FRAGILE=1 _run_via_compose ci 0
-      elif [[ "${doc_readers}" == "1" ]]; then
-        BATS_ONLY=1 DOC_READERS=1 _run_via_compose ci 0
       elif [[ "${bats_integration}" == "1" ]]; then
         BATS_ONLY=1 BATS_INTEGRATION=1 _run_via_compose ci 0
       elif [[ "${bats_only}" == "1" ]]; then

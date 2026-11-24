@@ -376,7 +376,6 @@ ci_prev_release_progress
 ci_prev_release_unavailable
 ci_missing_prerequisite
 ci_config_gen_unprovisioned
-ci_doc_readers_unlisted
 ci_live_tree_residue
 
 # transcript.sh (#606)
