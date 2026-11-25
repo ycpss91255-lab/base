@@ -336,8 +336,8 @@ _check_json() {
   [[ "${stderr}" == *'DRIFTED (1)'* ]] || fail "no DRIFTED (1): ${stderr}"
 }
 
-# why: A series no longer rebuilt sinks behind newer tags and must still be
-# found; a tag that only shares the ending is not a match
+# why: A series no longer rebuilt sinks below the 1000 tags paging can reach
+# and must still be found; a tag that only shares the ending is not a match
 @test "watch: a matching tag behind 1000 newer ones is found (base#2136)" {
   _hub_tags library/python 3.15.0a{1..1000}-trixie \
     3.14.9-alpine3.22 3.13-alpine3.22 3.13.13-alpine3.22 3.13.9-alpine3.22
