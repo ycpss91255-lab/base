@@ -678,7 +678,7 @@ _run_coverage_path() {
     return 0
   fi
   local -a _slices=()
-  _coverage_round_robin _slices "${_njobs}" "${_files[@]}"
+  _coverage_weighted_slices _slices "${_njobs}" "${_files[@]}"
 
   # Container-local scratch, never the mounted checkout. Removed below
   # whether the spec passed or failed.
@@ -896,7 +896,7 @@ _run_coverage() {
   # runs traced children concurrently (a pipeline, a `&`) still writes
   # them into its slice's one pipe, and base#1418 tracks that case.
   local -a _slices=()
-  _coverage_round_robin _slices "${_njobs}" "${_targets[@]}"
+  _coverage_weighted_slices _slices "${_njobs}" "${_targets[@]}"
   local _work
   _work="$(_coverage_parallel_workdir)"
   local -a _pids=()
@@ -980,22 +980,32 @@ _coverage_slice_workdir() {
   printf '%s\n' "${_d}"
 }
 
-# _coverage_round_robin <out_array_name> <n> <target>...
-#   Deal the targets into <n> slices round-robin (<n> capped at the target
-#   count), each slice a newline-separated list. One kcov runs per slice
-#   (base#1414).
-_coverage_round_robin() {
-  local -n _crr_out="${1:?BUG: _coverage_round_robin expects <out_array_name>}"
-  local _n="${2:?BUG: _coverage_round_robin expects <n>}"
+# _coverage_weighted_slices <out_array_name> <n> <target>...
+#   Deal the targets into <n> slices by _spec_weight (<n> capped at the
+#   target count), each slice a newline-separated list. One kcov runs per
+#   slice. A single slice keeps the targets in the order given.
+_coverage_weighted_slices() {
+  local -n _cws_out="${1:?BUG: _coverage_weighted_slices expects <out_array_name>}"
+  local _n="${2:?BUG: _coverage_weighted_slices expects <n>}"
   shift 2
   (( _n > $# )) && _n=$#
-  (( _n < 1 )) && _n=1
-  _crr_out=()
-  local _i=0 _f
-  for _f in "$@"; do
-    _crr_out[_i % _n]+="${_f}"$'\n'
-    _i=$(( _i + 1 ))
-  done
+  _cws_out=()
+  local _f
+  if (( _n <= 1 )); then
+    for _f in "$@"; do
+      _cws_out[0]+="${_f}"$'\n'
+    done
+    return 0
+  fi
+  local _bins _bin _path
+  _bins="$(
+    for _f in "$@"; do
+      printf '%s %s\n' "$(_spec_weight "${_f}")" "${_f}"
+    done | _lpt_assign "${_n}"
+  )" || return 1
+  while read -r _bin _path; do
+    _cws_out[_bin - 1]+="${_path}"$'\n'
+  done <<< "${_bins}"
 }
 
 # _coverage_stderr_replay <file>
