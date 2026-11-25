@@ -10,8 +10,9 @@
 # It lives here now, next to the workflow it mirrors, and
 # test/bats/unit/pre_pr_mirror_parity_spec.bats holds it to that workflow:
 # every `ci-rollup` need is attested or excluded with a reason, only the
-# jobs no local machine can reproduce may be excluded, and an attested job
-# runs locally in the same mode (plain vs kcov) CI runs it.
+# jobs no local machine can reproduce and the release-only ones CI runs for
+# no pull request may be excluded, and an attested job runs locally in the
+# same mode (plain vs kcov) CI runs it.
 #
 # Usage:
 #   ./script/ci/pre_pr_mirror.sh [--base <ref>]
@@ -145,7 +146,8 @@ readonly -a _AMD64_CMDS=("${_CMD_SYSTEM}" "${_CMD_ACCEPTANCE}")
 # Membership of `attested` is a claim about what the plan RUNS, on every
 # diff CI runs the job for; the parity spec checks the plan against each
 # job's `if:` gate and the run against the plan. `excluded` is the honest way to narrow the claim, and only what no
-# local machine can reproduce belongs in it.
+# local machine can reproduce, or CI runs for no pull request (base#2177),
+# belongs in it.
 _table() {
   local t=$'\t'
   printf '%s\n' \
@@ -154,7 +156,6 @@ _table() {
     "attested${t}shellcheck${t}${_CMD_TEST}" \
     "attested${t}doc-counts${t}${_CMD_TEST}" \
     "attested${t}lint-static${t}${_CMD_TEST}" \
-    "attested${t}mutation-roster${t}${_CMD_TEST}" \
     "attested${t}hadolint${t}${_CMD_TEST}" \
     "attested${t}bats-fragile${t}${_CMD_TEST}" \
     "attested${t}coverage${t}${_CMD_COVERAGE}" \
@@ -166,6 +167,7 @@ _table() {
     "excluded${t}acceptance/arm64${t}the native arm64 runner leg; a local run measures the host's own arch, and there is no local arm64 runner to stand in for it" \
     "excluded${t}classify${t}CI's own path classifier computing the other jobs' if: gates; the plan applies the same two rules itself, and there is no repo-content verdict to reproduce" \
     "excluded${t}compute-shards${t}CI plumbing: it publishes the shard list and the cached weights blob; --coverage-shards applies its shard-count rule to the same CI_SHARDS, and the cache it restores is CI state no run before the push can read" \
+    "excluded${t}mutation-roster${t}release-only (base#2177): CI runs it on a tag push and on workflow_dispatch, for no pull request; run just test mutation-required before a release" \
     "excluded${t}single-issue-pr${t}reads the pull request live through the GitHub API (base#1629); before the push there is no pull request to read, and the script's own unit spec runs under just test" \
     "excluded${t}test-tools-image-amd64${t}CI plumbing (base#1588): it obtains the run's test-tools image for the other jobs and writes the GHA layer cache on a push to main only; every attested local command obtains that image itself, and the cache is CI state no run before the push can write" \
     "excluded${t}test-tools-image-arm64${t}CI plumbing (base#1588): the arm64 twin of test-tools-image-amd64, on the native arm64 runner; there is no local arm64 runner to stand in for it" \
