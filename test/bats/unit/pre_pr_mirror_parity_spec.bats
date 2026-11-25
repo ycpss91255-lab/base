@@ -1253,7 +1253,10 @@ in-container bats"
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
     _run_lint_group() { printf "in-container lint group %s\n" "$1"; }
-    bash() { printf "roster\n"; }
+    bash() {
+      [[ "$*" != *mutation_required.sh* ]] || { printf "roster\n"; return 0; }
+      command bash "$@"
+    }
     main --ci
   '
   assert_success
@@ -1264,7 +1267,10 @@ in-container bats"
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
     _run_tests() { printf "in-container bats\n"; }
-    bash() { printf "roster\n"; }
+    bash() {
+      [[ "$*" != *mutation_required.sh* ]] || { printf "roster\n"; return 0; }
+      command bash "$@"
+    }
     main --ci
   '
   assert_success
