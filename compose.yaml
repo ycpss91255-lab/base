@@ -164,8 +164,11 @@ services:
       - HOST_GID=${HOST_GID:?set by 'just test' / 'just test system' -- run one of those instead of driving docker compose directly}
       - MOUNT_DOCKER_SOCK=1
       # Bare: compose forwards the caller's value and omits an unset one.
+      # TEST_TOOLS_IMAGE: the tag this service runs; a pinned one cannot be
+      # derived in the container.
       # GITHUB_ACTIONS: makes _run_system refuse a skip. `ci` must not
       # carry it: the in-image lint refuses a runner.
+      - TEST_TOOLS_IMAGE
       - GITHUB_ACTIONS
     entrypoint: /bin/bash
     command:
