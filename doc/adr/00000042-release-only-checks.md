@@ -17,7 +17,8 @@ The required-kill roster (#1461) proves that a test notices when the guard
 it covers is removed. Its hosted job, `mutation-roster`, ran for every code
 change three times on the way to `main`: on the pull request, on the merge
 group and on the push. No ADR recorded that it must pass; the rule lived in
-`self-test.yaml` and in the specs that hold it, so this record is the first
+`self-test.yaml`, in the specs that hold it, and in the two rulesets that
+require `ci-rollup` (`main` and the `v*` tags), so this record is the first
 one and amends none.
 
 #1592 asked whether it should keep blocking every merge, and deferred the
@@ -63,7 +64,8 @@ longer block every change and block a release instead.
 3. **One gate shape.** A release-only job keeps the `if:` every gated job
    has, on its own key, and stays in `needs:` of `ci-rollup` and of
    `release`. So `ci-rollup` passes its skip only where `classify` wrote
-   `false`, and names it in its notice; `release` runs only when it
+   `false`, and names it in its notice (a docs-only pull request's notice
+   says instead that every gated job skipped); `release` runs only when it
    succeeded, not when it skipped.
 4. **Local matches hosted.** The no-flag `just test` and the pre-PR mirror
    stand for the pull request gate, so they do not run it either. The mirror
@@ -71,17 +73,19 @@ longer block every change and block a release instead.
    mirror runs `just test go-gates`, the recipe of the hosted gates job;
    `just test go` stays the gates and then the redpath, all that a tag runs
    for it.
-5. **Before a release**, run it on the commit to be tagged: `gh workflow run
-   self-test.yaml --ref main`, or the local command in the table.
-   `workflow_dispatch` is kept for this.
+5. **Before a release**, run it on the commit to be tagged: the local
+   command in the table, or a `workflow_dispatch` of `self-test.yaml`, which
+   is kept for this. `doc/test/TEST.md` has the commands and what to check
+   on the hosted run. Nothing enforces this step.
 
 No roster row is removed or changed, and the specs that read the roster as
 data (every row still applies to its subject, has a witness, and fits its
-leg) still run on every pull request. No redpath case is removed or changed
-either, and `config_gen_gates_spec.bats` still runs the redpath against a
-stub runner on every pull request that selects coverage. `config-gen-gates`
-keeps its own selection, and ADR-00000039's rule that one recipe runs the Go
-gates in every environment stands: that recipe is `just test go-gates`.
+leg) still run on every pull request but a docs-only one. No redpath case is
+removed or changed either, and `config_gen_gates_spec.bats` still runs the
+redpath against a stub runner on every pull request that selects coverage.
+`config-gen-gates` keeps its own selection, and ADR-00000039's rule that one
+recipe runs the Go gates in every environment stands: that recipe is
+`just test go-gates`.
 
 ## Consequences
 
@@ -93,12 +97,18 @@ gates in every environment stands: that recipe is `just test go-gates`.
 - **A test that stops killing its mutant, or a Go gate that can no longer go
   red, can reach `main`** and is found only at the next release or dispatch,
   after later changes have landed on top of it.
-- **A red release-only check on a tag comes after the tag exists.** The tag
-  also starts `release-test-tools.yaml`, which publishes the test-tools
-  images without waiting for it. Only the GitHub Release is withheld. Running
-  the checks before tagging is what avoids this.
-- A run whose `ci-rollup` is green no longer says the release-only checks
-  passed. The rollup's notice names the jobs that did not run.
+- **A run whose `ci-rollup` is green no longer says the release-only checks
+  passed.** The rollup's notice names the jobs that did not run.
+- **A red release-only check on a tag comes after the tag exists**, and
+  withholds the GitHub Release alone. Running the checks before tagging is
+  what avoids this:
+  - The tag can still be pushed. The `v*` ruleset asks for a green
+    `ci-rollup` on the commit, and the merge group's is green without them.
+  - Downstream takes the tag. `dist/script/base/upgrade.sh` and `init.sh`
+    pick the newest `vX.Y.Z` tag (`git ls-remote --tags`), not the newest
+    GitHub Release.
+  - The tag also starts `release-test-tools.yaml`, which publishes the
+    test-tools images without waiting for them.
 
 ## Alternatives
 

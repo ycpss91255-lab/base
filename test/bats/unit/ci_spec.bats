@@ -1084,8 +1084,7 @@ _all_group_members() {
 }
 
 # why: End-to-end default dispatch. PATH holds the docker mock alone, so a
-# no-flag run that started anything else on the host fails here: the
-# required-kill roster is not part of it (base#2177).
+# no-flag run that starts anything else on the host fails here.
 @test "main: dispatches no-flag default to the ci service" {
   local _log="${BATS_TEST_TMPDIR}/docker.log"
   mock_cmd "docker" '

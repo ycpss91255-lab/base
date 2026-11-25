@@ -216,11 +216,8 @@ _ci_gate() {
   fi
 }
 
-# _release_only_jobs -- the ci-rollup needs CI runs for no change
-# (base#2177), one per line. Read by running classify's own diff step as a
-# pull request whose base cannot be read: every key the diff decides is
-# then `true` (fail closed), so a key still `false` is one the event alone
-# decides.
+# _release_only_jobs -- the ci-rollup needs the event alone deselects, one
+# per line: classify's diff step, run with no base to read, selects the rest.
 _release_only_jobs() {
   local _d="${SCRATCH}/classify" _job _gate _key
   mkdir -p "${_d}"
@@ -311,11 +308,8 @@ table:
 ${_table}"
 }
 
-# why: An exclusion is the honest way to narrow what a green stamp claims,
-# and only two kinds are honest: a job no local machine can reproduce
-# (ALLOWED_EXCLUSIONS), and a job CI itself runs for no pull request
-# (base#2177), which is read off CI's own classify rather than listed here,
-# so a job moved back onto pull requests has to be attested again.
+# why: an exclusion narrows what a green stamp claims. The release-only jobs
+# are read off classify, so one moved back onto pull requests must be attested.
 @test "pre-PR mirror: only arm64 acceptance, classify, compute-shards, the test-tools-image builders, worker-selftest and the release-only jobs may be excluded (base#1409, base#2177)" {
   local _table _job _release _bad=""
   _table="$(_mirror_table)" || return 1
@@ -327,11 +321,8 @@ ${_table}"
   [[ -z "${_bad}" ]] || fail "the mirror excludes jobs it is required to run locally:${_bad}"
 }
 
-# why: base#2177. CI runs a release-only job for no pull request, so a
-# mirror that attested it would be stricter than the CI it mirrors; one that
-# dropped it in silence would leave nobody running it before the tag, which
-# is where its first hosted verdict lands. So each is excluded, and its
-# reason names the `just test` recipe the CI job itself runs.
+# why: a mirror that attested one would be stricter than CI, and one that
+# dropped it in silence would leave nobody running it before the tag.
 @test "pre-PR mirror: every release-only job is excluded, naming the recipe its CI job runs (base#2177)" {
   local _table _jobs _job _reason _recipe
   _table="$(_mirror_table)" || return 1
@@ -1172,14 +1163,10 @@ STUB
   refute_output --partial "BASE_SHA"
 }
 
-# ── `just test` runs no release-only check (base#2177) ───────────────────────
+# ── `just test` runs no release-only check ───────────────────────────────────
 #
-# The required-kill roster gates no pull request (base#2177), so no
-# test.sh dispatch runs it; `just test mutation-required` does, before a
-# release. Each case sources test.sh and stubs the compose dispatch, so
-# what is asserted is the calls main makes. The roster is seen by its
-# driver: main may start it through any function or recipe, and the two
-# commands that can (`bash`, `just`) print `roster` when they are handed it.
+# Each case sources test.sh with the compose dispatch stubbed; `bash` and
+# `just`, the two ways main can start the roster, print `roster` for it.
 
 # _main_calls <args>... -- run the sourced main with the compose dispatch
 # stubbed; each call prints one line. LINT_ONLY and
@@ -1218,11 +1205,8 @@ _main_calls() {
   ' _ "$@"
 }
 
-# why: The no-flag run stands for the pull request gate on this machine, and
-# no pull request runs the roster, so a no-flag run that still ran it would
-# be stricter than the CI it mirrors. The dispatch was split in two only to
-# put the roster between the lint phase and bats; without it one compose
-# run does both, in that order (the `--ci` case below).
+# why: the no-flag run stands for the pull request gate on this machine, so
+# one that ran the roster would be stricter than the CI it mirrors.
 @test "test.sh: a no-flag run is one compose run that lints and runs bats, without the roster (base#2177)" {
   _main_calls
   assert_success
@@ -1238,12 +1222,8 @@ _main_calls() {
   refute_line roster
 }
 
-# why: `--ci` is the in-container dispatch every compose run lands in -- the
-# no-flag run among them, which lints and then runs bats there -- so a
-# roster call there would run it inside the test-tools container, and in
-# every CI job that reaches it. The phases it does run are stubbed and
-# printed, so the case proves the dispatch ran, in that order, and still
-# made no roster call.
+# why: every compose run lands in `--ci`, so a roster call there would run
+# it inside the test-tools container and in every CI job that reaches it.
 @test "test.sh: --ci runs its in-container phases and not the roster (base#1461)" {
   _main_calls --ci
   assert_success

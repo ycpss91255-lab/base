@@ -350,10 +350,8 @@ _with() {
   done
 }
 
-# why: base#2110. The rollup must tell a docs-only skip from one that
-# should have run: mutation-roster and the arm64 image builder pass
-# skipped only while their own key is `false`. The same skip beside a
-# `true`, empty or missing key fails, whatever the other keys say.
+# why: the rollup must tell a deselected skip from one that should have run,
+# by the job's own key and whatever the other keys say.
 @test "self-test: the rollup excuses a mutation-roster or arm64 image skip only when its own key is false (base#2110)" {
   local _job _k _base
   _base="$(_needs_json true success)"

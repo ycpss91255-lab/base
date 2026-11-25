@@ -171,8 +171,7 @@ _context_copy_paths() {
   assert_line 'testtools_changed=false'
 }
 
-# why: A non-PR event still runs the full suite. The flag being
-# computable now must not narrow what a push runs.
+# why: the flag being computable must not narrow what a push runs.
 @test "classify: a push is still code-changed and system-relevant (#1010)" {
   run _classify_push doc/guide.md
   assert_success
@@ -261,13 +260,10 @@ _context_copy_paths() {
   assert_line 'testtools_changed=true'
 }
 
-# The twelve select_* keys classify writes. Each of the twelve
-# self-test.yaml jobs whose `if:` reads classify reads one of its own;
-# config-gen-gates reads select_config_gen (cycle 4 below).
+# The select_* keys classify writes, one per gated job; config-gen-gates
+# reads select_config_gen.
 SELECT_KEYS="select_config_gen select_config_gen_redpath select_coverage select_coverage_gate select_acceptance select_system select_worker_selftest select_shellcheck select_hadolint select_bats_fragile select_mutation_roster select_test_tools_image_arm64"
-# Of those, the release-only ones (base#2177, ADR-00000042): the event
-# decides them, not the diff. A tag push and workflow_dispatch select them;
-# a pull request, a merge group and a push to a branch do not.
+# The release-only ones of those: the event decides them, not the diff.
 RELEASE_KEYS="select_mutation_roster select_config_gen_redpath"
 
 # _assert_keys <output> <value> [<key>...] -- every select_* key named (all
@@ -296,10 +292,8 @@ _assert_all_but_release() {
 # The ref a merge_group run is for, in the form GitHub names it.
 MERGE_GROUP_REF=refs/heads/gh-readonly-queue/main/pr-1-0123456789abcdef0123456789abcdef01234567
 
-# why: cycle 6. Main runs every check a diff can affect (owner decision,
-# base#1584), and the release-only ones wait for the tag (owner decision,
-# base#2177). `master` is the other branch the workflow's push trigger
-# names.
+# why: a push is not narrowed by its diff; only the jobs that wait for a tag
+# skip on it.
 @test "classify: a push to main or master selects every gated job but the release-only ones (base#1584, base#2177)" {
   run _classify_push doc/guide.md
   assert_success
@@ -309,20 +303,16 @@ MERGE_GROUP_REF=refs/heads/gh-readonly-queue/main/pr-1-0123456789abcdef012345678
   _assert_all_but_release "${output}"
 }
 
-# why: a merge group is the last run before main (base#1587), and only a
-# pull request narrows the selection by its diff (base#1584). So a
-# merge_group run selects every job a diff can affect even when its diff is
-# docs only, or the queue would land a commit whose gated jobs never ran.
-# The release-only jobs gate no merge (base#2177).
+# why: a merge group is the last run before main, so even a docs-only one is
+# not narrowed, or the queue would land a commit its gated jobs never ran on.
 @test "classify: a merge_group run selects every gated job but the release-only ones (base#1584, base#1587, base#2177)" {
   CLASSIFY_REF="${MERGE_GROUP_REF}" run _classify_event merge_group doc/guide.md
   assert_success
   _assert_all_but_release "${output}"
 }
 
-# why: base#2177. A release runs everything: the tag push, whose `release`
-# job needs the release-only jobs, and the workflow_dispatch run that gives
-# their answer before the tag exists.
+# why: the tag's `release` job needs the release-only jobs, and
+# workflow_dispatch gives their answer before the tag exists.
 @test "classify: a tag push and workflow_dispatch select every gated job, the release-only ones included (base#2177)" {
   CLASSIFY_REF=refs/tags/v1.2.3 run _classify_push doc/guide.md
   assert_success
@@ -332,11 +322,8 @@ MERGE_GROUP_REF=refs/heads/gh-readonly-queue/main/pr-1-0123456789abcdef012345678
   _assert_keys "${output}" true
 }
 
-# why: base#2177, fail closed. Only a pull request, a merge group and a push
-# to a branch skip a release-only job. A push whose ref is not a branch
-# (empty, unqualified, or a kind the trigger does not list today) and an
-# event the step has no case for run them, so a trigger added later cannot
-# drop them by omission.
+# why: fail closed: a trigger or a kind of ref added later runs the
+# release-only jobs until the step names it, and cannot drop them by omission.
 @test "classify: a push to no known branch, or an event the step does not name, selects the release-only jobs (base#2177)" {
   local _ref
   for _ref in '' refs/notes/x main; do
@@ -349,22 +336,15 @@ MERGE_GROUP_REF=refs/heads/gh-readonly-queue/main/pr-1-0123456789abcdef012345678
   _assert_keys "${output}" true
 }
 
-# why: base#2177. The step reads the ref from an env key of its own, so that
-# key has to be bound to the run's ref: any other binding makes a tag push
-# read as a branch, or a branch push as a tag.
+# why: any other binding makes a tag push read as a branch, or a branch push
+# as a tag.
 @test "classify: the diff step reads the run's own ref (base#2177)" {
   run yq '.jobs.classify.steps[] | select(.id == "diff") | .env.EVENT_REF' "${SELF_WF}"
   assert_output "\${{ github.ref }}"
 }
 
-# why: cycle 6. A docs-only pull request cannot change a roster row's
-# verdict, so mutation-roster is gated on its own key (base#2110; choosing
-# rows from a diff belongs to base#1604). The workflow's job list is main's
-# (`git show origin/main:.github/workflows/self-test.yaml`, re-measured in
-# redesign r6). base#1588 adds the two ungated test-tools-image builders
-# after classify; base#1629 adds the ungated single-issue-pr before
-# mutation-roster. base#1989 adds the ungated commit-attribution job
-# before ci-rollup.
+# why: with a key of its own the event can skip the roster and nothing else,
+# and no job joins or leaves the workflow without this list changing.
 @test "self-test.yaml: mutation-roster is gated on its own key and the job list is main's (base#1584, base#2110)" {
   run yq '.jobs."mutation-roster".if' "${SELF_WF}"
   assert_output "needs.classify.outputs.select_mutation_roster == 'true'"
@@ -393,10 +373,8 @@ ci-rollup
 release"
 }
 
-# why: cycle 24, the issue's fail-closed rule: a pull request touching a
-# path the map does not know runs every job the map decides; the
-# release-only jobs are not the map's to decide (base#2177).
-# `zz-new/thing.txt` names no directory the repo has.
+# why: fail closed: a path the map does not know skips no job the map
+# decides. `zz-new/thing.txt` names no directory the repo has.
 @test "classify: a pull request touching an unknown path selects every gated job but the release-only ones (base#1584, base#2177)" {
   run _classify_pr zz-new/thing.txt
   assert_success
@@ -421,7 +399,7 @@ release"
 
 # why: cycle 22 (RR3-F1). A unit spec is a leaf (row E1): coverage and the
 # code checks run; config-gen, acceptance, system and worker-selftest do
-# not, and neither do the release-only jobs (base#2177).
+# not.
 @test "classify: a pull request changing one unit spec selects coverage and the code checks only (base#1584)" {
   run _classify_pr test/bats/unit/ci_spec.bats
   assert_success
@@ -436,10 +414,8 @@ release"
       select_hadolint select_bats_fragile select_test_tools_image_arm64
 }
 
-# why: base#2110. A fork's pull request is never narrowed by its diff:
-# classify answers `true` for every key the map decides, and so does a run
-# that cannot say whether it is a fork. It is still a pull request, so the
-# release-only keys stay `false` (base#2177).
+# why: a diff narrows only a run known to be same-repo; any other is still a
+# pull request, so the release-only jobs skip on it.
 @test "classify: a fork pull request, or one not known to be same-repo, selects every gated job (base#2110)" {
   local _v
   for _v in true ''; do
@@ -589,12 +565,8 @@ _pr_restores_selection() {
   done
 }
 
-# why: cycle 29. The classify step cannot invent a `false` for a job the
-# map decides: its one selection call is selection_at_base.sh, the only
-# `false` it can write for such a key is the one it read
-# (`[[ "${val}" == "false" ]]`), and no line writes a literal
-# select_*=false. The release-only keys (base#2177) take release_run, which
-# one arm alone sets to `false`.
+# why: the step must not invent a `false` for a job the map decides: it has
+# one selection call, and passes on only the `false` it read there.
 @test "classify: the diff step's only select_* false is the selection's own or a release-only job's (base#1584, base#2177)" {
   local _step
   _step="$(yaml_step_run "${SELF_WF}" classify diff | grep -v '^[[:space:]]*#')"
@@ -608,8 +580,6 @@ _pr_restores_selection() {
   local _lines
   _lines="$(grep -E '\bval\b.*false|false.*\bval\b' <<< "${_step}" | sed 's/^[[:space:]]*//')"
   assert_equal "${_lines}" '[[ "${val}" == "false" ]] || val=true'
-  _lines="$(grep -F 'release_run=false' <<< "${_step}" | sed 's/^[[:space:]]*//')"
-  assert_equal "${_lines}" 'pull_request:* | merge_group:* | push:refs/heads/*) release_run=false ;;'
 }
 
 # _chain_classify_outputs <classify-output> <assoc-name>
@@ -756,9 +726,8 @@ _gated_jobs() {
 # set comes from the issue and the design, not from the map: a unit spec
 # cannot affect config-gen, acceptance, system or worker-selftest, so
 # those skip; it is code, so shellcheck, hadolint, bats-fragile,
-# coverage and coverage-gate run; and mutation-roster and
-# config-gen-redpath run only for a
-# release (base#2177). Read through classify's real step, its `outputs:` map, every
+# coverage and coverage-gate run; and the release-only jobs skip.
+# Read through classify's real step, its `outputs:` map, every
 # job's parsed `if:` and the real rollup step, so a gate that reads the
 # wrong output, an output classify does not export, or a classify that
 # never carries a `false` all change the set, and the rollup must pass
@@ -800,8 +769,7 @@ _gated_jobs() {
   assert_output --partial 'Passed as a doc-only change'
 }
 
-# The release-only jobs (base#2177), by job name: the ones whose key is
-# release-only (RELEASE_KEYS).
+# The release-only jobs, by job name.
 RELEASE_JOBS="mutation-roster config-gen-redpath"
 
 # _chain_gated <results> <release-only-result> -- every gated job got
@@ -821,9 +789,8 @@ _chain_gated() {
   _chain_check "${_results}" "${_want[@]}"
 }
 
-# why: cycle 3, issue criterion 1: a workflow change, a driver change and
-# an unknown path each skip no job the map decides. The release-only jobs
-# skip on every pull request (base#2177).
+# why: a workflow change, a driver change and an unknown path can each break
+# any job, so only the jobs that wait for a release skip.
 @test "chain: a workflow, driver or unknown-path PR skips no gated job but the release-only ones (base#1584, base#2177)" {
   local _p _out
   for _p in .github/workflows/self-test.yaml script/test/drivers/bats.sh zz-new/thing.txt; do
@@ -834,12 +801,8 @@ _chain_gated() {
   done
 }
 
-# why: On the three runs a change makes on its way to main -- the pull
-# request, the merge group and the push to main -- the release-only jobs
-# skip, the rollup that branch protection requires still passes, and it
-# says which jobs did not run, so its green is not read as a full one. Read
-# through classify's real step, every job's parsed `if:` and the real
-# rollup step.
+# why: branch protection requires the rollup, so the skips must pass it; and
+# it must name the jobs, so that its green is not read as a full run's.
 @test "chain: a PR, a merge group and a push to main skip the release-only jobs, and the rollup passes naming them (base#2176, base#2177)" {
   local _run _out _results
   for _run in pull_request merge_group push; do
@@ -869,10 +832,8 @@ _chain_config_gen() {
   assert_success
 }
 
-# why: The gates' key is not the redpath's. The gates still follow the diff
-# on a pull request, where a change to the redpath runs them and a deny-list
-# path alone does not, and still run on every merge group and push to main.
-# The redpath runs on none of them.
+# why: the two config-gen keys must not be crossed, or skipping the redpath
+# would skip the gates too, or the gates' selection would run the redpath.
 @test "chain: config-gen-gates keeps its own selection where the redpath skips (base#2176)" {
   _chain_config_gen "$(_classify_pr dockerfile/config-gen/cmd/config-gen/main.go)" success
   _chain_config_gen "$(_classify_pr script/test/config_gen_redpath.sh)" success
@@ -881,10 +842,8 @@ _chain_config_gen() {
   _chain_config_gen "$(_classify_push doc/x.md)" success
 }
 
-# why: A tag push runs the release-only jobs and publishes the release
-# behind them; workflow_dispatch runs them with no release, so they can be
-# checked before the tag exists. Neither run skips a job, so the rollup has
-# nothing to name.
+# why: the tag is where the release-only jobs block, and a dispatch on a branch
+# is how they are checked before the tag exists, with nothing published.
 @test "chain: a tag push and workflow_dispatch run the release-only jobs, and only the tag releases (base#2176, base#2177)" {
   local _out
   _out="$(CLASSIFY_REF=refs/tags/v1.2.3 _classify_push zz-new/thing.txt)"
@@ -906,9 +865,8 @@ _chain_config_gen() {
   refute_output --partial 'skipped by design'
 }
 
-# why: Each release-only job alone blocks a tag's release: none is published
-# when the job fails, and none when it never ran, whatever classify said.
-# The rollup excuses the second, so `release` cannot rest on it.
+# why: the rollup excuses a job classify deselected, so `release` cannot rest
+# on the rollup: it must need each release-only job itself.
 @test "chain: a tag on which a release-only job fails or never runs publishes no release (base#2176, base#2177)" {
   local _out _j
   _out="$(CLASSIFY_REF=refs/tags/v1.2.3 _classify_push zz-new/thing.txt)"
@@ -929,11 +887,9 @@ _chain_config_gen() {
 
 # why: cycle 4. One source for every gate: the map's names,
 # the map's --jobs and classify's loop list are the same set, and with the
-# release-only jobs, which the event decides and the map does not name
-# (base#2177), they are the keys the gated jobs' `if:`s read. Each gated
-# job reads exactly one
-# select_* key, the one its `if:` names; config-gen-gates reads
-# select_config_gen. The rollup must resolve each gated job to
+# release-only jobs the keys the gated jobs' `if:`s read. Each gated job
+# reads exactly one select_* key, the one its `if:` names; config-gen-gates
+# reads select_config_gen. The rollup must resolve each gated job to
 # that same key: its skip fails while the key is `true` and passes once
 # that key alone is `false`. The key comes from the job's `if:`, never
 # from a rewrite of the job's name, so a rollup that guesses the key from

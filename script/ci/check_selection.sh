@@ -8,9 +8,8 @@
 #   check_selection.sh --event <event> --base <ref> # paths from git diff <ref>...HEAD
 #   check_selection.sh --jobs                       # the gated job names alone
 #
-# Prints one `<job>=<true|false>` line per gated job, in a fixed order. A
-# release-only job is not one of them (base#2177): no diff selects it, and
-# classify writes its key from the event.
+# Prints one `<job>=<true|false>` line per gated job, in a fixed order, but
+# for the release-only jobs, whose keys classify writes from the event.
 #
 # CI and `test.sh --selection` never run this file from the working tree:
 # script/ci/selection_at_base.sh runs the BASE side's copy, so a pull
@@ -44,8 +43,7 @@ export LC_ALL=C
 
 # The gated jobs, in output order. coverage-gate prints coverage's value,
 # worker-selftest prints system's, and shellcheck, hadolint, bats-fragile
-# and test-tools-image-arm64 print the code value (false only for docs,
-# base#2110).
+# and test-tools-image-arm64 print the code value (false only for docs).
 readonly -a _CS_JOBS=(config-gen coverage coverage-gate acceptance system
   worker-selftest shellcheck hadolint bats-fragile test-tools-image-arm64)
 # The answers the rows set; every job above prints one of them.
@@ -192,11 +190,8 @@ main() {
   [[ -n "${_event}" ]] || { _cs_usage; return 2; }
   [[ "${_from_stdin}" -eq 1 || "${_have_base}" -eq 1 ]] || { _cs_usage; return 2; }
 
-  # Only a pull request narrows the selection: push, tag and
-  # workflow_dispatch runs select every job, so main runs the full suite
-  # (owner decision, base#1584). classify names a pull request from a fork,
-  # or into any branch but the default one, by another event, so neither is
-  # narrowed (base#2110).
+  # Only a pull request narrows the selection. classify names one from a
+  # fork, or into any branch but the default one, by another event.
   if [[ "${_event}" != pull_request ]]; then
     _cs_select_all non_pr
     return 0

@@ -146,8 +146,7 @@ readonly -a _AMD64_CMDS=("${_CMD_SYSTEM}" "${_CMD_ACCEPTANCE}")
 # Membership of `attested` is a claim about what the plan RUNS, on every
 # diff CI runs the job for; the parity spec checks the plan against each
 # job's `if:` gate and the run against the plan. `excluded` is the honest way to narrow the claim, and only what no
-# local machine can reproduce, or CI runs for no pull request (base#2177),
-# belongs in it.
+# local machine can reproduce, or what is release-only, belongs in it.
 _table() {
   local t=$'\t'
   printf '%s\n' \
