@@ -34,6 +34,10 @@ ARG PYTHON_VERSION=3.13.13-alpine3.22
 FROM python:${PYTHON_VERSION}
 
 COPY toml_bridge.py /usr/local/bin/toml-bridge
-RUN chmod +x /usr/local/bin/toml-bridge
+# Run the bridge once, so the bytecode of the modules it imports is in the
+# image: python:alpine ships none and a `docker run --rm` keeps none, so
+# every call would compile them again (base#2184).
+RUN chmod +x /usr/local/bin/toml-bridge && \
+    python3 /usr/local/bin/toml-bridge < /dev/null > /dev/null
 
 ENTRYPOINT ["python3", "/usr/local/bin/toml-bridge"]
