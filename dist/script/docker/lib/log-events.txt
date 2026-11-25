@@ -510,8 +510,7 @@ config_gen_input_not_regular
 config_gen_input_unreadable
 config_gen_output_failed
 
-# script/test/drivers/mutation_required.sh (the required-kill roster runner,
-# base#1461).
+# script/test/drivers/mutation_required.sh (the required-kill roster runner).
 mutation_required_usage_invalid
 mutation_required_roster_empty
 mutation_required_row_invalid
