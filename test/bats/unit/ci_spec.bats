@@ -3116,10 +3116,8 @@ _kcov_slice_mock() {
   assert_output --partial "--recursive"
 }
 
-# _system_run_tree [VAR=value ...]
-#   Run _run_system with real bats over ${BATS_TEST_TMPDIR}/repo, with
-#   GITHUB_ACTIONS cleared and then the caller's assignments. The builder
-#   half (_system_setup / _system_teardown) is stubbed.
+# _system_run_tree [VAR=value ...]: _run_system over the fixture tree with
+# real bats, GITHUB_ACTIONS cleared, the builder half stubbed.
 _system_run_tree() {
   run env -u GITHUB_ACTIONS "$@" bash -c '
     cd "${BATS_TEST_TMPDIR}"

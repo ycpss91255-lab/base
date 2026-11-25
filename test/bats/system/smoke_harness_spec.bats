@@ -47,9 +47,8 @@ setup_file() {
     skip "system test: docker CLI not present"
   fi
 
-  # The harness's `FROM ${TEST_TOOLS_IMAGE}` needs a real image. test.sh
-  # --test-tools-image returns the tag ci-system forwards, or derives the
-  # content hash when none is set.
+  # test.sh --test-tools-image returns the tag ci-system forwards, or derives
+  # the content hash when none is set.
   TEST_TOOLS_IMAGE="$(/source/script/test/test.sh --test-tools-image)"
   export TEST_TOOLS_IMAGE
   if ! docker image inspect "${TEST_TOOLS_IMAGE}" >/dev/null 2>&1; then
