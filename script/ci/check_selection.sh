@@ -190,11 +190,8 @@ main() {
   [[ -n "${_event}" ]] || { _cs_usage; return 2; }
   [[ "${_from_stdin}" -eq 1 || "${_have_base}" -eq 1 ]] || { _cs_usage; return 2; }
 
-  # Only a pull request narrows the selection: push, tag and
-  # workflow_dispatch runs select every job, so main runs the full suite
-  # (owner decision, base#1584). classify names a pull request from a fork,
-  # or into any branch but the default one, by another event, so neither is
-  # narrowed (base#2110).
+  # Only a pull request narrows the selection. classify names one from a
+  # fork, or into any branch but the default one, by another event.
   if [[ "${_event}" != pull_request ]]; then
     _cs_select_all non_pr
     return 0

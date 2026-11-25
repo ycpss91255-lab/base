@@ -171,8 +171,7 @@ _context_copy_paths() {
   assert_line 'testtools_changed=false'
 }
 
-# why: A non-PR event still runs the full suite. The flag being
-# computable now must not narrow what a push runs.
+# why: the flag being computable must not narrow what a push runs.
 @test "classify: a push is still code-changed and system-relevant (#1010)" {
   run _classify_push doc/guide.md
   assert_success
@@ -347,14 +346,8 @@ MERGE_GROUP_REF=refs/heads/gh-readonly-queue/main/pr-1-0123456789abcdef012345678
   assert_output "\${{ github.ref }}"
 }
 
-# why: cycle 6. A docs-only pull request cannot change a roster row's
-# verdict, so mutation-roster is gated on its own key (base#2110; choosing
-# rows from a diff belongs to base#1604). The workflow's job list is main's
-# (`git show origin/main:.github/workflows/self-test.yaml`, re-measured in
-# redesign r6). base#1588 adds the two ungated test-tools-image builders
-# after classify; base#1629 adds the ungated single-issue-pr before
-# mutation-roster. base#1989 adds the ungated commit-attribution job
-# before ci-rollup.
+# why: with a key of its own the event can skip the roster and nothing else,
+# and no job joins or leaves the workflow without this list changing.
 @test "self-test.yaml: mutation-roster is gated on its own key and the job list is main's (base#1584, base#2110)" {
   run yq '.jobs."mutation-roster".if' "${SELF_WF}"
   assert_output "needs.classify.outputs.select_mutation_roster == 'true'"

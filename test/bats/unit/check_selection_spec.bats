@@ -110,8 +110,7 @@ _commit() {
   assert_output "$(tr ' ' '\n' <<<"${GATED_JOBS}")"
 }
 
-# why: the issue's rule "On push, tag and workflow_dispatch everything
-# runs" (main runs the full suite, owner 2026-11-10).
+# why: only a pull request may narrow the selection.
 @test "check_selection: a push run selects every gated job even when its diff is docs only (base#1584)" {
   run --separate-stderr _select push doc/x.md
   assert_success
