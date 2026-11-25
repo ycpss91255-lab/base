@@ -257,10 +257,9 @@ is Docker + Git + `just` and nothing else, and a host-side Python or
 binary would add a fourth dependency whose version the project cannot
 control across Ubuntu 16.04--24.04 machines. Docker is already
 required, so invoking the parser via `docker run` adds no new
-prerequisite. Inside the container the parser is Python with vendored
-`tomli` (the backport accepted into the stdlib as `tomllib` via
-PEP 680), which is zero-dependency, ~1000 lines, MIT-licensed, and
-supports Python 3.6+. The merge logic (type-aware: scalar key-level,
+prerequisite. Inside the container the parser is Python with its stdlib
+`tomllib` (PEP 680, Python 3.11+), so the image installs no package
+beside the interpreter. The merge logic (type-aware: scalar key-level,
 array replace) also runs in Python where the type information is
 native (`dict` vs `list`). The `toml-bridge` image is a standalone
 Dockerfile (`dockerfile/Dockerfile.toml-bridge`).
