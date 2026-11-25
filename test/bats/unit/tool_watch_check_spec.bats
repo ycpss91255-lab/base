@@ -373,6 +373,25 @@ _check_json() {
   done
 }
 
+# why: Docker Hub sends 10 tags a page unless asked for more; the highest match
+# must be found behind the first 10, whether or not the query has a `name`
+@test "watch: the highest match behind the first 10 tags is found (base#2136)" {
+  _hub_tags owner/foo tip-{1..20} 1.9.0
+  _dockerfile '# tool-pin: foo dockerhub owner/foo pattern=^1\.[0-9]+\.[0-9]+$' \
+    'ARG FOO_VERSION=1.0.0'
+  _check_json --drift-tsv
+  assert_equal "${status}" 10
+  assert_output $'foo\t1.0.0\t1.9.0\tdockerfile/Dockerfile\t2'
+
+  _hub_tags owner/foo 1.0.{1..20}-trixie 1.9.0-trixie
+  _dockerfile \
+    '# tool-pin: foo dockerhub owner/foo pattern=^1\.[0-9]+\.[0-9]+-trixie$' \
+    'ARG FOO_VERSION=1.0.0-trixie'
+  _check_json --drift-tsv
+  assert_equal "${status}" 10
+  assert_output $'foo\t1.0.0-trixie\t1.9.0-trixie\tdockerfile/Dockerfile\t2'
+}
+
 # _curl_logged -- the fixture curl, with every call logged to curl.log.
 _curl_logged() {
   : > "${SCRATCH}/curl.log"
