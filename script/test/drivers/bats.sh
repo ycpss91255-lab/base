@@ -1292,5 +1292,26 @@ _run_system() {
   local _label
   _bats_args_with_label _bats_args _label
   echo "--- Running Bats System Runtime Tests (${_label}) ---"
-  bats "${_bats_args[@]}" "${REPO_ROOT}/test/bats/system/"
+  local _report_dir _rc=0 _ran _skipped
+  _report_dir="$(mktemp -d)"
+  bats "${_bats_args[@]}" --report-formatter junit --output "${_report_dir}" \
+    "${REPO_ROOT}/test/bats/system/" || _rc=$?
+  _ran="$(_junit_case_pairs "${_report_dir}/report.xml" all)"
+  _skipped="$(_junit_case_pairs "${_report_dir}/report.xml" skipped \
+    | tr '\t' ' ' | paste -sd ';' -)"
+  rm -rf "${_report_dir}"
+
+  # The system specs skip when a prerequisite is missing, and bats counts
+  # a skip as a pass: six of them skipped on every CI run and the job
+  # stayed green (base#2173). Off a runner that is the operator's to
+  # supply. On one the job exists to supply it, so a skip there is a test
+  # that ran nowhere and the run fails. No report at all fails too: what
+  # it skipped is unknown.
+  if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+    [[ -n "${_ran}" ]] || _die ci_system_skip \
+      "the system run reported no test, so what it skipped is unknown."
+    [[ -z "${_skipped}" ]] || _die ci_system_skip \
+      "skipped on a CI runner, where a missing prerequisite fails the run: [${_skipped}]"
+  fi
+  return "${_rc}"
 }

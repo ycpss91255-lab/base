@@ -163,6 +163,12 @@ services:
       - HOST_UID=${HOST_UID:?set by 'just test' / 'just test system' -- run one of those instead of driving docker compose directly}
       - HOST_GID=${HOST_GID:?set by 'just test' / 'just test system' -- run one of those instead of driving docker compose directly}
       - MOUNT_DOCKER_SOCK=1
+      # Bare on purpose: compose forwards the caller's value and omits the
+      # variable when it is unset. The runner's mark is what makes
+      # _run_system refuse a skip (base#2173), so a local run, which has
+      # none, keeps its skips. `ci` must not carry it: the in-image lint
+      # refuses a runner.
+      - GITHUB_ACTIONS
     entrypoint: /bin/bash
     command:
       - -c
