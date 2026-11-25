@@ -77,28 +77,23 @@ and `just test lint`) enforces this so the refs cannot creep back in.
 
 ### 2026-11-26 修訂（base#2182）：註解只說明程式本身
 
-原本的決定只刪編號，其他文字一律保留，歷史敘述與長篇說明因此留在註解裡。
-在 main `540dd34c`，註解有 87,097 行，占程式檔的 34%；其中 7,036 段超過兩行，
-超出的部分有 48,632 行。自本修訂起，所有程式檔的註解適用下列規則：
+原本的決定只刪編號，歷史敘述與長篇說明因此留在註解裡。所有程式檔的註解改為：
 
-1. 註解只說明程式本身：這段程式做什麼、有什麼不明顯的前提或限制。以重點
-   敘述，一兩行為原則。
+1. 註解只說明程式本身：這段程式做什麼、有什麼不明顯的前提或限制。長篇說明濃縮
+   成重點，一兩行為原則。
 2. 修改的情境不寫在註解：為什麼改、以前怎麼寫、哪個 issue 或事故、討論過程。
    這些屬於 commit 訊息，或 issue 與 PR。
 3. issue 與 PR 的編號不寫在註解，包括帶 repo 前綴的（`base#1234`）與句尾單純的
    編號。
-4. 長篇說明濃縮成重點。被拿掉的背景若只存在於註解，整理後以留言貼回原本的
-   issue 或 PR；那邊已有完整記載就不重貼，在 PR 說明即可。
-5. `.bats` 的 `# why:` 保留，內容只寫這個測試現在在保護什麼，不寫歷史與編號，
+4. `.bats` 的 `# why:` 保留，內容只寫這個測試現在在保護什麼，不寫歷史與編號，
    以一行為原則。
-6. 給工具讀的註解不動：`shellcheck`、`hadolint`、bats 標籤、`tool-pin:`、各 lint
-   的 allow 標記、當作 `--help` 輸出的檔頭、`just --list` 的食譜說明，以及 spec
-   逐字比對的註解。
+5. 給工具讀的註解不動，例如 `shellcheck`、`hadolint`、`tool-pin:` 與各 lint 的
+   allow 標記；完整的表在 base#2182。spec 逐字比對的註解保留到剛好讓 spec 通過，
+   要拿掉得先改 spec。
 
 這份標準不加 lint，由 review 把關；`issueref` 維持原樣，它不擋不代表允許。它只掃
 `dist/`、`script/`、`test/` 底下的上述五種檔案與根目錄的 `compose.yaml`、`justfile`，
-只擋沒有前綴的 `#NNN`，並且跳過 `.bats` 的 `# why:` 區塊。既有的註解由 base#2182
-分批處理。
+只擋沒有前綴的 `#NNN`，並且跳過 `.bats` 的 `# why:` 區塊。
 
 ## Out of scope
 
@@ -120,10 +115,8 @@ the upgrade / fanout.
   than as change-logs.
 - The `issueref` lint makes the convention enforceable rather than
   aspirational; a reintroduced `#N` in a comment fails `just test`.
-- 2026-11-26 修訂之後，「為什麼這樣改」只能由 `git blame` 找到 commit 與 PR，
-  所以 commit 訊息要寫清楚拿掉什麼、改了什麼與原因。
-- 2026-11-26 修訂沒有 lint，違反的註解只能在 review 發現；既有註解處理完之前，
-  新舊寫法並存。
+- 2026-11-26 修訂之後，修改的原因只在 commit、issue 與 PR，commit 訊息要寫清楚。
+- 既有的註解由 base#2182 分批處理，完成之前新舊寫法並存。
 
 ## Alternatives considered
 
@@ -137,9 +130,7 @@ the upgrade / fanout.
   silently regresses; the lint is what makes the acceptance criterion
   hold over time.
 - **（2026-11-26 修訂）只刪歷史，保留長篇說明。** 否決：base#2183 的第一版照此
-  處理三個檔案，345 行註解只減到 316 行，長篇說明都還在。
+  處理，長篇說明都還在。
 - **（2026-11-26 修訂）保留帶前綴的編號（`base#1234`）。** 否決：編號的讀者在
-  issue 與 PR，`git blame` 找得到；留在句尾和沒有前綴的編號一樣會過期。
-- **（2026-11-26 修訂）加 lint 限制行數或擋歷史敘述。** 否決：維護者認為 repo 的
-  測試工具與檢查程式已經太多；是不是歷史也無法靠字面判斷，以關鍵字比對命中的
-  行只有 31% 是歷史（base#2182 的抽樣）。
+  issue 與 PR，`git blame` 找得到。
+- **（2026-11-26 修訂）加 lint。** 否決：維護者決定不加。
