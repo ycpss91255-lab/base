@@ -3205,15 +3205,15 @@ force-rewrite).
 | `apply_migrations skips cleanly when path does not exist (#567)` | No-Dockerfile skip |
 | `_MIGRATIONS is a non-empty ordered list (#567)` | Data-driven table is seeded |
 | `migration 0 (downstream-to-dist): rewrites lib/wrapper COPY sources to .base/dist/ (#714)` | - |
-| `migration 0 (downstream-to-dist): detect false when no .base/downstream/ reference (#714)` | - |
+| `migration 0 (downstream-to-dist): detect false when no .base/downstream/ reference (#714)` | dist/ is the settled spelling, so a Dockerfile on it has nothing to heal. |
 | `migration 0 (downstream-to-dist): idempotent — second run is a no-op (#714)` | - |
 | `migration 1 (wrapper-copy): rewrites shape A 'COPY *.sh /lint/' (#567)` | - |
 | `migration 1 (wrapper-copy): rewrites shape B 'COPY .base/script/docker/*.sh /lint/' (#567)` | - |
 | `migration 1 (wrapper-copy): idempotent — second run is a no-op (#567)` | - |
 | `migration 1 (wrapper-copy): the dispatcher lands shape A on the dist wrapper glob (#915)` | - |
-| `migration 1 (wrapper-copy): detect is false when no legacy wrapper COPY present (#567)` | - |
+| `migration 1 (wrapper-copy): detect is false when no legacy wrapper COPY present (#567)` | This shape is wrapper_copy's own output. A detect that matched it would never settle. |
 | `migration 2 (pip-helper): drops the retired CONFIG_DIR pip install line (#567)` | - |
-| `migration 2 (pip-helper): idempotent — no pip line means detect false (#567)` | - |
+| `migration 2 (pip-helper): idempotent — no pip line means detect false (#567)` | The migration deletes lines, so it must not start on a file that carries none of them. |
 | `migration 2 (pip-helper): keeps a pip line whose requirements file carries real requirements (#956)` | - |
 | `migration 2 (pip-helper): drops the line when the requirements file is comment/blank-only (#956)` | - |
 | `migration 2 (pip-helper): keeps the line when the requirements file cannot be READ (#956)` | - |
@@ -3235,15 +3235,15 @@ force-rewrite).
 | `migration 3 (explicit-copy): drops single-line explicit top-level .sh COPY (#567)` | - |
 | `migration 3 (explicit-copy): drops multi-line backslash-continued COPY block (#567)` | - |
 | `migration 3 (explicit-copy): the rewritten Dockerfile keeps its exact mode under umask 077 (base#1323)` | the awk migrations land the Dockerfile through _dfm_install too; the Dockerfile must come back with exactly the mode it had, not 0600 and not a fixed default. Several modes under a restrictive umask (077) so a hardcoded mode or a umask-derived one cannot pass (base#1323). |
-| `migration 3 (explicit-copy): detect false when lint stage uses lib/wrapper dir COPYs only (#567)` | - |
+| `migration 3 (explicit-copy): detect false when lint stage uses lib/wrapper dir COPYs only (#567)` | These COPYs are the replacement shape. Apply removes whole COPY statements, so it must not start on them. |
 | `migration 4 (logging-rename): rewrites the Dockerfile COPY to runtime/logging.sh (#567)` | - |
 | `migration 4 (logging-rename): rewrites a sibling entrypoint source line (#567)` | - |
-| `migration 4 (logging-rename): detect false when already on new name (#567)` | - |
+| `migration 4 (logging-rename): detect false when already on new name (#567)` | logging.sh is the tail of the old name, so a looser pattern would match the migration's own output. |
 | `migration 4 (logging-rename): heals a stale entrypoint when the Dockerfile is already migrated (#692)` | - |
 | `migration (smoke-copy): rewrites the flat COPY into shared + the stage's own folder (#915)` | - |
 | `migration (smoke-copy): emits only the shared baseline when the stage ships no folder (#915)` | - |
 | `migration (smoke-copy): an unresolvable per-stage path costs the stage its own COPY (#956)` | - |
-| `migration (smoke-copy): idempotent — detect false once already on the dist tree (#915)` | - |
+| `migration (smoke-copy): idempotent — detect false once already on the dist tree (#915)` | The new path still runs through test/ and smoke/, so a looser pattern would take the migration's own output for the retired tree. |
 | `migration (smoke-copy): rewrites a hand-listed spec to where the subtree ships it (#928)` | - |
 | `migration (smoke-copy): rewrites every source of a multi-source hand-listed COPY (#928)` | - |
 | `migration (smoke-copy): declines a hand-listed spec the subtree no longer ships (#928)` | - |
@@ -3252,7 +3252,7 @@ force-rewrite).
 | `migration (smoke-copy): detects a statement whose smoke sources are only on continuation lines (#928)` | - |
 | `migration (smoke-copy): warns about an unresolvable spec on a continuation line (#928)` | - |
 | `migration (smoke-copy): duplicates a continued wholesale COPY into shared + the stage's own folder (#928)` | - |
-| `migration (smoke-copy): a .base/test/smoke-prefixed sibling path is not the retired tree (#928)` | - |
+| `migration (smoke-copy): a .base/test/smoke-prefixed sibling path is not the retired tree (#928)` | The detect is a path prefix, so it has to stop at a path boundary. A tree that merely STARTS with the retired name is not the retired tree, and firing on it makes the migration log a patch it did not make and a warning nobody can act on -- which is how an operator learns to ignore the warning that matters. |
 | `migration (smoke-copy): rewrites .base/test/smoke but leaves an xbase/test/smoke COPY alone (base#1324)` | A dot in the retired prefix matches only a dot |
 | `migration (smoke-copy): the rewrite prints no awk escape-sequence warning (base#1324)` | An upgrade prints no awk escape-sequence warning |
 | `migration (smoke-copy): a hand-listed COPY is rewritten the same under every awk (base#2138)` | base#2138 -- under mawk every shipped spec read as shipped at two paths, so a hand-listed COPY was left naming the deleted tree, the upgrade exited 0 and the consumer's next build failed. The input is the issue's. The two refusals are the control: they must stay refusals. |
@@ -3270,22 +3270,22 @@ force-rewrite).
 | `migration (repo-smoke-copy): is registered, and after smoke-copy (#1044)` | Registered, and ordered after the migration whose path contains its own |
 | `migration (flat-to-dist): rewrites the flat lint-stage lib/wrapper COPYs (#915)` | - |
 | `migration (flat-to-dist): rewrites the flat config COPY (#915)` | - |
-| `migration (flat-to-dist): idempotent — detect false on an already-dist Dockerfile (#915)` | - |
+| `migration (flat-to-dist): idempotent — detect false on an already-dist Dockerfile (#915)` | The rewrite inserts dist/ after .base/, so a pattern loose enough to match its own output would insert it again on the next upgrade. |
 | `migration (flat-to-dist): dispatcher run twice rewrites exactly once (#915)` | - |
 | `apply_migrations leaves no .base COPY source behind on the v0.41.0 shape (#915)` | - |
 | `apply_migrations leaves every .base COPY source resolvable in the shipped tree (#969)` | - |
 | `migration (runtime-moved-files): rewrites the smoke.sh source to the shipped test tree (#971)` | - |
 | `migration (runtime-moved-files): rewrites the entrypoint.sh source at the pre-dist path (#971)` | - |
-| `migration (runtime-moved-files): detect false once nothing names the old paths (#971)` | - |
+| `migration (runtime-moved-files): detect false once nothing names the old paths (#971)` | The directory the two files left is still shipped and still COPY'd, so its name alone must not fire. |
 | `migration (runtime-dir-copy): collapses the three per-file COPYs into one dir COPY (#971)` | - |
 | `migration (runtime-dir-copy): collapses a subset in any order at the pre-dist path (#971)` | - |
 | `migration (runtime-dir-copy): one dir COPY per stage, not one for the file (#971)` | - |
 | `migration (runtime-dir-copy): a statement hand-listing two helpers collapses to one source (#971)` | - |
 | `migration (runtime-dir-copy): a hand-relocated destination is preserved (#971)` | - |
 | `migration (runtime-dir-copy): rewrites the commented runtime-stage example too (#971)` | - |
-| `migration (runtime-dir-copy): an already-collapsed dir COPY is left alone (#971)` | - |
+| `migration (runtime-dir-copy): an already-collapsed dir COPY is left alone (#971)` | The collapsed COPY names the same directory as the per-file ones; only a helper file name may fire. |
 | `migration (runtime-dir-copy): dispatcher run twice collapses exactly once (#971)` | - |
-| `migration (runtime-dir-copy): detect false when no helper COPY is present (#971)` | - |
+| `migration (runtime-dir-copy): detect false when no helper COPY is present (#971)` | Firing on a file that names no helper would put this migration in every repo's report line. |
 | `apply_migrations heals the runtime COPYs every real consumer actually carries (#971)` | - |
 | `migration 5 (hadolint): DL3007 pins bats/alpine :latest tags (#567)` | - |
 | `migration 5 (hadolint): DL3046 adds useradd -l (#567)` | - |
@@ -3297,14 +3297,14 @@ force-rewrite).
 | `migration 5 (hadolint): DL4006 adds SHELL pipefail to alpine lint-tools (#567)` | - |
 | `migration 5 (hadolint): DL3006 inline ignore before parameterized FROM (#567)` | - |
 | `migration 5 (hadolint): DL3006 idempotent — does not double-insert (#567)` | - |
-| `migration 5 (hadolint): detect false on a clean Dockerfile (#567)` | - |
+| `migration 5 (hadolint): detect false on a clean Dockerfile (#567)` | Several rules feed this one detect; any of them matching a file with no finding would fire it on every repo. |
 | `migration 6 (sc1090): broadens the entrypoint directive to SC1090,SC1091 (#567)` | - |
 | `migration 6 (sc1090): idempotent when already SC1090,SC1091 (#567)` | - |
-| `migration 6 (sc1090): detect false when no sibling entrypoint (#567)` | - |
+| `migration 6 (sc1090): detect false when no sibling entrypoint (#567)` | The migration edits a file beside the Dockerfile, and a repo need not have one. |
 | `migration 7 (arg-user): a bare 'ARG USER' is warned about, never rewritten (base#1322)` | base#1322 criterion 1/2 -- the old rewrite is retired; a bare ARG USER is reported with its file and line and left alone |
 | `migration 7 (arg-user): an earlier upgrade's ARG USER="${USER_NAME}" is warned about as may-run-as-root (base#1322)` | base#1322 criterion 2 -- a consumer that already took the v0.42 rewrite has to learn the image may run as root |
 | `migration 7 (arg-user): the full dispatcher reports 0 files rewritten for an ARG USER Dockerfile (base#1322)` | base#1322 criterion 1 -- through the full shipped list, arg_user matches and the dispatcher reports nothing rewritten |
-| `migration 7 (arg-user): does not touch an unrelated ARG (#579)` | - |
+| `migration 7 (arg-user): does not touch an unrelated ARG (#579)` | USER_NAME is the build arg compose does pass. Warning on it would tell every current repo to port what it already ported. |
 | `migration 7 (arg-user) regression: case-insensitive FROM (base#1322)` | base#1322 -- a lower-case FROM/AS still opens a stage |
 | `migration 7 (arg-user) regression: global-scope ARG USER_NAME (base#1322)` | base#1322 -- a global USER_NAME before the first FROM does not make the later alias safe to leave unreported |
 | `migration 7 (arg-user) regression: sibling stage declares USER_NAME (base#1322)` | base#1322 -- USER_NAME declared in a sibling stage is not in scope |
@@ -3347,7 +3347,7 @@ force-rewrite).
 | `migration 8 (nounset-source): every spelling of a bracket is read as one (base#2149)` | base#2149 -- a bracket is whatever turns nounset off, not the one spelling on the line above. Each body is guarded as written. |
 | `migration 8 (nounset-source): a source after the bracket ends is still bracketed (base#2149)` | the direction that must not be lost. A bracket ends at its `set -u`, and a source after it is bare whatever was guarded above. |
 | `migration 8 (nounset-source): a function written before nounset is turned on is still bracketed (base#2149)` | where a function body stands in the file says nothing about when it runs. One written above the `set -u` is called below it. |
-| `migration 8 (nounset-source): detect false when no set -u in entrypoint (#579)` | - |
+| `migration 8 (nounset-source): detect false when no set -u in entrypoint (#579)` | Without nounset the source cannot die on an unbound variable, and a bracket's closing `set -u` would turn it on. |
 | `migration 8 (nounset-source): fires under the orchestrator when the bringup sets nothing (#945)` | The gap the branch's own README migration opens. Keying the guard on an in-file `set -u` covers nothing here -- the bringup seeded before this release has no `set` line at all, and the orchestrator imposes nounset from outside it. This is the FAILS-at-HEAD case; without it the migration stays silent on exactly the path base tells people to take |
 | `migration 8 (nounset-source): brackets that bringup's source, directive and all (#945)` | Detecting is half of it; the write has to be correct for a file that never set nounset itself. The trailing `set -u` must RESTORE the mode the orchestrator was already in, which is checked by re-running detect on the rewritten file rather than by eyeballing the diff |
 | `migration 8 (nounset-source): silent under the orchestrator with no ROS source (#945)` | Bounds the widened trigger. Now that an ENTRYPOINT can turn the migration on, the obvious over-reach is firing on the ENTRYPOINT alone -- which would bracket nothing and warn on every orchestrator repo for ever |
@@ -5054,15 +5054,15 @@ OK, error names body + file
 | `LOG_FORMAT=auto is equivalent to unset (non-TTY -> JSON)` | - |
 | `_log_is_tty helper is defined after sourcing (#605)` | - |
 | `_log_is_tty: cached 0 wins over a non-TTY fd (#605)` | - |
-| `_log_is_tty: cached non-zero wins over the live probe (#605)` | - |
-| `_log_is_tty: unset falls back to live test -t (non-TTY pipe -> non-zero) (#605)` | - |
+| `_log_is_tty: cached non-zero wins over the live probe (#605)` | A run that was not on a terminal at startup keeps that answer, however its fds are rearranged later. |
+| `_log_is_tty: unset falls back to live test -t (non-TTY pipe -> non-zero) (#605)` | A script that sources log.sh on its own never sets the cache, so the live probe is the only answer it has. |
 | `auto dispatch: _LOG_IS_TTY=0 forces text even on a non-TTY pipe (#605)` | - |
 | `auto dispatch: _LOG_IS_TTY unset preserves live detection (non-TTY -> JSON) (#605)` | - |
 | `explicit LOG_FORMAT=json ignores _LOG_IS_TTY=0 (cache scoped to auto) (#605)` | - |
 | `explicit LOG_FORMAT=text ignores _LOG_IS_TTY=1 (cache scoped to auto) (#605)` | - |
 | `_log_color_enabled honours _LOG_IS_TTY=0 on a non-TTY (#605)` | - |
-| `_log_color_enabled with _LOG_IS_TTY=1 stays disabled (#605)` | - |
-| `_log_color_enabled: NO_COLOR wins over _LOG_IS_TTY=0 (#605)` | - |
+| `_log_color_enabled with _LOG_IS_TTY=1 stays disabled (#605)` | Colour follows the same cached answer as the format, so a redirected run gets no ANSI codes in its log. |
+| `_log_color_enabled: NO_COLOR wins over _LOG_IS_TTY=0 (#605)` | NO_COLOR is the user's opt-out; a terminal does not undo it. |
 | `_log_color_enabled: FORCE_COLOR wins over _LOG_IS_TTY=1 (#605)` | - |
 | `JSON output contains OTel fields` | - |
 | `JSON code.filepath and code.lineno name the caller of _log_<level>, not log.sh (base#1464)` | code.filepath and code.lineno must name the code that logged the event. They were read one frame too shallow, so every event was attributed to the _log_<level> wrapper inside log.sh itself, and a check that a refusal came from a given script could never pass or fail on it (base#1464). |
@@ -5088,9 +5088,9 @@ OK, error names body + file
 | `_log_with_span preserves trace_id from parent` | - |
 | `_log_with_trace prints trace started message to stderr` | - |
 | `_log_plain is no longer defined` | - |
-| `_log_color_enabled returns non-zero on non-TTY without overrides` | - |
+| `_log_color_enabled returns non-zero on non-TTY without overrides` | The default for a pipe or a CI log, where ANSI codes are noise. |
 | `_log_color_enabled returns 0 with FORCE_COLOR=1` | - |
-| `_log_color_enabled returns non-zero with NO_COLOR=1 + FORCE_COLOR=1` | - |
+| `_log_color_enabled returns non-zero with NO_COLOR=1 + FORCE_COLOR=1` | The two overrides contradict each other, and the opt-out is the one that has to win. |
 | `_log_err FORCE_COLOR=1 emits red bold ANSI in text` | - |
 | `_log_warn FORCE_COLOR=1 emits yellow ANSI in text` | - |
 | `NO_COLOR=1 text omits ANSI` | - |
@@ -7839,10 +7839,10 @@ sanitization, `detect_ws_path`, and `_reconcile_workspace_path` (#569).
 | `detect_gui returns false when both DISPLAY and WAYLAND_DISPLAY unset` | - |
 | `_is_ssh_x11 true when SSH_CONNECTION set + DISPLAY=localhost:N (#321)` | - |
 | `_is_ssh_x11 true when DISPLAY=localhost:N without fractional part (#321)` | - |
-| `_is_ssh_x11 false when SSH_CONNECTION unset (#321)` | - |
-| `_is_ssh_x11 false when DISPLAY is local socket (:0) (#321)` | - |
-| `_is_ssh_x11 false when DISPLAY is unset (#321)` | - |
-| `_is_ssh_x11 false when DISPLAY points to a remote host (#321)` | - |
+| `_is_ssh_x11 false when SSH_CONNECTION unset (#321)` | localhost:N alone does not prove a tunnel; without an SSH session there is no forwarded display to serve. |
+| `_is_ssh_x11 false when DISPLAY is local socket (:0) (#321)` | An SSH session can still draw on the machine's own screen, which is not the forwarded display. |
+| `_is_ssh_x11 false when DISPLAY is unset (#321)` | SSH without X forwarding has no display, so there is no cookie to rewrite. |
+| `_is_ssh_x11 false when DISPLAY points to a remote host (#321)` | A display on another host is not the tunnel sshd opened. |
 | `detect_image_name uses template default rules (prefix:docker_ → strip)` | - |
 | `detect_image_name uses template default rules (suffix:_ws → strip)` | - |
 | `detect_image_name template default falls through to @basename for generic paths` | - |
@@ -10552,7 +10552,7 @@ process-level supervision loops + signal paths live in
 | `_watchdog_load_config accepts start_period 0 but clamps non-numeric (#797)` | - |
 | `_watchdog_load_config honors restart-service, defaults bogus ON_FAIL to restart-container (#797)` | - |
 | `_watchdog_run_check returns the check command's status (#797)` | - |
-| `_watchdog_run_check times out a hung check as unhealthy (#797)` | - |
+| `_watchdog_run_check times out a hung check as unhealthy (#797)` | A check that hangs is a failure too; waiting on it would stop the supervision. |
 | `_watchdog_evaluate resets the counter on a healthy check (#797)` | - |
 | `_watchdog_evaluate returns 1 (under threshold) then 2 (threshold reached) (#797)` | - |
 | `_watchdog_should_give_up fires only at the MAX_RESTARTS ceiling (#797)` | - |

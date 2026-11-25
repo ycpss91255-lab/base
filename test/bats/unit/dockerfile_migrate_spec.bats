@@ -49,6 +49,12 @@ _src() {
   printf 'source %s/_lib.sh; source %s/dockerfile_migrate.sh' "${LIB}" "${LIB}"
 }
 
+# A detect that answers "no" returns 1, and the cases below assert that
+# status rather than any failure: a missing function is 127 and a file grep
+# could not read is 2, and a bare assert_failure accepts both (base#2174).
+# apply_migrations counts every detect that fires in its report line, so a
+# false match is visible in each upgrade even when nothing is rewritten.
+
 # _src_from <libdir>
 #   As _src, but sourcing a COPY of the lib tree rather than the shipped
 #   one. The template conf layer is located from the lib's OWN directory
@@ -114,13 +120,15 @@ EOF
   refute grep -q '\.base/downstream/' "${DF}"
 }
 
+# why: dist/ is the settled spelling, so a Dockerfile on it has nothing to
+# heal.
 @test "migration 0 (downstream-to-dist): detect false when no .base/downstream/ reference (#714)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS lint
 COPY .base/dist/script/docker/lib /lint/lib
 EOF
   run bash -c "$(_src); _migrate_downstream_to_dist_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 @test "migration 0 (downstream-to-dist): idempotent — second run is a no-op (#714)" {
@@ -195,13 +203,15 @@ EOF
   grep -Fq "COPY .base/dist/script/docker/wrapper/*.sh /lint/" "${DF}"
 }
 
+# why: This shape is wrapper_copy's own output. A detect that matched it
+# would never settle.
 @test "migration 1 (wrapper-copy): detect is false when no legacy wrapper COPY present (#567)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS lint
 COPY .base/script/docker/wrapper/*.sh /lint/
 EOF
   run bash -c "$(_src); _migrate_wrapper_copy_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── migration 2: retired .base/dockerfile/setup pip helper ──────────────────
@@ -231,13 +241,15 @@ EOF
   grep -Fq "RUN echo done" "${DF}"
 }
 
+# why: The migration deletes lines, so it must not start on a file that
+# carries none of them.
 @test "migration 2 (pip-helper): idempotent — no pip line means detect false (#567)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS sys
 RUN echo done
 EOF
   run bash -c "$(_src); _migrate_pip_helper_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # The delete's precondition is "this line installs nothing", and the line
@@ -758,6 +770,8 @@ EOF
   done
 }
 
+# why: These COPYs are the replacement shape. Apply removes whole COPY
+# statements, so it must not start on them.
 @test "migration 3 (explicit-copy): detect false when lint stage uses lib/wrapper dir COPYs only (#567)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS lint
@@ -765,7 +779,7 @@ COPY .base/script/docker/lib /lint/lib
 COPY .base/script/docker/wrapper/*.sh /lint/
 EOF
   run bash -c "$(_src); _migrate_explicit_copy_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── migration 4: _entrypoint_logging.sh -> runtime/logging.sh rename ─────────
@@ -804,13 +818,15 @@ EOF
   refute grep -q '_entrypoint_logging.sh' "${TEMP_DIR}/script/entrypoint.sh"
 }
 
+# why: logging.sh is the tail of the old name, so a looser pattern would
+# match the migration's own output.
 @test "migration 4 (logging-rename): detect false when already on new name (#567)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS devel
 COPY --chmod=0755 .base/dist/script/docker/runtime/logging.sh /usr/local/lib/base/logging.sh
 EOF
   run bash -c "$(_src); _migrate_logging_rename_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 @test "migration 4 (logging-rename): heals a stale entrypoint when the Dockerfile is already migrated (#692)" {
@@ -905,6 +921,8 @@ EOF
   refute grep -q 'smoke/devel-test/' "${DF}"
 }
 
+# why: The new path still runs through test/ and smoke/, so a looser pattern
+# would take the migration's own output for the retired tree.
 @test "migration (smoke-copy): idempotent — detect false once already on the dist tree (#915)" {
   cat > "${DF}" <<'EOF'
 FROM devel AS devel-test
@@ -912,7 +930,7 @@ COPY .base/dist/test/bats/smoke/shared/ /smoke_test/
 COPY .base/dist/test/bats/smoke/devel-test/ /smoke_test/
 EOF
   run bash -c "$(_src); _migrate_smoke_copy_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # The same tree was also reached FILE BY FILE. Six of the org's consumer
@@ -1063,12 +1081,11 @@ DOCKERFILE
   ! grep -q '\.base/test/smoke/' "${DF}"
 }
 
-# The detect is a path prefix, so it has to stop at a path boundary. A tree
-# that merely STARTS with the retired name is not the retired tree, and
+# why: The detect is a path prefix, so it has to stop at a path boundary. A
+# tree that merely STARTS with the retired name is not the retired tree, and
 # firing on it makes the migration log a patch it did not make and a warning
 # nobody can act on -- which is how an operator learns to ignore the warning
 # that matters.
-
 @test "migration (smoke-copy): a .base/test/smoke-prefixed sibling path is not the retired tree (#928)" {
   mkdir -p "${TEMP_DIR}/.base/dist/test/bats/smoke/shared"
   cat > "${DF}" <<'DOCKERFILE'
@@ -1077,7 +1094,7 @@ COPY .base/test/smoke_helpers/x.bash /smoke_test/x.bash
 DOCKERFILE
   cp "${DF}" "${TEMP_DIR}/Dockerfile.before"
   run bash -c "$(_src); _migrate_smoke_copy_detect '${DF}'"
-  assert_failure
+  assert_failure 1
   run bash -c "$(_src); apply_migrations '${DF}'"
   assert_success
   refute_output --partial "per-stage dist smoke COPYs"
@@ -1494,6 +1511,8 @@ EOF
   grep -Fq '.base/dist/config "${CONFIG_DIR}"' "${DF}"
 }
 
+# why: The rewrite inserts dist/ after .base/, so a pattern loose enough to
+# match its own output would insert it again on the next upgrade.
 @test "migration (flat-to-dist): idempotent — detect false on an already-dist Dockerfile (#915)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS lint
@@ -1501,7 +1520,7 @@ COPY .base/dist/script/docker/lib /lint/lib
 COPY .base/dist/config /tmp/config
 EOF
   run bash -c "$(_src); _migrate_flat_to_dist_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 @test "migration (flat-to-dist): dispatcher run twice rewrites exactly once (#915)" {
@@ -1655,13 +1674,15 @@ EOF
   grep -Fq "COPY --chmod=0755 .base/dist/dockerfile/entrypoint.sh /entrypoint.sh" "${DF}"
 }
 
+# why: The directory the two files left is still shipped and still COPY'd,
+# so its name alone must not fire.
 @test "migration (runtime-moved-files): detect false once nothing names the old paths (#971)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS devel
 COPY --chmod=0755 .base/dist/script/docker/runtime/ /usr/local/lib/base/
 EOF
   run bash -c "$(_src); _migrate_runtime_moved_files_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── migration (runtime-dir-copy): per-file helper COPYs -> one dir COPY ──────
@@ -1769,13 +1790,15 @@ EOF
   [ "${_n}" -eq 1 ]
 }
 
+# why: The collapsed COPY names the same directory as the per-file ones;
+# only a helper file name may fire.
 @test "migration (runtime-dir-copy): an already-collapsed dir COPY is left alone (#971)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS devel
 COPY --chmod=0755 .base/dist/script/docker/runtime/ /usr/local/lib/base/
 EOF
   run bash -c "$(_src); _migrate_runtime_dir_copy_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 @test "migration (runtime-dir-copy): dispatcher run twice collapses exactly once (#971)" {
@@ -1790,13 +1813,15 @@ EOF
   [ "${_n}" -eq 1 ]
 }
 
+# why: Firing on a file that names no helper would put this migration in
+# every repo's report line.
 @test "migration (runtime-dir-copy): detect false when no helper COPY is present (#971)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS devel
 RUN echo hi
 EOF
   run bash -c "$(_src); _migrate_runtime_dir_copy_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── the shape the REAL consumers carry ──────────────────────────────────────
@@ -1940,7 +1965,7 @@ RUN cd /lint && hadolint Dockerfile
 # hadolint ignore=DL3003,DL3059
 RUN cd /lint && hadolint Dockerfile.b'
   run bash -c "$(_src); _migrate_hadolint_detect '${DF}'"
-  assert_failure
+  assert_failure 1
   cp "${DF}" "${DF}.before"
   run bash -c "$(_src); apply_migrations '${DF}'"
   assert_success
@@ -1986,7 +2011,7 @@ EOF
   printf '%s\n' 'FROM busybox AS devel-test' 'WORKDIR /lint' 'RUN hadolint Dockerfile' > "${DF}"
   cp "${DF}" "${DF}.before"
   run bash -c "$(_src); _migrate_hadolint_detect '${DF}'"
-  assert_failure
+  assert_failure 1
   run bash -c "$(_src); apply_migrations '${DF}'"
   assert_success
   diff "${DF}.before" "${DF}"
@@ -2031,13 +2056,15 @@ EOF
   [ "$(grep -c '# hadolint ignore=DL3006' "${DF}")" = "1" ]
 }
 
+# why: Several rules feed this one detect; any of them matching a file with
+# no finding would fire it on every repo.
 @test "migration 5 (hadolint): detect false on a clean Dockerfile (#567)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS sys
 RUN echo hi
 EOF
   run bash -c "$(_src); _migrate_hadolint_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── migration 6: noetic entrypoint SC1090 directive ─────────────────────────
@@ -2073,10 +2100,12 @@ EOF
   diff "${TEMP_DIR}/script/entrypoint.sh" "${TEMP_DIR}/ep.orig"
 }
 
+# why: The migration edits a file beside the Dockerfile, and a repo need
+# not have one.
 @test "migration 6 (sc1090): detect false when no sibling entrypoint (#567)" {
   : > "${DF}"
   run bash -c "$(_src); _migrate_sc1090_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── migration 7 (facet B): ARG USER is reported, never rewritten ────────
@@ -2232,6 +2261,8 @@ EOF
   assert_output --partial "matched (arg_user), 0 file(s) rewritten"
 }
 
+# why: USER_NAME is the build arg compose does pass. Warning on it would
+# tell every current repo to port what it already ported.
 @test "migration 7 (arg-user): does not touch an unrelated ARG (#579)" {
   cat > "${DF}" <<'EOF'
 FROM busybox AS sys
@@ -2239,7 +2270,7 @@ ARG USERLAND
 ARG USER_NAME
 EOF
   run bash -c "$(_src); _migrate_arg_user_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── migration 7 regression inputs (base#1322 criterion 4) ───────────────
@@ -2856,7 +2887,7 @@ EOF
   assert_line --index 3 'nounset restored'
   diff "${TEMP_DIR}/ep.orig" "${TEMP_DIR}/script/entrypoint.sh"
   run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: base#2149 -- apply skipped a guard whose source carries a shellcheck
@@ -3024,6 +3055,8 @@ EOF
   assert_failure
 }
 
+# why: Without nounset the source cannot die on an unbound variable, and a
+# bracket's closing `set -u` would turn it on.
 @test "migration 8 (nounset-source): detect false when no set -u in entrypoint (#579)" {
   mkdir -p "${TEMP_DIR}/script"
   : > "${DF}"
@@ -3032,7 +3065,7 @@ EOF
 source "/opt/ros/${ROS_DISTRO}/setup.bash"
 EOF
   run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # The nounset the ROS source runs under is not always written in the file
@@ -3105,7 +3138,7 @@ EOF
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 EOF
   run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: The direction that would do harm rather than nothing. Pre-flip the
@@ -3124,7 +3157,7 @@ source "/opt/ros/${ROS_DISTRO}/setup.bash"
 exec "${@}"
 EOF
   run bash -c "$(_src); _migrate_nounset_source_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── migration (entrypoint-orchestrator / bringup-residue): notice, no rewrite ─
@@ -3211,7 +3244,7 @@ EOF
 @test "migration (entrypoint-orchestrator): silent once the ENTRYPOINT is the orchestrator (#945)" {
   _write_migrated_repo 'export MY_APP_HOME=/opt/app'
   run bash -c "$(_src); _migrate_entrypoint_orchestrator_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: Every repo generated from the shipped template carries a commented
@@ -3225,7 +3258,7 @@ EOF
   _write_migrated_repo 'export MY_APP_HOME=/opt/app'
   printf '# ENTRYPOINT ["/entrypoint.sh"]\n' >> "${DF}"
   run bash -c "$(_src); _migrate_entrypoint_orchestrator_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: A real repo in the org does this -- ros1_bridge's runtime stage runs
@@ -3238,7 +3271,7 @@ EOF
   _write_migrated_repo 'export MY_APP_HOME=/opt/app'
   printf 'ENTRYPOINT ["/ros_entrypoint.sh"]\n' >> "${DF}"
   run bash -c "$(_src); _migrate_entrypoint_orchestrator_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: The coupling between the two adoption edits, and the failure that
@@ -3296,7 +3329,7 @@ EOF
   # is doing exactly what its Dockerfile asks of it.
   _write_old_model_repo
   run bash -c "$(_src); _migrate_bringup_residue_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: The steady state after both edits. This is the shape every migrated
@@ -3305,7 +3338,7 @@ EOF
 @test "migration (bringup-residue): silent for a clean bringup (#945)" {
   _write_migrated_repo 'export MY_APP_HOME=/opt/app'
   run bash -c "$(_src); _migrate_bringup_residue_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: A bringup is optional under the orchestrator, so the absent file is
@@ -3316,7 +3349,7 @@ EOF
   _write_migrated_repo 'export MY_APP_HOME=/opt/app'
   rm -f "${TEMP_DIR}/script/entrypoint.sh"
   run bash -c "$(_src); _migrate_bringup_residue_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: The claim a consumer actually cares about, asserted through the real
@@ -3514,7 +3547,7 @@ FROM busybox
 USER root
 EOF
   run bash -c "$(_src); _migrate_hadolint_detect '${DF}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── DL3046: -u is not always the first flag ─────────────────────────────────

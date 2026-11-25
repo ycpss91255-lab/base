@@ -130,7 +130,8 @@ _probe_run() {
   local _f="${TEMP_DIR}/no-pin"
   printf 'FROM alpine\nRUN apk add shellcheck\n' > "${_f}"
   run bash -c "$(_src); _probe_pinned_version '${_f}' shellcheck"
-  assert_failure
+  # Pinned: a missing function is 127 (base#2174).
+  assert_failure 1
 }
 
 # ── comparing a reported version ────────────────────────────────────────────
@@ -148,7 +149,7 @@ _probe_run() {
 # why: An unescaped regex dot would let 0x11x0 pass as 0.11.0
 @test "probe: the dots in a version are literal, not any-character (#947)" {
   run bash -c "$(_src); _probe_reports_version 'version: 0x11x0' '0.11.0'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── reading the series pin ──────────────────────────────────────────────────
@@ -177,7 +178,7 @@ _probe_run() {
   local _f="${TEMP_DIR}/no-series"
   printf 'FROM alpine\n' > "${_f}"
   run bash -c "$(_src); _probe_pinned_series '${_f}'"
-  assert_failure
+  assert_failure 1
 }
 
 # why: Whichever one a reader picked, half the stages would be built on the
@@ -188,7 +189,7 @@ _probe_run() {
   local _f="${TEMP_DIR}/two-series"
   printf 'ARG ALPINE_VERSION=3.22\nARG ALPINE_VERSION=3.24\n' > "${_f}"
   run bash -c "$(_src); _probe_pinned_series '${_f}'"
-  assert_failure
+  assert_failure 1
 }
 
 # ── the decision ────────────────────────────────────────────────────────────
@@ -414,6 +415,9 @@ _probe_image img '${_f}'"
 $(_fake_run "*alpine-release*) echo '3.22.5' ;;")
 _probe_image img '${_f}'"
   assert_failure 1
+  # The fake image also reports no shellcheck, which is status 1 as well, so
+  # the message has to name the series (base#2174).
+  assert_output --partial 'pins alpine 3.2 but'
 }
 
 # ── the entry point ─────────────────────────────────────────────────────────

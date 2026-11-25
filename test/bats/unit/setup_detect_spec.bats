@@ -218,37 +218,45 @@ fi'
   SSH_CONNECTION="x y z w" DISPLAY="localhost:0" _is_ssh_x11
 }
 
+# why: localhost:N alone does not prove a tunnel; without an SSH session
+# there is no forwarded display to serve.
 @test "_is_ssh_x11 false when SSH_CONNECTION unset (#321)" {
   run bash -c "
     source /source/dist/script/docker/wrapper/setup.sh
     unset SSH_CONNECTION
     DISPLAY=localhost:10.0 _is_ssh_x11
   "
-  assert_failure
+  # Pinned: a missing function is 127 (base#2174).
+  assert_failure 1
 }
 
+# why: An SSH session can still draw on the machine's own screen, which
+# is not the forwarded display.
 @test "_is_ssh_x11 false when DISPLAY is local socket (:0) (#321)" {
   run bash -c "
     source /source/dist/script/docker/wrapper/setup.sh
     SSH_CONNECTION='x y z w' DISPLAY=:0 _is_ssh_x11
   "
-  assert_failure
+  assert_failure 1
 }
 
+# why: SSH without X forwarding has no display, so there is no cookie to
+# rewrite.
 @test "_is_ssh_x11 false when DISPLAY is unset (#321)" {
   run bash -c "
     source /source/dist/script/docker/wrapper/setup.sh
     SSH_CONNECTION='x y z w' DISPLAY='' _is_ssh_x11
   "
-  assert_failure
+  assert_failure 1
 }
 
+# why: A display on another host is not the tunnel sshd opened.
 @test "_is_ssh_x11 false when DISPLAY points to a remote host (#321)" {
   run bash -c "
     source /source/dist/script/docker/wrapper/setup.sh
     SSH_CONNECTION='x y z w' DISPLAY='other-host:0' _is_ssh_x11
   "
-  assert_failure
+  assert_failure 1
 }
 
 # ════════════════════════════════════════════════════════════════════

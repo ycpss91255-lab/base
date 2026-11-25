@@ -260,14 +260,19 @@ setup() {
   assert_success
 }
 
+# why: A run that was not on a terminal at startup keeps that answer,
+# however its fds are rearranged later.
 @test "_log_is_tty: cached non-zero wins over the live probe (#605)" {
   run bash -c "export _LOG_IS_TTY=1; source ${LOG_SH}; _log_is_tty 1"
-  assert_failure
+  # Pinned: a missing function is 127 (base#2174).
+  assert_failure 1
 }
 
+# why: A script that sources log.sh on its own never sets the cache, so
+# the live probe is the only answer it has.
 @test "_log_is_tty: unset falls back to live test -t (non-TTY pipe -> non-zero) (#605)" {
   run bash -c "unset _LOG_IS_TTY; source ${LOG_SH}; _log_is_tty 1"
-  assert_failure
+  assert_failure 1
 }
 
 @test "auto dispatch: _LOG_IS_TTY=0 forces text even on a non-TTY pipe (#605)" {
@@ -301,14 +306,17 @@ setup() {
   assert_success
 }
 
+# why: Colour follows the same cached answer as the format, so a
+# redirected run gets no ANSI codes in its log.
 @test "_log_color_enabled with _LOG_IS_TTY=1 stays disabled (#605)" {
   run bash -c "source ${LOG_SH}; _LOG_IS_TTY=1 _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
+# why: NO_COLOR is the user's opt-out; a terminal does not undo it.
 @test "_log_color_enabled: NO_COLOR wins over _LOG_IS_TTY=0 (#605)" {
   run bash -c "source ${LOG_SH}; NO_COLOR=1 _LOG_IS_TTY=0 _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
 @test "_log_color_enabled: FORCE_COLOR wins over _LOG_IS_TTY=1 (#605)" {
@@ -592,9 +600,10 @@ setup() {
 
 # ── _log_color_enabled ─────────────────────────────────────────────
 
+# why: The default for a pipe or a CI log, where ANSI codes are noise.
 @test "_log_color_enabled returns non-zero on non-TTY without overrides" {
   run bash -c "source ${LOG_SH}; _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
 @test "_log_color_enabled returns 0 with FORCE_COLOR=1" {
@@ -602,9 +611,11 @@ setup() {
   assert_success
 }
 
+# why: The two overrides contradict each other, and the opt-out is the
+# one that has to win.
 @test "_log_color_enabled returns non-zero with NO_COLOR=1 + FORCE_COLOR=1" {
   run bash -c "NO_COLOR=1 FORCE_COLOR=1 source ${LOG_SH}; NO_COLOR=1 FORCE_COLOR=1 _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
 # ── FORCE_COLOR text ───────────────────────────────────────────────

@@ -96,9 +96,13 @@ teardown() {
   assert_failure
 }
 
+# why: A check that hangs is a failure too; waiting on it would stop the
+# supervision.
 @test "_watchdog_run_check times out a hung check as unhealthy (#797)" {
   run bash -c ". '${WD}'; WATCHDOG_CHECK='sleep 10' _WATCHDOG_TIMEOUT=1 _watchdog_run_check"
-  assert_failure
+  # 124 is the status of timeout(1) for a command it cut off. A bare
+  # assert_failure also accepts a missing function, 127 (base#2174).
+  assert_failure 124
 }
 
 # ── evaluate: the shared decision seam ───────────────────────────────
