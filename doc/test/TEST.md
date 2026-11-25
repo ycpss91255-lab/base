@@ -538,12 +538,13 @@ validates every row), and the self-hosted `config-gen` job in
 no `if:` and no `continue-on-error`. No `test.sh` mode runs it, the no-flag
 `just test` included, and the pre-PR mirror lists it as excluded.
 
-**Before a release**, run it and the other release-only check, the config
-generator's redpath, on the commit to be tagged, in one of two ways:
+**Before a release**, run both release-only checks, this roster and the config
+generator's redpath, on the commit to be tagged: locally with the first two
+commands, or hosted with the third alone.
 
 ```bash
-just test mutation-required                 # local: the roster alone
-just test go-redpath                        # local: the redpath alone
+just test mutation-required                 # local: the roster
+just test go-redpath                        # local: the redpath, every case
 gh workflow run self-test.yaml --ref main   # hosted: the whole CI, both included
 ```
 
