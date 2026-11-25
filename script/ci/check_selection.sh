@@ -8,7 +8,9 @@
 #   check_selection.sh --event <event> --base <ref> # paths from git diff <ref>...HEAD
 #   check_selection.sh --jobs                       # the gated job names alone
 #
-# Prints one `<job>=<true|false>` line per gated job, in a fixed order.
+# Prints one `<job>=<true|false>` line per gated job, in a fixed order. A
+# release-only job is not one of them (base#2177): no diff selects it, and
+# classify writes its key from the event.
 #
 # CI and `test.sh --selection` never run this file from the working tree:
 # script/ci/selection_at_base.sh runs the BASE side's copy, so a pull
@@ -41,12 +43,11 @@ set -euo pipefail
 export LC_ALL=C
 
 # The gated jobs, in output order. coverage-gate prints coverage's value,
-# worker-selftest prints system's, and shellcheck, hadolint, bats-fragile,
-# mutation-roster and test-tools-image-arm64 print the code value (false
-# only for docs, base#2110).
+# worker-selftest prints system's, and shellcheck, hadolint, bats-fragile
+# and test-tools-image-arm64 print the code value (false only for docs,
+# base#2110).
 readonly -a _CS_JOBS=(config-gen coverage coverage-gate acceptance system
-  worker-selftest shellcheck hadolint bats-fragile mutation-roster
-  test-tools-image-arm64)
+  worker-selftest shellcheck hadolint bats-fragile test-tools-image-arm64)
 # The answers the rows set; every job above prints one of them.
 readonly -a _CS_KEYS=(config-gen coverage acceptance system code)
 
@@ -59,8 +60,7 @@ _cs_key() {
   case "$1" in
     coverage-gate) echo coverage ;;
     worker-selftest) echo system ;;
-    shellcheck | hadolint | bats-fragile) echo code ;;
-    mutation-roster | test-tools-image-arm64) echo code ;;
+    shellcheck | hadolint | bats-fragile | test-tools-image-arm64) echo code ;;
     *) echo "$1" ;;
   esac
 }
