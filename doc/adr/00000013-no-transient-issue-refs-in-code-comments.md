@@ -8,9 +8,18 @@
 - **Relates to:** the `doc/adr/` references that this convention
   deliberately preserves
 
-> **Amendment (base#2182, 2026-11-26): 註解只說明程式本身。** Decision 裡的
-> 「**Keep** all what/why prose; only the bare issue number goes」由該節的
-> 「2026-11-26 修訂」取代。其餘決定不變，`ADR-0000xxxx` 仍然保留。
+> **Amendment (base#2182, 2026-11-26): 註解只說明程式本身。** 規則在 Decision 的
+> 「2026-11-26 修訂」，取代下列原文；其餘決定不變，`ADR-0000xxxx` 仍然保留。
+>
+> - 標題與 Decision 的 `what/why prose`、`drop the number, keep the sentence`：
+>   歷史與修改的原因不再保留。
+> - Decision 的範圍（五種檔案、沒有前綴的編號）：改為所有程式檔，帶前綴的編號也
+>   不寫。
+> - Decision 的 `A lint driver enforces this` 與 Consequences 的
+>   `a reintroduced #N in a comment fails just test`：只在 `issueref` 掃得到的範圍
+>   成立。
+> - Alternatives 的 `Convention without a lint`：只適用於沒有前綴的編號，那部分仍由
+>   `issueref` 擋；修訂的其他規則不加 lint。
 
 ## Context
 
@@ -86,9 +95,10 @@ and `just test lint`) enforces this so the refs cannot creep back in.
    的 allow 標記、當作 `--help` 輸出的檔頭、`just --list` 的食譜說明，以及 spec
    逐字比對的註解。
 
-上面「not issue references」列出的例外（`@test` 名稱、字串、版本號、URL）仍然
-適用。這份標準不加 lint，由 review 把關；`issueref` 維持原樣，只擋沒有前綴的
-`#NNN`。既有的註解由 base#2182 分批處理。
+這份標準不加 lint，由 review 把關；`issueref` 維持原樣，它不擋不代表允許。它只掃
+`dist/`、`script/`、`test/` 底下的上述五種檔案與根目錄的 `compose.yaml`、`justfile`，
+只擋沒有前綴的 `#NNN`，並且跳過 `.bats` 的 `# why:` 區塊。既有的註解由 base#2182
+分批處理。
 
 ## Out of scope
 
