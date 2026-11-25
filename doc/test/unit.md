@@ -9129,7 +9129,7 @@ directions, so the derivation cannot drift away from the tree it is about.
 |------|-------------|
 | `toml-bridge: Dockerfile exists` | ADR-37 mandates a standalone toml-bridge image for containerised parsing |
 | `toml-bridge: Python version pinned with tool-pin marker` | reproducible builds require a pinned Python base with tool-pin marker |
-| `toml-bridge: tomli version pinned with tool-pin marker` | reproducible builds require a pinned tomli dependency with tool-pin marker |
+| `toml-bridge: the image installs no tomli beside the stdlib tomllib (base#2184)` | The pinned Python carries tomllib, the bridge's first import, so a tomli beside it is never loaded; its pin would still be a version the weekly watch has to resolve, from releases upstream does not publish (base#2136, base#2184). |
 | `toml-bridge: Python bridge script exists in build context` | the Dockerfile COPY needs the script present in the build context |
 | `toml-bridge: bash shim exists and is sourceable` | the shim is the host-side entry point sourced by all TOML consumers |
 | `toml-bridge: shim converts TOML to JSON via docker run` | golden-path contract -- TOML in, JSON out, via docker run |

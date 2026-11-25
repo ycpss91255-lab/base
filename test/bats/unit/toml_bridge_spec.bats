@@ -4,7 +4,7 @@
 # TOML parser (ADR-37 sec. Containerised parsing).
 #
 # Seam 1: Dockerfile.toml-bridge structure (tool-pin markers, Python
-#          version, tomli vendoring).
+#          version, no tomli beside the stdlib tomllib).
 # Seam 2: toml_bridge.sh bash shim (TOML in -> JSON out via docker run).
 #
 # The test-tools seam is NOT here, and its absence is deliberate. It was
@@ -64,14 +64,16 @@ setup() {
   assert_success
 }
 
-# why: reproducible builds require a pinned tomli dependency with tool-pin marker
-@test "toml-bridge: tomli version pinned with tool-pin marker" {
+# why: The pinned Python carries tomllib, the bridge's first import, so a
+# tomli beside it is never loaded; its pin would still be a version the
+# weekly watch has to resolve, from releases upstream does not publish
+# (base#2136, base#2184).
+@test "toml-bridge: the image installs no tomli beside the stdlib tomllib (base#2184)" {
   assert_spec_subject "${DOCKERFILE}" \
     "the toml-bridge Dockerfile"
-  run grep 'tool-pin:.*tomli' "${DOCKERFILE}"
-  assert_success
-  run grep '^ARG TOMLI_VERSION=' "${DOCKERFILE}"
-  assert_success
+  run grep -nE 'tool-pin:.*tomli|TOMLI_VERSION|pip3? install' "${DOCKERFILE}"
+  assert_failure 1
+  assert_output ""
 }
 
 # why: the Dockerfile COPY needs the script present in the build context
