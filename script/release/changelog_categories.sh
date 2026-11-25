@@ -10,24 +10,20 @@
 # exactly these seven. A roster nothing checks is a roster that drifts, and
 # a roster copied into each consumer drifts one consumer at a time.
 #
-# The axis is `BREAKING` plus the Keep a Changelog six. Conventional-commit
-# types (`feat` / `fix` / `test` / `chore` / `refactor`) were considered and
-# rejected: they answer "what kind of work was this", the author's view,
-# where a changelog answers "what changed for me", the reader's. Filing by
-# commit type institutionalises putting `test:` / `chore:` / `refactor:`
-# work into the changelog, which is part of how this file passed 680 KiB. A
-# refactor a reader must know about -- a new lint that can fail their CI --
-# is `Added`; one they need not know about is not an entry at all.
+# The axis is `BREAKING` plus the Keep a Changelog six, not the
+# conventional-commit types (`feat` / `fix` / `test` / `chore` / `refactor`):
+# those answer "what kind of work was this", the author's view, where a
+# changelog answers "what changed for me", the reader's. Filing by commit
+# type institutionalises putting `test:` / `chore:` / `refactor:` work into
+# the changelog. A refactor a reader must know about -- a new lint that can
+# fail their CI -- is `Added`; one they need not know about is not an entry
+# at all.
 #
 # BREAKING sorts first and is first-class because this project's dominant
-# risk is breaking the downstream repos that carry `.base/`. It was already
-# in ad-hoc use three times before it was named here.
+# risk is breaking the downstream repos that carry `.base/`.
 #
-# The headings this replaces -- `Documentation`, `Tests`, `Migration`,
-# `Migration notes`, `Performance`, `Known issues`, `Release summary`, and
-# the one-offs carrying a date or a parenthetical -- are twenty variants
-# where seven will do. Migration instructions belong INSIDE the BREAKING
-# entry they serve, not in a parallel section a reader can miss.
+# Migration instructions belong INSIDE the BREAKING entry they serve, not in
+# a parallel section a reader can miss.
 #
 # Scope: [Unreleased] only. A released section is a historical
 # record and rewriting a shipped heading falsifies it, so the roster is
