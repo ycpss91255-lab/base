@@ -541,12 +541,24 @@ no `if:` and no `continue-on-error`. No `test.sh` mode runs it, the no-flag
 **Before a release**, run it on the commit to be tagged, in one of two ways:
 
 ```bash
-gh workflow run self-test.yaml --ref main   # hosted: the whole CI, the roster included
 just test mutation-required                 # local: the roster alone
+gh workflow run self-test.yaml --ref main   # hosted: the whole CI, the roster included
 ```
 
-A roster that is red on the tag itself withholds the GitHub Release, but by
-then the tag exists and `release-test-tools.yaml` has published its images.
+The hosted run takes the branch's latest commit, so check that it is the one
+to be tagged. It shares one concurrency group with the pushes to `main`, which
+keeps a single pending run: a later merge cancels it while it waits, and it
+cancels a push run that waits.
+
+Nothing enforces this step. A roster that is red on the tag itself withholds
+the GitHub Release and nothing else:
+
+- The tag is pushed all the same: the `v*` ruleset asks for a green
+  `ci-rollup` on the commit, and the merge group's is green without the
+  roster.
+- `upgrade.sh` and `init.sh` pick the newest `vX.Y.Z` tag, not the newest
+  GitHub Release, so a downstream upgrade takes it.
+- `release-test-tools.yaml` has published its images.
 
 ## Maintaining these docs
 
