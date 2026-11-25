@@ -12,15 +12,16 @@ sibling docs below.
 > edit. Ask the run instead: `just test` reports what it ran, and a
 > released version's figure belongs to that release.
 >
-> The `just test` self-test suite is **Unit + Integration** -- what runs
-> in the `Self Test` CI job. System and smoke specs are catalogued here
-> too but are **not** part of it: System specs need host docker access
-> and are opt-in, and smoke specs are Dockerfile `test`-stage build-time
-> assertions, not self-tests. Acceptance is a host-driven level with no
-> bats specs by design: it drives a real scaffolded consumer + built image
-> via `script/ci/acceptance.sh` -- the `acceptance` job in CI, `just test
-> acceptance` locally -- not the mounted-`/source` sandbox
-> (see [acceptance.md](acceptance.md)).
+> The `just test` self-test suite is **Unit + Integration** -- what CI runs
+> in the `coverage` matrix (under kcov) and the `bats-fragile` job (the
+> kcov-fragile tests, uninstrumented). System and smoke specs are
+> catalogued here too but are **not** part of it: System specs need host
+> docker access and are opt-in, and smoke specs are Dockerfile
+> `test`-stage build-time assertions, not self-tests. Acceptance is a
+> host-driven level with no bats specs by design: it drives a real
+> scaffolded consumer + built image via `script/ci/acceptance.sh` -- the
+> `acceptance` job in CI, `just test acceptance` locally -- not the
+> mounted-`/source` sandbox (see [acceptance.md](acceptance.md)).
 
 ## Test Docs by Level / Type
 

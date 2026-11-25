@@ -1,8 +1,8 @@
 # Unit Tests
 
-> Part of the `just test` self-test suite — what runs in the `Self Test`
-> CI job. See [TEST.md](TEST.md) for the index across all test levels and
-> types.
+> Part of the `just test` self-test suite — in CI, the `coverage` matrix and
+> the `bats-fragile` job run it. See [TEST.md](TEST.md) for the index across
+> all test levels and types.
 >
 > No suite total is recorded here (ADR-00000028 sec. 1): this file is the
 > one every branch that adds a unit test rewrites, and a total of the
