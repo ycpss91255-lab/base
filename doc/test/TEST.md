@@ -194,14 +194,14 @@ tool therefore needs its own join to `.github/workflows/self-test.yaml`:
 
 | Lint | Enforces | CI job | Gated? |
 |------|----------|--------|--------|
-| `shellcheck` | shell static analysis | `shellcheck` (`--shellcheck-only`) | `code_changed` |
-| `hadolint` | Dockerfile static analysis | `hadolint` (`--lint --hadolint`, in the test-tools image) | `code_changed` |
+| `shellcheck` | shell static analysis | `shellcheck` (`--lint --shellcheck`) | `select_shellcheck` |
+| `hadolint` | Dockerfile static analysis | `hadolint` (`--lint --hadolint`) | `select_hadolint` |
 | `issueref` | no transient `#NNN` in code comments (ADR-00000013) | `lint-static` (one group) | ungated |
 | `adr-numbering` | `doc/adr/` duplicate-free + well-formed | `lint-static` (one group) | ungated |
 | `adr-structure` | every ADR carries each required part exactly once at column 0 -- `> Serves:`, Context, Decision, Consequences, Alternatives, Status | `lint-static` (one group) | ungated |
 | `stale-setup-conf` | no legacy `config/docker/setup.conf` under `dist/` | `lint-static` (one group) | ungated |
 | `readme-sync` | localized READMEs still match `README.md` | `lint-static` (one group) | ungated |
-| `doc-counts` | the figures / catalog rows below | `doc-counts` (`--doc-counts-only`) | ungated |
+| `doc-counts` | the figures / catalog rows below | `doc-counts` (`--lint --doc-counts`) | ungated |
 | `home-literal` | no concrete username in a home path under `dist/` or `dockerfile/` (ADR-00000024) | `lint-static` (one group) | ungated |
 | `arch-literal` | no bare architecture literal in a shipped Dockerfile under `dist/` or `dockerfile/`; architecture comes from `ARG TARGETARCH`, and a mapping onto an upstream asset spelling opts out with a stated reason | `lint-static` (one group) | ungated |
 | `moving-tag` | no workflow, Dockerfile, compose file or script in base resolves the test-tools image by `:latest`, `:main`, no tag or a tag decided at run time, outside the per-line allow-list in `script/test/drivers/moving_tag.sh` (base#1647) | `lint-static` (one group) | ungated |
@@ -250,7 +250,8 @@ them.
 The same spec holds this TABLE to it, which is how the table stopped being
 hand-maintained prose: one guard compares the row set against `_LINT_TOOLS` in
 both directions, another requires every CI job name cited above to be a job
-`self-test.yaml` declares. The table drifted to 15 of 26 rows over one release
+`self-test.yaml` declares, and a third requires the flags and the condition in
+a row to be that job's own. The table drifted to 15 of 26 rows over one release
 cycle, and carried a `lint-static (i18n-orphan)` row pointing at a check that
 has not existed since the matrix became a partition of groups. Only the
 "Enforces" column is authored: it is prose a person writes, not a figure.
