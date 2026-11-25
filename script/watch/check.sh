@@ -23,9 +23,7 @@
 #       what makes "latest alpine" mean the newest 3.x SERIES tag rather
 #       than `edge` or `latest`: which tags are comparable is a property of
 #       the upstream's tagging scheme, so it is declared per pin. Where the
-#       pattern fixes how a tag ends, `name=` asks for those tags only: one
-#       answer holds 100, and an anonymous caller may page to 1000, while
-#       library/python has over 4000 (base#2136).
+#       pattern fixes how a tag ends, `name=` asks for those tags only.
 #
 # ── When a source cannot be reached ─────────────────────────────────────────
 #
@@ -103,13 +101,8 @@ _watch_latest_github_release() {
   printf '%s\n' "${_tag}"
 }
 
-# _watch_tag_ending <pattern> -- text every tag matching <pattern> ends with,
-# or nothing.
-#
-# It goes to Docker Hub as `name=`, so it must never be text a match can
-# lack. It is what stands right before the closing `$`, where nothing can
-# make it optional: plain characters and `\.`, back to the first thing that
-# is neither. A pattern with a `|` yields nothing.
+# _watch_tag_ending <pattern> -- text every match ends with, or nothing: the
+# plain characters and `\.` right before the closing `$`; none if it has `|`.
 _watch_tag_ending() {
   local _re='(^|[^\\])((\\\.|[A-Za-z0-9-])+)\$$'
   [[ "${1}" != *'|'* && "${1}" =~ ${_re} ]] || return 0
