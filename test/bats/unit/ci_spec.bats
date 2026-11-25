@@ -3155,7 +3155,7 @@ _system_skip_tree() {
   _system_skip_tree
   _system_run_tree GITHUB_ACTIONS=true
   assert_failure
-  # The TAP names every test, so the names are read off the refusal line.
+  # TAP lines carry the names too, so only the DIE line is matched.
   assert_output --regexp "DIE: ci_system_skip .*first without its image.*second without its image"
   refute_output --regexp "DIE: .*neighbour that ran"
 }
