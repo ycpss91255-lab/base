@@ -12,103 +12,21 @@
 # Writes the body to stdout. Exit 0 = assembled; 1 = refused, with the
 # reason on stderr.
 #
-# WHY IT EXISTS. The release job in .github/workflows/self-test.yaml hands
-# what this prints to softprops/action-gh-release. An extraction that matches
-# nothing exits 0 and writes an EMPTY file, and the action accepts an empty
-# body_path without complaint, so a doc-only PR that renames or reformats one
-# `## [vX.Y.Z]` heading would ship a release with the curated notes silently
-# absent -- green CI, no warning. This script is that extraction with
-# assertions on its result, in a file a spec can drive.
+# A final tag's notes are the union of its own section and its `-rcN`
+# sections, one list per category in changelog_categories.sh order.
 #
-# WHY THE UNION. This project cuts RCs and promotes one unchanged, so the
-# entries stay under the RC headings that introduced them. RC structure is an
-# internal artifact -- a reader of `v0.42.0` has no interest in which RC
-# introduced what -- so a final release's notes are the union of its own
-# section and every `-rcN` section under it, merged category by category so
-# each category is one list.
+# The tag's own lead (prose above its first `### `) is published as written;
+# an RC's only when it holds a `- ` entry.
 #
-# That merge is a few lines only because the category set is locked
-# (script/release/changelog_categories.sh). Categories are emitted in roster
-# order, and a historical heading outside the roster is emitted after them
-# in first-seen order rather than dropped -- released text is a record, and
-# the roster governs what is written from now on, not what shipped.
-#
-# THE LEAD PARAGRAPH. Prose sitting under the version heading before the
-# first `### ` is a lead paragraph. The LEADING section's is always kept --
-# it is the only prose anyone wrote for this release page. An RC's is kept
-# only when it CARRIES AN ENTRY: a `- ` bullet under no heading is an entry
-# that happens to sit above the first one, not prose, and it is kept along
-# with the sentence that introduces it. An RC lead that carries none says
-# which candidate this is, which a reader of the final tag is not being
-# told.
-#
-# Both halves of that are read off the lead itself, not off whether the
-# section has a `### ` of its own. A section without one can be a pointer at
-# the RCs, and it can be the v0.29.0 shape, whose prose ends in three bullets
-# naming the downstream propagation queued for that release.
-#
-# A prose-only lead cannot be classified at all, and the entry count below
-# cannot miss what was never a bullet. A promoted final's lead is prose under
-# no headings whether it points at the RCs or tells the reader to upgrade
-# before their next build; the shapes are identical. Publishing both is the
-# cheaper failure: a stale pointer is a sentence a reader can see and an
-# author can correct in the next release, where a deleted upgrade instruction
-# is gone from the one page it was aimed at, with no message. CONVENTIONS.md
-# says so where the author writes it.
-#
-# WHAT IT REFUSES. A body over GitHub's 125,000-character release-body cap
-# (the union of v0.42's four RCs is 326,932 -- the figure the check itself
-# prints, measured over the body and not over the newline printf adds after
-# it; a spec pins it -- so this is not hypothetical: handing it over would
-# be a 422 at tag push, after every gate has passed);
-# no section for the tag; a tag whose section appears in
-# more than one file (the split's own failure mode -- a section copied
-# rather than moved leaves two answers to "what shipped", and picking either
-# silently is how the wrong one reaches a release page); an assembled
-# body carrying no entry bullet at all (a pointer at the RCs with none to
-# union in -- a refusal rather than a short body because a release page with
-# no notes is exactly what this script exists to stop shipping); and an
-# assembled body carrying FEWER entry bullets than the sections it was
-# merged from.
-#
-# THE COUNT. That last one is a postcondition, not a shape check.
-# `grep -q '^- '` over the whole body passes as long as one bulleted
-# category survived, so an entry the merge could not file is
-# indistinguishable from a release with a single category -- and the release
-# job publishes this body ALONE (`generate_release_notes: false`), so a
-# dropped entry has no second source. Counting the entries in and out costs
-# one pass and turns the next shape this file was not written for into a
-# refusal at tag push rather than a release page nobody knows is short.
-#
-# It only does that while the count is NOT the merge's reader. With one
-# fence state on both sides, a shape that state mis-reads is subtracted from
-# the source count and the emitted count alike and the two agree -- on a
-# page missing everything the reader misfiled. An unclosed ```markdown fence
-# is one such shape: everything below it, a `### ` heading and its entries
-# included, reads as fence content.
-#
-# So _count_entries has no fence state at all: a `- ` at column 0 is an
-# entry wherever it stands. That over-counts what an entry is -- a bullet
-# inside a fenced example counts -- and an over-count can only refuse a
-# release early, never publish one short. The lead rule above counts the
-# same way for the same reason: a lead the count calls entry-carrying must
-# not be a lead the merge drops, or the release refuses over a shape nobody
-# got wrong.
-#
-# Everywhere else fenced code blocks are structurally inert, as in the
-# changelog lint: the file documents its own format in ```markdown examples,
-# so a `## [` inside a fence is an example of a heading and must not end a
-# section.
+# Refused: no section, a section in two files, no entry, fewer entries than
+# the sections hold, or a body over GitHub's cap (v0.42's is 326,932).
 
-# Where this script lives, so the default changelog directory resolves
-# without a caller having to know the layout.
+# Where this script lives; the default changelog directory is relative to it.
 _RELEASE_NOTES_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" \
   &> /dev/null && pwd)"
 readonly _RELEASE_NOTES_DIR
 
-# GitHub's cap on a release body. A body over it is rejected by the API
-# with a 422, so the choice is to find that out here or at tag push after
-# every gate has passed.
+# A longer release body is rejected by the GitHub API with a 422.
 readonly _RELEASE_NOTES_MAX=125000
 
 err() { printf '[release-notes] %s\n' "$*" >&2; }
@@ -133,19 +51,16 @@ _is_fence_delimiter() {
   return 1
 }
 
-# _ends_section <line> -- does the line end the body of a version section?
-# A level-2 heading starts the next one; a link definition at column 0 is
-# the compare-link block at the foot of a series file, which is reference
-# data and not part of anyone's notes.
+# _ends_section <line> -- the next level-2 heading, or a compare-link
+# definition at column 0, ends a version section's body.
 _ends_section() {
   [[ "${1}" == '## '* ]] && return 0
   [[ "${1}" =~ ^\[[^]]+\]:[[:space:]] ]] && return 0
   return 1
 }
 
-# _index_sections <dir> -- index every `## [<tag>]` section under <dir>/*.md.
-# A tag found twice is fatal: two answers to "what shipped in this tag" is
-# not a thing to resolve by preferring one file.
+# _index_sections <dir> -- index every `## [<tag>]` section under
+# <dir>/*.md. A tag found twice is fatal.
 _index_sections() {
   local _dir="${1}" _file _tag _open='' _fence=''
   local -a _lines=()
@@ -197,9 +112,8 @@ _section_body() {
   done
 }
 
-# _rc_tags <final-tag> -- the tag's release candidates, oldest first. A
-# release candidate of `vX.Y.Z` is `vX.Y.Z-rcN`; the numeric sort is what
-# keeps rc10 after rc9 rather than after rc1.
+# _rc_tags <final-tag> -- the tag's `vX.Y.Z-rcN` tags, oldest first; sorted
+# numerically so rc10 follows rc9.
 _rc_tags() {
   local _final="${1}" _tag
   for _tag in "${!_RN_FILE[@]}"; do
@@ -208,9 +122,7 @@ _rc_tags() {
   done | sort -n | cut -d' ' -f2
 }
 
-# _trim_blank_edges -- drop leading AND trailing blank lines from stdin.
-# The lead paragraph needs both ends: a `## [tag]` heading is always
-# followed by a blank line, so the first line of a lead is always blank.
+# _trim_blank_edges -- drop leading and trailing blank lines from stdin.
 _trim_blank_edges() {
   local -a _buf=()
   local _line _i _first=-1 _last=-1
@@ -277,10 +189,7 @@ _assemble() {
       fi
       if [[ -z "${_current}" ]]; then
         _lead+=("${_line}")
-        # Counted the way the postcondition counts, fence state ignored: a
-        # lead this file calls an entry-carrying lead must not be one the
-        # merge drops, or the count below refuses a release over a shape
-        # nobody got wrong.
+        # Fence state ignored, as in _count_entries.
         if [[ "${_line}" == '- '* ]]; then
           _lead_entries=$(( _lead_entries + 1 ))
         fi
@@ -289,21 +198,8 @@ _assemble() {
       _bucket["${_current}"]+="${_line}"$'\n'
     done
 
-    # Keep the LEADING section's lead whatever it holds: it is the only
-    # prose written for this release page, and a pointer at the RCs and a
-    # summary of them are the same shape (see THE LEAD PARAGRAPH above), so
-    # a rule that drops one drops the other with no message. Keep a later
-    # section's only when it carries an entry -- a `- ` bullet under no
-    # heading is an entry that sits above the first one, and the sentence
-    # introducing it is what says what the list is. An RC lead that carries
-    # none names the candidate, which the final tag's reader is not being
-    # told.
-    #
-    # The guard is on the TEXT, not on the line count. A `## [tag]` heading
-    # is always followed by a blank line, so _lead is never an empty array
-    # -- only ever an array of blanks -- and a count-based guard therefore
-    # fires for every release that wrote no lead at all, emitting a blank
-    # line ahead of the first `### `.
+    # The first section's lead is kept whatever it holds, a later one's only
+    # with an entry. Tests the text: _lead is never empty, only blank lines.
     _lead_text=''
     if [[ "${#_lead[@]}" -gt 0 ]] \
       && { [[ "${_first}" -eq 1 ]] || [[ "${_lead_entries}" -gt 0 ]]; }; then
@@ -319,8 +215,7 @@ _assemble() {
     printf '\n'
   done
 
-  # Roster order first, then whatever history left behind, in first-seen
-  # order. A shipped heading outside the roster is a record, not a defect.
+  # Roster order first, then other headings in first-seen order.
   local -a _emitted=()
   for _key in "${CHANGELOG_CATEGORIES[@]}"; do
     [[ -n "${_bucket["${_key}"]+set}" ]] || continue
@@ -344,17 +239,8 @@ _in_list() {
   return 1
 }
 
-# _count_entries -- how many entry bullets stdin carries. A `- ` at column 0
-# is the unit the changelog is written in and the unit the entry lint
-# measures; a continuation line and a nested bullet are indented and belong
-# to the entry above them.
-#
-# It counts one WHEREVER it stands, fence or no fence, and that is the whole
-# point of it: this is the postcondition's reader, and a postcondition that
-# borrows the merge's reader cannot see what that reader gets wrong (see
-# THE COUNT above). Counting a bullet inside a fenced example is an
-# over-count of what an entry is, and an over-count can only refuse early --
-# never publish short.
+# _count_entries -- how many `- ` entries at column 0 stdin carries. Ignores
+# fences, unlike the merge it checks; an over-count can only refuse early.
 _count_entries() {
   local _line _n=0
   while IFS= read -r _line; do
@@ -371,9 +257,7 @@ _emit_category() {
 }
 
 main() {
-  # Strict mode is set HERE, not at file scope: this file carries the
-  # `BASH_SOURCE == $0` guard, so it is sourceable, and a sourced file that
-  # turns nounset on leaves it on in its caller.
+  # Strict mode here, not at file scope: the file is sourceable.
   set -euo pipefail
 
   local _tag="${1:-}"
@@ -416,10 +300,7 @@ main() {
     return 1
   fi
 
-  # The merge is complete or the release fails here. Counted rather than
-  # trusted because an entry the merge cannot file under a category is
-  # dropped in silence, and the guard above passes on the categories that
-  # survive.
+  # Every entry the sections hold must reach the body.
   local _source_entries=0 _emitted_entries _rc_entries
   local _source
   for _source in "${_sources[@]}"; do
@@ -438,9 +319,7 @@ main() {
         "it. Fix the assembler, not the changelog."
     return 1
   fi
-  # Measured in BYTES, which is at least the character count GitHub
-  # actually caps, so the refusal errs toward firing early rather than
-  # toward a release that fails at the API.
+  # Bytes, which is at least the character count GitHub caps.
   local _size
   _size="$(LC_ALL=C printf '%s' "${_notes}" | wc -c)"
   if (( _size > _RELEASE_NOTES_MAX )); then
