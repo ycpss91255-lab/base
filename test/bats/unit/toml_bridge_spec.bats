@@ -77,7 +77,7 @@ setup() {
 @test "toml-bridge: the image runs the bridge once at build time (base#2184)" {
   assert_spec_subject "${DOCKERFILE}" \
     "the toml-bridge Dockerfile"
-  run grep -E '^[^#]*python3 /usr/local/bin/toml-bridge <' "${DOCKERFILE}"
+  run grep -E '^(RUN| )[^#]*python3 /usr/local/bin/toml-bridge( |$)' "${DOCKERFILE}"
   assert_success
 }
 
