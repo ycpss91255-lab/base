@@ -104,12 +104,8 @@ _wf_root() {
   cp /source/.github/workflows/self-test.yaml "$1/.github/workflows/"
 }
 
-# why: cycle 30, review round 2. The traced commands are what the
-# config-gen jobs run, so the job set comes from the workflow: every job
-# whose `if:` reads classify's select_config_gen or
-# select_config_gen_redpath key. A reader keyed on one of the two would
-# trace half of what config-gen reads. The expected names are main's two
-# jobs.
+# why: the traced commands are what the config-gen jobs run; a reader keyed on
+# one of their two keys would trace half of them.
 @test "config_gen_readers: the config-gen jobs are the jobs that gate on a config-gen key (base#1584, base#2176)" {
   run bash "${READERS_SH}" --root /source --jobs
   assert_success
@@ -117,10 +113,8 @@ _wf_root() {
 config-gen-redpath"
 }
 
-# why: cycle 30, review round 2. A workflow where no job gates on a
-# config-gen key, or where a config-gen job has no `run:` step, gives
-# the tracer nothing to run. That must fail the deny-list spec, never
-# read as an empty reader set.
+# why: a workflow with no config-gen job, or one with no `run:` step, gives
+# the tracer nothing to run, which must never read as an empty reader set.
 @test "config_gen_readers: no config-gen job, or one with no run step, is refused (base#1584)" {
   local _r="${BATS_TEST_TMPDIR}/r" _flag
   _wf_root "${_r}"

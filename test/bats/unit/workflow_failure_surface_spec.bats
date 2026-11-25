@@ -284,8 +284,7 @@ _with() {
 # own select_* key `false` and fails with it `true`. The job set is read
 # from `needs` and each job's `if:`, not from the rollup's text, and the
 # key is the one the job's `if:` reads, never a rewrite of the job's name:
-# config-gen-gates reads select_config_gen, and a rollup that guessed
-# select_config_gen_gates from the name failed its decided skip.
+# config-gen-gates reads select_config_gen.
 @test "self-test: the rollup passes a gated skip only when its own select key is false (base#1584)" {
   local _job _k _if _base _n=0 _bad=""
   _base="$(_needs_json true success)"

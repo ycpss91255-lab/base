@@ -747,9 +747,8 @@ _gated_jobs() {
   assert_success
 }
 
-# why: cycle 2. A docs-only PR skips every gated job (twelve),
-# mutation-roster and the arm64 image among them (base#2110), runs the
-# documentation checks, and the rollup passes and says so.
+# why: a docs-only PR can affect no gated job; the documentation checks still
+# run, and the rollup says which kind of pass it is.
 @test "chain: a docs-only PR skips every gated job, mutation-roster included, and the rollup passes as doc-only (base#1584, base#2110)" {
   local _out _results _j
   local -a _want=(mutation-roster=skipped test-tools-image-arm64=skipped

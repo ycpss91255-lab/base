@@ -745,14 +745,8 @@ _acceptance_code() {
   refute_output --partial "if: needs.classify.outputs.code_changed == 'true'"
 }
 
-# why: PR base#1559 changed one spec and two docs, code_changed was true,
-# and config-gen ran 111 min (run 42549448309). base#1584 has a pull
-# request run a heavy job only when classify's map selected it, so
-# config-gen must read its own select_config_gen output, not the
-# shared code_changed answer. config-gen-gates gates on that key, which the
-# diff decides, and config-gen-redpath on select_config_gen_redpath, which
-# the event decides, so the redpath can skip where the gates run. The whole
-# `if:` is compared, not a substring.
+# why: the diff decides the gates and the event the redpath, so one key
+# cannot gate both; the whole `if:` is compared, not a substring.
 @test "self-test.yaml: each config-gen job's job-level if: gates on a classify key of its own (base#1584, base#2176)" {
   run yq '.jobs["config-gen-gates"].if' "${WF}"
   assert_success
@@ -4403,9 +4397,8 @@ ${_bad}"
 
 # ── config-gen: the Go gates job, in both workflows (base#1462) ──────────────
 #
-# `just test go` is go-gates and then go-redpath. The self-hosted workflow
-# runs it whole; the hosted one runs each recipe in a job of its own, the
-# redpath for a release only. A job that merely MENTIONS its command is not a
+# The self-hosted workflow runs `just test go`, the hosted one its two
+# recipes in a job each. A job that merely MENTIONS its command is not a
 # job that runs it: an `if: false` on the step, a `shell:` that never starts
 # bash, a `continue-on-error`, a workflow-level BASH_ENV that exits 0 before
 # the step body runs -- each leaves the job green with the gates unrun. So
@@ -4923,11 +4916,8 @@ _rollup_honours_every_need() {
   assert_output ""
 }
 
-# why: config-gen skips where classify deselects it; the rollup must
-# read that skip as a pass and a failure or cancel as red. The skip passes
-# only on the classify answer it came from, the job's own key: the other
-# config-gen job's key does not excuse it, and a skip classify did not
-# decide fails, whatever code_changed says (base#1584).
+# why: a skip passes only on the job's own key, whatever the other config-gen
+# job's key or code_changed says; a failure or a cancel never passes.
 @test "self-test.yaml: ci-rollup passes config-gen success and a decided skip, fails failure and cancelled (base#1462, base#2176)" {
   local _j _k _other
   while read -r _j _k _other; do

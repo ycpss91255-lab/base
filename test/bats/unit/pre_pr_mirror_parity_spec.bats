@@ -932,7 +932,7 @@ _make_report() {
 ${_recipe}"
 }
 
-# ── config-gen: just test go-gates is attested and planned (base#1462) ───────
+# ── config-gen: just test go-gates is attested and planned ───────────────────
 
 # why: A gate read by substring took `<gate> && false` -- a job that
 # never runs -- for a gated job, so the plan check demanded a local
@@ -949,10 +949,8 @@ ${_recipe}"
   assert_output always
 }
 
-# why: config-gen-gates joins ci-rollup's needs, so the mirror must run the
-# recipe its CI job runs, and that command must resolve to a recipe. It is
-# `just test go-gates` and not `just test go`, which also runs the redpath,
-# the half CI runs for no pull request.
+# why: the mirror runs the recipe the CI job runs; `just test go` would also
+# run the redpath, which CI runs for no pull request.
 @test "pre-PR mirror: config-gen-gates is attested by exactly just test go-gates (base#1462, base#2176)" {
   local _table
   _table="$(_mirror_table)" || return 1
@@ -964,9 +962,8 @@ ${_recipe}"
   assert_output plain
 }
 
-# why: The config generator's sources are code paths; a diff touching only
-# them must plan the Go gates, and a docs-only diff must not. No diff plans
-# the redpath, through either recipe that runs it.
+# why: a diff in the generator's sources can break the gates and a docs-only
+# one cannot; no diff plans the redpath, through either recipe that runs it.
 @test "pre-PR mirror: a config-gen diff plans just test go-gates and a docs-only diff does not (base#1462, base#2176)" {
   _require_mirror
   run bash "${MIRROR}" --plan <<<"dockerfile/config-gen/cmd/config-gen/main.go"
@@ -1032,10 +1029,8 @@ STUB
       "${SCRATCH}/repo/script/ci/pre_pr_mirror.sh" --base "${_base}"
 }
 
-# why: The plan naming `just test go-gates` is a string; what CI attests is
-# the recipe `just` runs for argv `test go-gates`, and that its red reaches
-# the mirror's own exit status (base#1462). No other argv reaches the
-# config generator's recipes.
+# why: a planned string attests nothing unless `just` is handed that recipe,
+# and no other config-gen one, and its red reaches the mirror's exit status.
 @test "pre-PR mirror: a config-gen diff calls just with argv test go-gates, and its red fails the mirror (base#1462, base#2176)" {
   _require_mirror
   _stub_just_run 0
