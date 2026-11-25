@@ -37,12 +37,37 @@ setup() {
   # is itself the reason these cases must not reach a real API: a unit
   # spec that needed the network would be skipped in exactly the
   # environment it is meant to guard.
+  #
+  # A `tags?` URL is answered the way Docker Hub answers it: at most 100
+  # tags a page, `name` a substring, and a 403 (curl's 22) past the first
+  # 1000 tags, which is as deep as a caller with no token may page.
   cat > "${SCRATCH}/bin/curl" <<'STUB'
 #!/usr/bin/env bash
+# _tags <list> <query>
+_tags() {
+  local _size=10 _page=1 _name='' _arg
+  local -a _args
+  IFS='&' read -ra _args <<< "${2}"
+  for _arg in "${_args[@]}"; do
+    case "${_arg}" in
+      page_size=*) _size="${_arg#*=}" ;;
+      page=*) _page="${_arg#*=}" ;;
+      name=*) _name="${_arg#*=}" ;;
+    esac
+  done
+  (( _size <= 100 )) || _size=100
+  (( _page * _size <= 1000 )) || return 22
+  grep -F -- "${_name}" "${1}" | awk -v from="$(( (_page - 1) * _size ))" -v to="$(( _page * _size ))" '
+    NR > from && NR <= to { rows = rows sep "{\"name\":\"" $0 "\"}"; sep = "," }
+    END { printf "{\"count\":%d,\"next\":%s,\"results\":[%s]}\n", NR, (NR > to ? "\"more\"" : "null"), rows }'
+}
 _url="${!#}"
 _path="${_url#file://}"
-[[ -f "${_path}" ]] || exit 22
-cat -- "${_path}"
+[[ -f "${_path%%\?*}" ]] || exit 22
+case "${_path}" in
+  */tags\?*) _tags "${_path%%\?*}" "${_path#*\?}" ;;
+  *) cat -- "${_path}" ;;
+esac
 STUB
   chmod +x "${SCRATCH}/bin/curl"
 }
@@ -56,6 +81,13 @@ _release() {
   mkdir -p "${SCRATCH}/api/repos/${1}/releases"
   printf '{"tag_name": "%s"}\n' "${2}" \
     > "${SCRATCH}/api/repos/${1}/releases/latest"
+}
+
+# _hub_tags <namespace/repo> <tag>... -- what the dockerhub resolver reads:
+# the repository's tags, the newest push first.
+_hub_tags() {
+  mkdir -p "${SCRATCH}/hub/repositories/${1}"
+  printf '%s\n' "${@:2}" > "${SCRATCH}/hub/repositories/${1}/tags"
 }
 
 # _dockerfile <line>... -- the scanned tree.
@@ -259,15 +291,14 @@ _golang_tree() {
     '# tool-pin: golang dockerhub library/golang pattern=^1\.[0-9]+\.[0-9]+-trixie$' \
     'ARG GO_IMAGE=golang:1.27.2-trixie@sha256:47667934874913a449b96faa7ef4777fa285d9ec29126ee80ed61c45b7cccf0e' \
     > "${SCRATCH}/tree/dockerfile/Dockerfile.config-gen"
-  mkdir -p "${SCRATCH}/hub/repositories/library/golang" "${SCRATCH}/tree/dockerfile/config-gen"
-  printf '{"results": [{"name": "1.27.2-trixie"}]}\n' \
-    > "${SCRATCH}/hub/repositories/library/golang/tags?page_size=100"
+  mkdir -p "${SCRATCH}/tree/dockerfile/config-gen"
+  _hub_tags library/golang 1.27.2-trixie
   printf '%s\n' "$@" > "${SCRATCH}/tree/dockerfile/config-gen/go.mod"
 }
 
 # _check_json <arg>... -- check.sh over the staged tree with JSON logs, its
 # stdout and stderr judged apart (assert_refusal), the Docker Hub resolver
-# pointed at the _golang_tree fixture.
+# pointed at the _hub_tags fixture.
 _check_json() {
   _stage
   PATH="${SCRATCH}/bin:${PATH}" PIN_REPO_ROOT="${SCRATCH}/tree" LOG_FORMAT=json \
@@ -304,6 +335,48 @@ _check_json() {
   assert_equal "${status}" 10
   assert_output $'toml\tv1.5.0\tv1.6.0\tdockerfile/config-gen/go.mod\t7'
   [[ "${stderr}" == *'DRIFTED (1)'* ]] || fail "no DRIFTED (1): ${stderr}"
+}
+
+# why: Docker Hub lists tags by push time, 100 a page, and shows a caller
+# with no token only the newest 1000. A pinned series that is no longer
+# rebuilt sinks below all of them, and a watch that cannot see it there
+# fails on a pin that is current. A tag that only shares the ending is not
+# taken for a match (base#2136).
+@test "watch: a matching tag behind 1000 newer ones is found (base#2136)" {
+  _hub_tags library/python 3.15.0a{1..1000}-trixie \
+    3.14.9-alpine3.22 3.13-alpine3.22 3.13.13-alpine3.22 3.13.9-alpine3.22
+  _dockerfile \
+    '# tool-pin: toml-bridge-python dockerhub library/python pattern=^3\.13\.[0-9]+-alpine3\.22$' \
+    'ARG PYTHON_VERSION=3.13.12-alpine3.22'
+  _check_json --drift-tsv
+  [[ "${stderr}" == *'UNRESOLVED (0)'* ]] || fail "unresolved: ${stderr}"
+  assert_equal "${status}" 10
+  assert_output $'toml-bridge-python\t3.13.12-alpine3.22\t3.13.13-alpine3.22\tdockerfile/Dockerfile\t2'
+}
+
+# why: What Docker Hub is asked to narrow down to is taken from the pattern,
+# and it must not hide a tag the pattern accepts: a newer version that was
+# never listed reads as current. Each pattern here holds text that one of
+# its matches lacks (base#2136).
+@test "watch: no matching tag is hidden by text it need not contain (base#2136)" {
+  local _case _pattern _tag
+  local -a _cases=(
+    '^1\.[0-9]+$|^2\.[0-9]+-trixie$ 1.9'
+    '^1\.[0-9]+(-trixie)?$ 1.9'
+    '^v?1\.[0-9]+$ 1.9'
+    '^1\.[0-9]+-rc?$ 1.9-r'
+    '^1\.[0-9]+.22$ 1.9-22'
+    '^1\.[0-9]+\w$ 1.9b'
+  )
+  for _case in "${_cases[@]}"; do
+    _pattern="${_case% *}"
+    _tag="${_case#* }"
+    _hub_tags owner/foo "${_tag}"
+    _dockerfile "# tool-pin: foo dockerhub owner/foo pattern=${_pattern}" 'ARG FOO_VERSION=1.0'
+    _check_json --drift-tsv
+    assert_equal "${_pattern}: ${status}" "${_pattern}: 10"
+    assert_output $'foo\t1.0\t'"${_tag}"$'\tdockerfile/Dockerfile\t2'
+  done
 }
 
 # _curl_logged -- the fixture curl, with every call logged to curl.log.
