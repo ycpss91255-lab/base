@@ -338,7 +338,7 @@ ${_table}"
       || fail "${_job}: the exclusion names no just test recipe: ${_reason}"
     _recipe="${BASH_REMATCH[1]}"
     [[ -n "$(_recipe_body "${_recipe}")" ]] || fail "${_job}: ${JUSTFILE_TEST} declares no ${_recipe} recipe"
-    yaml_job_lines "${WF}" "${_job}" | grep -Fq -- "just test ${_recipe}" \
+    yaml_job_lines "${WF}" "${_job}" | grep -Eq -- "just test ${_recipe}( |\$)" \
       || fail "${_job}: its CI job does not run just test ${_recipe}"
   done <<<"${_jobs}"
 }
