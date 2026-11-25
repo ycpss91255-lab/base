@@ -639,7 +639,8 @@ _kcov_bash_method_args() {
 #
 #   Target selection is the caller's path, verbatim. It never consults
 #   _shard_unit_files, so neither the greedy-LPT partition nor the
-#   recorded weights can change what runs. (`just test coverage
+#   recorded weights can change what runs; for a directory the weights
+#   decide only which slice a spec runs in. (`just test coverage
 #   <n>/<total> <weights>` runs CI's shard <n> when handed the weights CI
 #   partitioned by, base#1410.)
 #
