@@ -285,11 +285,12 @@ jobs:
           # A tag push and workflow_dispatch run them; a pull request, a
           # merge group and a push to a branch do not. Fails CLOSED: an
           # event or a ref no pattern names runs them.
+          release_jobs=(mutation_roster)
           release_run=true
           case "${EVENT_NAME}:${EVENT_REF:-}" in
             pull_request:* | merge_group:* | push:refs/heads/*) release_run=false ;;
           esac
-          for job in mutation_roster; do
+          for job in "${release_jobs[@]}"; do
             echo "select_${job}=${release_run}" >> "${GITHUB_OUTPUT}"
           done
           if [[ "${EVENT_NAME}" != "pull_request" ]]; then
