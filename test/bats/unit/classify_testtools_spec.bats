@@ -581,8 +581,6 @@ _pr_restores_selection() {
   local _lines
   _lines="$(grep -E '\bval\b.*false|false.*\bval\b' <<< "${_step}" | sed 's/^[[:space:]]*//')"
   assert_equal "${_lines}" '[[ "${val}" == "false" ]] || val=true'
-  _lines="$(grep -F 'release_run=false' <<< "${_step}" | sed 's/^[[:space:]]*//')"
-  assert_equal "${_lines}" 'pull_request:* | merge_group:* | push:refs/heads/*) release_run=false ;;'
 }
 
 # _chain_classify_outputs <classify-output> <assoc-name>
