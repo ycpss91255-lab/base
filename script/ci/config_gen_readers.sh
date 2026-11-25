@@ -19,9 +19,8 @@
 #      .github/workflows/self-test.yaml, as the job runs it, except the one
 #      whose only `./` command is script/ci/install-just.sh (it downloads a
 #      binary). The config-gen jobs are the jobs whose `if:` reads
-#      classify's select_config_gen or select_config_gen_redpath key
-#      (config-gen-gates and the config-gen-redpath matrix). A
-#      `${{ matrix.<key> }}`
+#      classify's key for either one (select_config_gen,
+#      select_config_gen_redpath). A `${{ matrix.<key> }}`
 #      in a block runs it once per value of that matrix key, so the five
 #      redpath shards together run every case (a subset would be a hand
 #      list); any other expression is refused. No config-gen job, or one
@@ -101,8 +100,7 @@ _cgr_traced() {
 }
 
 # _cgr_jobs <workflow> -- the config-gen jobs, one per line: every job
-# whose `if:` reads needs.classify.outputs.select_config_gen or
-# needs.classify.outputs.select_config_gen_redpath.
+# whose `if:` reads select_config_gen or select_config_gen_redpath.
 _cgr_jobs() {
   local _jobs
   _jobs="$(yq -o json '.jobs' "$1" | jq -r 'to_entries[]
