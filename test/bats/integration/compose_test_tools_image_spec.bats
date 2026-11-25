@@ -127,3 +127,20 @@ _system_env() {
   assert_success
   assert_output "test-tools:ci-1-1"
 }
+
+# why: _run_system refuses a skip on a CI runner, and only the runner's own
+# GITHUB_ACTIONS tells it that it is on one. Unset stays unset, so a local
+# run keeps its skips (base#2173)
+@test "compose.yaml: ci-system forwards GITHUB_ACTIONS when it is set, and nothing when it is not (base#2173)" {
+  export HOST_UID=1 HOST_GID=1 BASE_CHECKOUT_PATH=/source
+  export TEST_TOOLS_IMAGE=test-tools:ci-1-1
+  export GITHUB_ACTIONS=true
+  run _system_env GITHUB_ACTIONS
+  assert_success
+  assert_output "true"
+
+  unset GITHUB_ACTIONS
+  run _system_env GITHUB_ACTIONS
+  assert_success
+  assert_output ""
+}

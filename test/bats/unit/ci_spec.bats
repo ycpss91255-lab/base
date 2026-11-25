@@ -3116,6 +3116,97 @@ _kcov_slice_mock() {
   assert_output --partial "--recursive"
 }
 
+# _system_run_tree [VAR=value ...]
+#   Run _run_system over the fixture tree at ${BATS_TEST_TMPDIR}/repo with
+#   real bats, with GITHUB_ACTIONS cleared and then whatever the caller
+#   assigns. The builder half (_system_setup / _system_teardown) is
+#   stubbed: what is under test is what the run makes of its own results.
+#   The trees are written by _skip_audit_fixture.
+_system_run_tree() {
+  run env -u GITHUB_ACTIONS "$@" bash -c '
+    cd "${BATS_TEST_TMPDIR}"
+    REPO_ROOT="${BATS_TEST_TMPDIR}/repo"
+    _die() { echo "DIE: $*"; exit 1; }
+    source /source/script/test/drivers/bats.sh
+    _system_setup() { :; }
+    _system_teardown() { :; }
+    _run_system
+  '
+}
+
+# _system_skip_tree
+#   The shape the CI run had: one spec whose setup_file finds a
+#   prerequisite missing and skips the whole file, beside one that runs.
+_system_skip_tree() {
+  local _tree="${BATS_TEST_TMPDIR}/repo/test/bats/system"
+  _skip_audit_fixture "${_tree}/missing" '|setup_file() {
+|  skip "system test: tooling image not in the daemon"
+|}
+|
+|@test "first without its image" {
+|  true
+|}
+|
+|@test "second without its image" {
+|  true
+|}'
+  _skip_audit_fixture "${_tree}/present" '|@test "neighbour that ran" {
+|  true
+|}'
+}
+
+# why: bats counts a skip as a pass, so a system spec that could not find
+# the image CI loaded skipped its 6 tests on every run and the job stayed
+# green (base#2173). On a runner the skip is the failure, named per test.
+@test "_run_system: on a CI runner a skipped test fails the run, by name (base#2173)" {
+  _system_skip_tree
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_failure
+  # The TAP names every test, so the names are read off the refusal line.
+  assert_output --regexp "DIE: ci_system_skip .*first without its image.*second without its image"
+  refute_output --regexp "DIE: .*neighbour that ran"
+}
+
+# why: off a runner the prerequisites are the operator's to supply, so the
+# same tree keeps its skip and the run keeps its success (base#2173)
+@test "_run_system: off a CI runner a missing prerequisite still skips and passes (base#2173)" {
+  _system_skip_tree
+  _system_run_tree
+  assert_success
+  assert_output --partial "# skip system test: tooling image not in the daemon"
+  refute_output --partial "ci_system_skip"
+}
+
+# why: the refusal must not become the verdict. A run with no skip passes,
+# and one with a failing test fails as bats reported it (base#2173)
+@test "_run_system: on a CI runner a run with no skip keeps bats' own verdict (base#2173)" {
+  local _tree="${BATS_TEST_TMPDIR}/repo/test/bats/system"
+  _skip_audit_fixture "${_tree}" '|@test "neighbour that ran" {
+|  true
+|}'
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_success
+
+  _skip_audit_fixture "${_tree}" '|@test "failing on purpose" {
+|  false
+|}'
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_failure
+  assert_output --regexp "not ok [0-9]+ failing on purpose"
+  refute_output --partial "ci_system_skip"
+}
+
+# why: the skips are read from a report, and a report that holds no test
+# names no skip either. A run that cannot say what it skipped is not a run
+# that skipped nothing (base#2173)
+@test "_run_system: on a CI runner a run that reports no test fails (base#2173)" {
+  mkdir -p "${BATS_TEST_TMPDIR}/repo/test/bats/system"
+  mock_cmd "bats" 'exit 0'
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_failure
+  assert_output --partial "DIE: ci_system_skip "
+}
+
 # why: #615 shard env plumbing
 @test "main --coverage-shard: routes to the coverage service with COVERAGE_SHARD set (#615)" {
   local _log="${BATS_TEST_TMPDIR}/docker.log"
