@@ -279,6 +279,16 @@ STUB
   assert_output --partial '-ne 10'
 }
 
+# why: the cases below run the step as `bash -e`, true only while no shell is set
+@test "tool-version-watch: nothing sets a shell for the scan step, so the runner uses bash -e (base#2135)" {
+  run _yaml_eval "${WF}" '.defaults | tag'
+  assert_output '!!null'
+  run _yaml_eval "${WF}" '.jobs.scan | has("defaults")'
+  assert_output 'false'
+  run _yaml_eval "${WF}" '.jobs.scan.steps[] | select(.id == "scan") | has("shell")'
+  assert_output 'false'
+}
+
 # why: a failed comparison must print its report and hand bump nothing
 @test "tool-version-watch: check.sh exiting 1 fails the scan step with the report printed (base#2135)" {
   _run_scan 1 "${_ROWS}"

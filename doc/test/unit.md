@@ -9481,7 +9481,7 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `tool provenance: REFUSES a workflow file it could read no job out of` | The reader commits to the two-space job key this repo's workflows all use, because widening it starts reading a job's own nested keys as jobs. The floor is what makes that commitment safe: a whole-TREE floor only fires when NO file yielded a job, so one file written another way is skipped in silence beside nine that are not -- while the clean line still counts it among the workflows scanned, which reads as coverage it does not have. Every GitHub workflow declares `jobs:`, so a file that yielded none is a reader that stopped reading, not a workflow without work. |
 | `tool provenance: REFUSES an empty roster` | The roster is the population of tools. If the accessor stops answering, the scan has nothing to look for and passes having looked at nothing. |
 
-### test/bats/unit/tool_version_watch_yaml_spec.bats (27)
+### test/bats/unit/tool_version_watch_yaml_spec.bats (28)
 
 | Test | Description |
 |------|-------------|
@@ -9502,6 +9502,7 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `tool-version-watch: it does NOT treat a closed proposal as a refusal` | A closed proposal is dependabot's silent opt-out; the refusal here has to be skip= in the file that declares the pin |
 | `tool-version-watch: an unresolved upstream FAILS the scan job` | Exit 1 means a source did not answer, and treating that as an empty matrix would look exactly like a clean week |
 | `tool-version-watch: it separates 'drift found' from 'could not resolve'` | Drift and unresolved take opposite actions, so collapsing the two exit codes would either skip real bumps or bump on no answer |
+| `tool-version-watch: nothing sets a shell for the scan step, so the runner uses bash -e (base#2135)` | the cases below run the step as `bash -e`, true only while no shell is set |
 | `tool-version-watch: check.sh exiting 1 fails the scan step with the report printed (base#2135)` | a failed comparison must print its report and hand bump nothing |
 | `tool-version-watch: check.sh exiting 10 passes the scan step and hands bump the matrix (base#2135)` | drift must pass the step and reach bump as a matrix |
 | `tool-version-watch: check.sh exiting 0 passes the scan step with an empty matrix (base#2135)` | a week with no drift ends green with count=0, which skips bump |
