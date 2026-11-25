@@ -5080,8 +5080,8 @@ OK, error names body + file
 | `registered body succeeds normally` | - |
 | `empty body is allowed (no strict check)` | - |
 | `strict body error names the offending body and log-events.txt` | - |
-| `_log_info with no args exits non-zero` | - |
-| `_log_err with no args exits non-zero` | - |
+| `_log_info with no args exits non-zero` | A record without a service names no source, so the call is refused instead of written. |
+| `_log_err with no args exits non-zero` | The stderr levels reach the same refusal through their own wrapper. |
 | `_log_fatal does not exit; caller controls exit` | - |
 | `_log_with_trace sets TRACEPARENT and restores prior value` | - |
 | `_log_with_trace without prior TRACEPARENT unsets on return` | - |
@@ -7941,8 +7941,8 @@ duplicate-target guards, and S7 `runtime.env` retirement (#507).
 | `set logging.<svc>.local_path writes to per-service section (#328)` | - |
 | `[security] cap_add_* explicit override: user-provided list is honored (no template fallback)` | - |
 | `main rejects bare flag without subcommand (#49 Phase B-4 BREAKING)` | - |
-| `apply subcommand returns error when --base-path value is missing` | - |
-| `apply subcommand returns error when --lang value is missing` | - |
+| `apply subcommand returns error when --base-path value is missing` | apply writes into the base path, so a dropped value has to stop the run and say which flag lost it. |
+| `apply subcommand returns error when --lang value is missing` | --lang is parsed by its own arm, so the --base-path case does not cover it. |
 | `apply --lang zh-TW sets Chinese messages for full run` | - |
 | `apply prints WARN when per-repo setup.toml is missing (#186)` | - |
 | `apply prints WARN when per-repo setup.toml has no section headers (#186)` | - |

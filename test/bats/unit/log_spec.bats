@@ -511,12 +511,19 @@ setup() {
 
 # ── Missing service is rejected ────────────────────────────────────
 
+# why: A record without a service names no source, so the call is refused
+# instead of written.
 @test "_log_info with no args exits non-zero" {
   run -127 bash -c "source ${LOG_SH}; _log_info"
+  # 127 is also what a missing function returns, so the message decides
+  # (base#2174).
+  assert_output --partial "requires service"
 }
 
+# why: The stderr levels reach the same refusal through their own wrapper.
 @test "_log_err with no args exits non-zero" {
   run -127 bash -c "source ${LOG_SH}; _log_err"
+  assert_output --partial "requires service"
 }
 
 # ── _log_fatal does NOT auto-exit ──────────────────────────────────

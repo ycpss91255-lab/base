@@ -804,12 +804,20 @@ EOF
   assert_output --partial "Unknown subcommand"
 }
 
+# why: apply writes into the base path, so a dropped value has to stop the
+# run and say which flag lost it.
 @test "apply subcommand returns error when --base-path value is missing" {
   run -127 bash -c "source /source/dist/script/docker/wrapper/setup.sh; main apply --base-path"
+  # 127 is also what a missing main returns, so the message decides
+  # (base#2174).
+  assert_output --partial "--base-path requires a value"
 }
 
+# why: --lang is parsed by its own arm, so the --base-path case does not
+# cover it.
 @test "apply subcommand returns error when --lang value is missing" {
   run -127 bash -c "source /source/dist/script/docker/wrapper/setup.sh; main apply --lang"
+  assert_output --partial "--lang requires a value"
 }
 
 @test "apply --lang zh-TW sets Chinese messages for full run" {
