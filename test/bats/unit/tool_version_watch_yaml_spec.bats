@@ -40,9 +40,8 @@ readonly _REPORT='stand-in report line'
 readonly _ROWS=$'toola\tv1.0.0\tv1.1.0\tdockerfile/Dockerfile.a\t12\ntoolb\t2.0\t3.0\tdir/b.yaml\t7\n'
 readonly _MATRIX='[{"name":"toola","from":"v1.0.0","to":"v1.1.0","file":"dockerfile/Dockerfile.a","line":"12"},{"name":"toolb","from":"2.0","to":"3.0","file":"dir/b.yaml","line":"7"}]'
 
-# _run_scan <status> <rows> -- run the scan step's own script as the runner
-# does (`bash -e`), with a check.sh that takes only `--drift-tsv`, prints
-# <rows> and exits <status>.
+# _run_scan <status> <rows> -- run the scan step's script as the runner does
+# (`bash -e`); check.sh takes only `--drift-tsv`, prints <rows>, exits <status>.
 _run_scan() {
   SCAN="${BATS_TEST_TMPDIR}/scan"
   mkdir -p "${SCAN}/script/watch"
