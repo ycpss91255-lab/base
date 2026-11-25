@@ -48,7 +48,8 @@ MIRROR="/source/script/ci/pre_pr_mirror.sh"
 COVERAGE_MATRIX='./script/ci/pre_pr_mirror.sh --coverage-matrix'
 JUSTFILE_TEST="/source/script/test/justfile.test"
 
-# The only jobs (or matrix legs) the mirror may leave out. Each one is a
+# The only jobs (or matrix legs) the mirror may leave out, beside the
+# release-only ones (_release_only_jobs). Each one is a
 # thing no local machine can reproduce: there is no local arm64 runner,
 # worker-selftest calls a reusable workflow only Actions can invoke, and
 # classify / compute-shards compute CI's own gating and partition rather
@@ -215,6 +216,30 @@ _ci_gate() {
   fi
 }
 
+# _release_only_jobs -- the ci-rollup needs CI runs for no change
+# (base#2177), one per line. Read by running classify's own diff step as a
+# pull request whose base cannot be read: every key the diff decides is
+# then `true` (fail closed), so a key still `false` is one the event alone
+# decides.
+_release_only_jobs() {
+  local _d="${SCRATCH}/classify" _job _gate _key
+  mkdir -p "${_d}"
+  git -C "${_d}" init -q
+  yaml_step_run "${WF}" classify diff > "${_d}/step.sh"
+  [[ -s "${_d}/step.sh" ]] || { fail "could not read classify's diff step"; return 1; }
+  (cd "${_d}" && env EVENT_NAME=pull_request EVENT_REF=refs/pull/1/merge BASE_REF=main \
+      IS_FORK_PR=false DEFAULT_BRANCH=main GITHUB_OUTPUT="${_d}/out" bash step.sh) >/dev/null 2>&1 || true
+  grep -Fxq 'select_shellcheck=true' "${_d}/out" \
+    || { fail "classify wrote no selection for a pull request whose base cannot be read: $(cat "${_d}/out")"; return 1; }
+  while IFS= read -r _job; do
+    _gate="$(_ci_gate "${_job}")"
+    _key="${_gate#select:}"
+    if [[ "${_gate}" == select:* ]] && grep -Fxq "select_${_key//-/_}=false" "${_d}/out"; then
+      printf '%s\n' "${_job}"
+    fi
+  done < <(_rollup_needs)
+}
+
 # _selected <job> <path> -- succeed when classify's map selects <job> for a
 # pull request touching only <path> (base#1584).
 _selected() {
@@ -286,14 +311,43 @@ table:
 ${_table}"
 }
 
-@test "pre-PR mirror: only arm64 acceptance, classify, compute-shards, the test-tools-image builders and worker-selftest may be excluded (base#1409)" {
-  local _table _job _bad=""
+# why: An exclusion is the honest way to narrow what a green stamp claims,
+# and only two kinds are honest: a job no local machine can reproduce
+# (ALLOWED_EXCLUSIONS), and a job CI itself runs for no pull request
+# (base#2177), which is read off CI's own classify rather than listed here,
+# so a job moved back onto pull requests has to be attested again.
+@test "pre-PR mirror: only arm64 acceptance, classify, compute-shards, the test-tools-image builders, worker-selftest and the release-only jobs may be excluded (base#1409, base#2177)" {
+  local _table _job _release _bad=""
   _table="$(_mirror_table)" || return 1
+  _release="$(_release_only_jobs)" || return 1
   while IFS= read -r _job; do
     [[ -n "${_job}" ]] || continue
-    grep -Fxq -- "${_job}" <<<"${ALLOWED_EXCLUSIONS}" || _bad+=" ${_job}"
+    grep -Fxq -- "${_job}" <<<"${ALLOWED_EXCLUSIONS}"$'\n'"${_release}" || _bad+=" ${_job}"
   done < <(awk -F'\t' '$1 == "excluded" {print $2}' <<<"${_table}")
   [[ -z "${_bad}" ]] || fail "the mirror excludes jobs it is required to run locally:${_bad}"
+}
+
+# why: base#2177. CI runs a release-only job for no pull request, so a
+# mirror that attested it would be stricter than the CI it mirrors; one that
+# dropped it in silence would leave nobody running it before the tag, which
+# is where its first hosted verdict lands. So each is excluded, and its
+# reason names the `just test` recipe the CI job itself runs.
+@test "pre-PR mirror: every release-only job is excluded, naming the recipe its CI job runs (base#2177)" {
+  local _table _jobs _job _reason _recipe
+  _table="$(_mirror_table)" || return 1
+  _jobs="$(_release_only_jobs)" || return 1
+  grep -Fxq mutation-roster <<<"${_jobs}" \
+    || fail "classify still selects mutation-roster for a pull request; release-only jobs read: ${_jobs:-none}"
+  while IFS= read -r _job; do
+    _reason="$(awk -F'\t' -v j="${_job}" '$1 == "excluded" && $2 == j {print $3}' <<<"${_table}")"
+    [[ -n "${_reason}" ]] || fail "the mirror does not exclude ${_job}, which CI runs for no pull request"
+    [[ "${_reason}" =~ just\ test\ ([a-z][a-z-]*) ]] \
+      || fail "${_job}: the exclusion names no just test recipe: ${_reason}"
+    _recipe="${BASH_REMATCH[1]}"
+    [[ -n "$(_recipe_body "${_recipe}")" ]] || fail "${_job}: ${JUSTFILE_TEST} declares no ${_recipe} recipe"
+    yaml_job_lines "${WF}" "${_job}" | grep -Fq -- "just test ${_recipe}" \
+      || fail "${_job}: its CI job does not run just test ${_recipe}"
+  done <<<"${_jobs}"
 }
 
 @test "pre-PR mirror: every table entry names a job ci-rollup needs (base#1409)" {

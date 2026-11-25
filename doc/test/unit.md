@@ -5695,7 +5695,7 @@ the outer run's value, which is the wrong mode's value.
 | `the PR template file exists` | Without the file GitHub has nothing to auto-load, so authors lose the whole checklist |
 | `the PR template has every section heading` | A heading that is gone drops its checklist items from every new PR |
 
-### test/bats/unit/pre_pr_mirror_parity_spec.bats (41)
+### test/bats/unit/pre_pr_mirror_parity_spec.bats (42)
 
 The pre-PR mirror attested "CI passed locally" while running the bats suite
 plain (CI's main unit gate is the kcov `coverage` matrix) and while skipping
@@ -5735,7 +5735,8 @@ local mode with it.
 | Test | Description |
 |------|-------------|
 | `pre-PR mirror: every ci-rollup need is attested or excluded with a named reason (base#1409)` | - |
-| `pre-PR mirror: only arm64 acceptance, classify, compute-shards, the test-tools-image builders and worker-selftest may be excluded (base#1409)` | - |
+| `pre-PR mirror: only arm64 acceptance, classify, compute-shards, the test-tools-image builders, worker-selftest and the release-only jobs may be excluded (base#1409, base#2177)` | An exclusion is the honest way to narrow what a green stamp claims, and only two kinds are honest: a job no local machine can reproduce (ALLOWED_EXCLUSIONS), and a job CI itself runs for no pull request (base#2177), which is read off CI's own classify rather than listed here, so a job moved back onto pull requests has to be attested again. |
+| `pre-PR mirror: every release-only job is excluded, naming the recipe its CI job runs (base#2177)` | base#2177. CI runs a release-only job for no pull request, so a mirror that attested it would be stricter than the CI it mirrors; one that dropped it in silence would leave nobody running it before the tag, which is where its first hosted verdict lands. So each is excluded, and its reason names the `just test` recipe the CI job itself runs. |
 | `pre-PR mirror: every table entry names a job ci-rollup needs (base#1409)` | - |
 | `pre-PR mirror: the mode classifier reads the recipe a just command runs, and union-check as plain (base#1409)` | The mode check stands on this classifier. Reading a command's spelling instead of the recipe it runs let a coverage recipe turned plain pass, and counting --coverage-union-check as kcov hid a real mode mismatch. |
 | `pre-PR mirror: every attested job runs locally in the mode CI runs it (plain vs kcov) (base#1409)` | A plain local run cannot attest a kcov CI job: specs that are red only under kcov stay green locally. This is the check that keeps the stamp measuring the same thing CI measures. |
