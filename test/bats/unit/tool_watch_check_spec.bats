@@ -38,9 +38,8 @@ setup() {
   # spec that needed the network would be skipped in exactly the
   # environment it is meant to guard.
   #
-  # A `tags?` URL is answered the way Docker Hub answers it: at most 100
-  # tags a page, `name` a substring, and a 403 (curl's 22) past the first
-  # 1000 tags, which is as deep as a caller with no token may page.
+  # A `tags?` URL is answered as Docker Hub does: at most 100 a page, `name`
+  # a substring, and a 403 (curl's 22) past the first 1000.
   cat > "${SCRATCH}/bin/curl" <<'STUB'
 #!/usr/bin/env bash
 # _tags <list> <query>
@@ -337,11 +336,8 @@ _check_json() {
   [[ "${stderr}" == *'DRIFTED (1)'* ]] || fail "no DRIFTED (1): ${stderr}"
 }
 
-# why: Docker Hub lists tags by push time, 100 a page, and shows a caller
-# with no token only the newest 1000. A pinned series that is no longer
-# rebuilt sinks below all of them, and a watch that cannot see it there
-# fails on a pin that is current. A tag that only shares the ending is not
-# taken for a match (base#2136).
+# why: A series no longer rebuilt sinks behind newer tags and must still be
+# found; a tag that only shares the ending is not a match
 @test "watch: a matching tag behind 1000 newer ones is found (base#2136)" {
   _hub_tags library/python 3.15.0a{1..1000}-trixie \
     3.14.9-alpine3.22 3.13-alpine3.22 3.13.13-alpine3.22 3.13.9-alpine3.22
@@ -354,10 +350,8 @@ _check_json() {
   assert_output $'toml-bridge-python\t3.13.12-alpine3.22\t3.13.13-alpine3.22\tdockerfile/Dockerfile\t2'
 }
 
-# why: What Docker Hub is asked to narrow down to is taken from the pattern,
-# and it must not hide a tag the pattern accepts: a newer version that was
-# never listed reads as current. Each pattern here holds text that one of
-# its matches lacks (base#2136).
+# why: Each pattern holds text one of its matches lacks; querying by that text
+# would hide a newer version and read the pin as current
 @test "watch: no matching tag is hidden by text it need not contain (base#2136)" {
   local _case _pattern _tag
   local -a _cases=(
