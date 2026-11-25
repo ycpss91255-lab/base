@@ -191,19 +191,17 @@ _ci_series_names() {
 # instruction and nothing else may render it. The layout lint guarantees
 # exactly one series file carries the heading, so exactly one row says it.
 #
-# It used to be derived from the version count instead, which agreed with
-# the live series only by coincidence -- a series with a released version of
-# its own said "(plus [Unreleased])" and left the words the prose names on
-# no row at all, while a stub cut and not yet written into claimed them. A
-# marker that names the wrong row is worse than an absent one: the reader
-# does what it says.
+# It is not derived from the version count, which agrees with the live
+# series only by coincidence: a live series can hold a released version of
+# its own, and a stub cut and not yet written into holds none. A marker that
+# names the wrong row is worse than an absent one: the reader does what it
+# says.
 _ci_row() {
   local _series="${1}" _versions="${2}" _unreleased="${3}"
   shift 3
   # 'undated' is the span of a released section whose heading carries no
-  # ISO date for the caller to collect. That fallback used to be
-  # 'in progress' too, which handed the live-series marker to a row on the
-  # strength of a missing date.
+  # ISO date for the caller to collect. It is not 'in progress': a missing
+  # date must not hand a row the live-series marker.
   local _span='undated' _noun='versions' _live=''
   [[ "${_versions}" -eq 1 ]] && _noun='version'
   [[ "${_unreleased}" -eq 1 ]] && _live=', in progress'
