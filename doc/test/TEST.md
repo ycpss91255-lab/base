@@ -122,11 +122,10 @@ the local 4/8, and a local `just test coverage 1/8` never ran the failing specs
 at all (base#1410). Naming the path removes the question: the spec you name is
 the spec that runs, in both places.
 
-`--bats-path` (`just test` has no recipe for it; use
-`./script/test/test.sh --bats-path <spec>`) remains the FAST loop -- no
-ShellCheck, no kcov, on the `ci` service. It refuses `--coverage` and still
-does: that combination is this recipe, on the `coverage` service, which is
-where kcov lives.
+`just test bats-path <spec>` (above) remains the FAST loop -- no ShellCheck,
+no kcov, on the `ci` service. The runner flag behind it, `--bats-path`,
+refuses `--coverage` and still does: that combination is this recipe, on the
+`coverage` service, which is where kcov lives.
 
 ## A full-scope coverage run on all your cores: `just test coverage-local`
 
