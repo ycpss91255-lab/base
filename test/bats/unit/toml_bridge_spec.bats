@@ -64,10 +64,7 @@ setup() {
   assert_success
 }
 
-# why: The pinned Python carries tomllib, the bridge's first import, so a
-# tomli beside it is never loaded; its pin would still be a version the
-# weekly watch has to resolve, from releases upstream does not publish
-# (base#2136, base#2184).
+# why: the bridge imports the stdlib tomllib first; a tomli is never loaded
 @test "toml-bridge: the image installs no tomli beside the stdlib tomllib (base#2184)" {
   assert_spec_subject "${DOCKERFILE}" \
     "the toml-bridge Dockerfile"
@@ -76,9 +73,7 @@ setup() {
   assert_output ""
 }
 
-# why: python:alpine ships no bytecode and a `docker run --rm` keeps none, so
-# unless the build runs the bridge, every call compiles the stdlib modules it
-# imports: 358 ms a call against 239 ms, measured on amd64 (base#2184).
+# why: otherwise every `docker run --rm` recompiles the bridge's imports
 @test "toml-bridge: the image runs the bridge once at build time (base#2184)" {
   assert_spec_subject "${DOCKERFILE}" \
     "the toml-bridge Dockerfile"
