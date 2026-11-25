@@ -207,9 +207,9 @@ jobs:
         run: just test go
 
       - name: Run the required-kill mutation roster
-        # The self-hosted run of the roster that the no-flag `just test` and
-        # the hosted mutation-roster matrix also run (base#1461, base#1571),
-        # ungated. Which jobs run it is decided by the self_test_yaml_spec
+        # The self-hosted run of the roster that the hosted mutation-roster
+        # matrix also runs (base#1461, base#1571), ungated. Which jobs run it
+        # is decided by the self_test_yaml_spec
         # case "the required-kill roster runs once per mutation-roster leg".
         run: just test mutation-required
 

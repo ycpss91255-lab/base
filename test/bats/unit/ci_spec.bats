@@ -4582,8 +4582,7 @@ _UNSOURCED_DRIVER_FILES=(
   coverage_gate.sh
   # Executed, not sourced: the required-kill roster runner (base#1461) is
   # a standalone program that re-executes itself once per row as a worker
-  # in its own process group; _run_mutation_required and the
-  # `mutation-required` recipe invoke it with bash.
+  # in its own process group; the `mutation-required` recipe runs it.
   mutation_required.sh
 )
 
