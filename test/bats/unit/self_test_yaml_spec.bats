@@ -4176,20 +4176,19 @@ _lint_probe_fixture() {
 # These three guards do, from the same table this spec already reads for the
 # CI-join completeness check: the row SET is _LINT_TOOLS, every job name the
 # table cites is a job self-test.yaml actually declares, and the flags and
-# the condition a row states are that job's own (base#2175). The "Enforces"
-# column stays authored -- it is prose a person writes, not a figure.
+# the condition a row states are that job's own. The "Enforces" column stays
+# authored -- it is prose a person writes, not a figure.
 
 TEST_MD='/source/doc/test/TEST.md'
 
 # Print `<lint>|<ci-job>|<flags>|<gate>` for each row of the static-lint
 # table. The job is the first code span of the CI-job cell, taken whole: a
 # row naming a job that does not exist is exactly the defect, so the cell is
-# not trimmed down to something that happens to resolve. The flags are its
-# second span, empty where the cell has none, and the gate is the Gated?
-# cell. `\|` inside a cell is an escaped pipe, not a column break (the
-# errexit-bang cell carries several), so it is protected before the split.
-# The fields are joined by `|` rather than a tab because `read` folds an
-# empty field away when the separator is whitespace.
+# not trimmed down to something that happens to resolve. `\|` inside a cell
+# is an escaped pipe, not a column break (the errexit-bang cell carries
+# several), so it is protected before the split.
+# Flags: the CI-job cell's second code span, empty when absent. Joined by
+# `|` because `read` drops an empty field between tabs.
 _test_md_lint_rows() {
   awk '
     /^\| Lint \| Enforces \| CI job \| Gated\? \|/ { inside = 1; next }
@@ -4298,10 +4297,7 @@ _lint_tools_table() {
     || fail "TEST.md cites CI job names that do not exist in ${WF}:${_bad} -- a reader looking for that check in the checks list will not find it"
 }
 
-# why: base#1412 moved shellcheck and doc-counts off the runner and base#1584
-# replaced code_changed with one select_<job> output per job; the table kept
-# the host-only flags and the retired condition through both, because nothing
-# read either cell
+# why: a row's flags and condition must be what the CI job it cites really has
 @test "TEST.md: each static-lint row states the flags and the condition of the CI job it cites (base#2175)" {
   local -a _rows=()
   mapfile -t _rows < <(_test_md_lint_rows)
