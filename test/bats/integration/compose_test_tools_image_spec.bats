@@ -105,21 +105,17 @@ _resolution() {
 }
 
 # ════════════════════════════════════════════════════════════════════
-# The system container is told which image it is
+# The environment ci-system forwards into its container
 # ════════════════════════════════════════════════════════════════════
 
-# _system_env <KEY>: the value <KEY> resolves to in the ci-system service's
-# environment, read out of compose's own resolution. Empty when compose
-# would not set it.
+# _system_env <KEY>: the value compose resolves for <KEY> in ci-system's
+# environment, empty when it sets none.
 _system_env() {
   docker compose -f "${ROOT}/compose.yaml" config --format json ci-system \
     | jq -r --arg key "${1}" '.services["ci-system"].environment[$key] // ""'
 }
 
-# why: the harness specs ask for the tag from INSIDE the container, where a
-# value compose does not forward is a value re-derived. CI runs a run-keyed
-# tag, so the derived one named an image nobody had loaded and the 6 tests
-# skipped on every run (base#2173)
+# why: a tag the caller pinned cannot be derived inside the container
 @test "compose.yaml: ci-system hands the container the TEST_TOOLS_IMAGE it runs (base#2173)" {
   export HOST_UID=1 HOST_GID=1 BASE_CHECKOUT_PATH=/source
   export TEST_TOOLS_IMAGE=test-tools:ci-1-1
@@ -128,9 +124,7 @@ _system_env() {
   assert_output "test-tools:ci-1-1"
 }
 
-# why: _run_system refuses a skip on a CI runner, and only the runner's own
-# GITHUB_ACTIONS tells it that it is on one. Unset stays unset, so a local
-# run keeps its skips (base#2173)
+# why: GITHUB_ACTIONS is how _run_system knows a CI runner from a local run
 @test "compose.yaml: ci-system forwards GITHUB_ACTIONS when it is set, and nothing when it is not (base#2173)" {
   export HOST_UID=1 HOST_GID=1 BASE_CHECKOUT_PATH=/source
   export TEST_TOOLS_IMAGE=test-tools:ci-1-1

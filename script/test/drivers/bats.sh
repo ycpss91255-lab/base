@@ -1301,12 +1301,8 @@ _run_system() {
     | tr '\t' ' ' | paste -sd ';' -)"
   rm -rf "${_report_dir}"
 
-  # The system specs skip when a prerequisite is missing, and bats counts
-  # a skip as a pass: six of them skipped on every CI run and the job
-  # stayed green (base#2173). Off a runner that is the operator's to
-  # supply. On one the job exists to supply it, so a skip there is a test
-  # that ran nowhere and the run fails. No report at all fails too: what
-  # it skipped is unknown.
+  # bats counts a skip as a pass. On a CI runner a skip means a missing
+  # prerequisite, and an empty report cannot rule one out: both fail.
   if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
     [[ -n "${_ran}" ]] || _die ci_system_skip \
       "the system run reported no test, so what it skipped is unknown."

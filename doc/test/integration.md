@@ -77,8 +77,8 @@ because the text is not what decides which image a run pulls.
 | `compose.yaml: with TEST_TOOLS_IMAGE unset the tag the test-tools build writes is the tag the ci run reads (#896)` | #896 build side vs run side |
 | `compose.yaml: with TEST_TOOLS_IMAGE unset every consumer service reaches the same outcome as the build (#896)` | #896 coverage / ci-system too |
 | `compose.yaml: an unset TEST_TOOLS_IMAGE fails naming the just recipe to run (#896)` | #896 loud, and actionable |
-| `compose.yaml: ci-system hands the container the TEST_TOOLS_IMAGE it runs (base#2173)` | the harness specs ask for the tag from INSIDE the container, where a value compose does not forward is a value re-derived. CI runs a run-keyed tag, so the derived one named an image nobody had loaded and the 6 tests skipped on every run (base#2173) |
-| `compose.yaml: ci-system forwards GITHUB_ACTIONS when it is set, and nothing when it is not (base#2173)` | _run_system refuses a skip on a CI runner, and only the runner's own GITHUB_ACTIONS tells it that it is on one. Unset stays unset, so a local run keeps its skips (base#2173) |
+| `compose.yaml: ci-system hands the container the TEST_TOOLS_IMAGE it runs (base#2173)` | a tag the caller pinned cannot be derived inside the container |
+| `compose.yaml: ci-system forwards GITHUB_ACTIONS when it is set, and nothing when it is not (base#2173)` | GITHUB_ACTIONS is how _run_system knows a CI runner from a local run |
 
 ### test/bats/integration/config_gen_admit_spec.bats (5)
 
