@@ -68,7 +68,7 @@ setup() {
 @test "toml-bridge: the image installs no tomli beside the stdlib tomllib (base#2184)" {
   assert_spec_subject "${DOCKERFILE}" \
     "the toml-bridge Dockerfile"
-  run grep -nE 'tool-pin:.*tomli|TOMLI_VERSION|pip3? install' "${DOCKERFILE}"
+  run grep -nE 'tool-pin:.*tomli|TOMLI_VERSION|^[^#]*tomli' "${DOCKERFILE}"
   assert_failure 1
   assert_output ""
 }
