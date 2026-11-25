@@ -76,6 +76,16 @@ setup() {
   assert_output ""
 }
 
+# why: python:alpine ships no bytecode and a `docker run --rm` keeps none, so
+# unless the build runs the bridge, every call compiles the stdlib modules it
+# imports: 358 ms a call against 239 ms, measured on amd64 (base#2184).
+@test "toml-bridge: the image runs the bridge once at build time (base#2184)" {
+  assert_spec_subject "${DOCKERFILE}" \
+    "the toml-bridge Dockerfile"
+  run grep -E '^[^#]*python3 /usr/local/bin/toml-bridge <' "${DOCKERFILE}"
+  assert_success
+}
+
 # why: the Dockerfile COPY needs the script present in the build context
 @test "toml-bridge: Python bridge script exists in build context" {
   assert_spec_subject "${BRIDGE_PY}" \
