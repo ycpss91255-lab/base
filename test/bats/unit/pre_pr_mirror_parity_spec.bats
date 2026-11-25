@@ -48,7 +48,8 @@ MIRROR="/source/script/ci/pre_pr_mirror.sh"
 COVERAGE_MATRIX='./script/ci/pre_pr_mirror.sh --coverage-matrix'
 JUSTFILE_TEST="/source/script/test/justfile.test"
 
-# The only jobs (or matrix legs) the mirror may leave out. Each one is a
+# The only jobs (or matrix legs) the mirror may leave out, beside the
+# release-only ones (_release_only_jobs). Each one is a
 # thing no local machine can reproduce: there is no local arm64 runner,
 # worker-selftest calls a reusable workflow only Actions can invoke, and
 # classify / compute-shards compute CI's own gating and partition rather
@@ -215,6 +216,27 @@ _ci_gate() {
   fi
 }
 
+# _release_only_jobs -- the ci-rollup needs the event alone deselects, one
+# per line: classify's diff step, run with no base to read, selects the rest.
+_release_only_jobs() {
+  local _d="${SCRATCH}/classify" _job _gate _key
+  mkdir -p "${_d}"
+  git -C "${_d}" init -q
+  yaml_step_run "${WF}" classify diff > "${_d}/step.sh"
+  [[ -s "${_d}/step.sh" ]] || { fail "could not read classify's diff step"; return 1; }
+  (cd "${_d}" && env EVENT_NAME=pull_request EVENT_REF=refs/pull/1/merge BASE_REF=main \
+      IS_FORK_PR=false DEFAULT_BRANCH=main GITHUB_OUTPUT="${_d}/out" bash step.sh) >/dev/null 2>&1 || true
+  grep -Fxq 'select_shellcheck=true' "${_d}/out" \
+    || { fail "classify wrote no selection for a pull request whose base cannot be read: $(cat "${_d}/out")"; return 1; }
+  while IFS= read -r _job; do
+    _gate="$(_ci_gate "${_job}")"
+    _key="${_gate#select:}"
+    if [[ "${_gate}" == select:* ]] && grep -Fxq "select_${_key//-/_}=false" "${_d}/out"; then
+      printf '%s\n' "${_job}"
+    fi
+  done < <(_rollup_needs)
+}
+
 # _selected <job> <path> -- succeed when classify's map selects <job> for a
 # pull request touching only <path> (base#1584).
 _selected() {
@@ -286,14 +308,37 @@ table:
 ${_table}"
 }
 
-@test "pre-PR mirror: only arm64 acceptance, classify, compute-shards, the test-tools-image builders and worker-selftest may be excluded (base#1409)" {
-  local _table _job _bad=""
+# why: an exclusion narrows what a green stamp claims. The release-only jobs
+# are read off classify, so one moved back onto pull requests must be attested.
+@test "pre-PR mirror: only arm64 acceptance, classify, compute-shards, the test-tools-image builders, worker-selftest and the release-only jobs may be excluded (base#1409, base#2177)" {
+  local _table _job _release _bad=""
   _table="$(_mirror_table)" || return 1
+  _release="$(_release_only_jobs)" || return 1
   while IFS= read -r _job; do
     [[ -n "${_job}" ]] || continue
-    grep -Fxq -- "${_job}" <<<"${ALLOWED_EXCLUSIONS}" || _bad+=" ${_job}"
+    grep -Fxq -- "${_job}" <<<"${ALLOWED_EXCLUSIONS}"$'\n'"${_release}" || _bad+=" ${_job}"
   done < <(awk -F'\t' '$1 == "excluded" {print $2}' <<<"${_table}")
   [[ -z "${_bad}" ]] || fail "the mirror excludes jobs it is required to run locally:${_bad}"
+}
+
+# why: a mirror that attested one would be stricter than CI, and one that
+# dropped it in silence would leave nobody running it before the tag.
+@test "pre-PR mirror: every release-only job is excluded, naming the recipe its CI job runs (base#2177)" {
+  local _table _jobs _job _reason _recipe
+  _table="$(_mirror_table)" || return 1
+  _jobs="$(_release_only_jobs)" || return 1
+  grep -Fxq mutation-roster <<<"${_jobs}" \
+    || fail "classify still selects mutation-roster for a pull request; release-only jobs read: ${_jobs:-none}"
+  while IFS= read -r _job; do
+    _reason="$(awk -F'\t' -v j="${_job}" '$1 == "excluded" && $2 == j {print $3}' <<<"${_table}")"
+    [[ -n "${_reason}" ]] || fail "the mirror does not exclude ${_job}, which CI runs for no pull request"
+    [[ "${_reason}" =~ just\ test\ ([a-z][a-z-]*) ]] \
+      || fail "${_job}: the exclusion names no just test recipe: ${_reason}"
+    _recipe="${BASH_REMATCH[1]}"
+    [[ -n "$(_recipe_body "${_recipe}")" ]] || fail "${_job}: ${JUSTFILE_TEST} declares no ${_recipe} recipe"
+    yaml_job_lines "${WF}" "${_job}" | grep -Fq -- "just test ${_recipe}" \
+      || fail "${_job}: its CI job does not run just test ${_recipe}"
+  done <<<"${_jobs}"
 }
 
 @test "pre-PR mirror: every table entry names a job ci-rollup needs (base#1409)" {
@@ -1117,16 +1162,13 @@ STUB
   refute_output --partial "BASE_SHA"
 }
 
-# ── the required-kill roster in the no-flag `just test` (base#1461) ──────────
+# ── `just test` runs no release-only check ───────────────────────────────────
 #
-# The mirror attests the roster through `just test`, so the no-flag
-# test.sh main is where the roster has to run: on the host, after the lint
-# phase and before bats. Each case sources test.sh and stubs the two
-# dispatches, so what is asserted is the order main calls them in and what
-# a red roster stops.
+# Each case sources test.sh with the compose dispatch stubbed; `bash` and
+# `just`, the two ways main can start the roster, print `roster` for it.
 
-# _main_calls <roster-rc> <args>... -- run the sourced main with the compose
-# dispatch and the roster stubbed; each call prints one line. LINT_ONLY and
+# _main_calls <args>... -- run the sourced main with the compose dispatch
+# stubbed; each call prints one line. LINT_ONLY and
 # BATS_ONLY are cleared first: this suite itself runs under BATS_ONLY=1, and
 # an inherited value would read as main's own. Unset and 0 both print 0.
 # The rest of the in-container routing (BATS_FILE, the shard and coverage
@@ -1137,10 +1179,16 @@ _MAIN_ROUTING_UNSET=(-u LINT_ONLY -u BATS_ONLY -u LINT_TOOL -u LINT_GROUP
   -u BATS_INTEGRATION -u COVERAGE -u COVERAGE_PATH -u COVERAGE_SHARD
   -u COVERAGE_LOCAL_JOBS)
 _main_calls() {
-  local _rc="${1}"
-  shift
-  run env "${_MAIN_ROUTING_UNSET[@]}" ROSTER_RC="${_rc}" bash -c '
+  run env "${_MAIN_ROUTING_UNSET[@]}" bash -c '
     source /source/script/test/test.sh
+    bash() {
+      [[ "$*" != *mutation_required.sh* ]] || { printf "roster\n"; return 0; }
+      command bash "$@"
+    }
+    just() {
+      [[ "$*" != *mutation-required* ]] || { printf "roster\n"; return 0; }
+      command just "$@"
+    }
     _invalidate_coverage_head() { :; }
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
@@ -1149,7 +1197,6 @@ _main_calls() {
         "$([[ "${LINT_ONLY:-0}" == 1 ]] && echo 1 || echo 0)" \
         "$([[ "${BATS_ONLY:-0}" == 1 ]] && echo 1 || echo 0)"
     }
-    _run_mutation_required() { printf "roster\n"; return "${ROSTER_RC}"; }
     _run_all_lint_tools() { printf "in-container lint\n"; }
     _run_lint_group() { printf "in-container lint group %s\n" "$1"; }
     _run_tests() { printf "in-container bats\n"; }
@@ -1157,53 +1204,39 @@ _main_calls() {
   ' _ "$@"
 }
 
-# why: The roster is one of the checks `just test` attests and the pre-PR
-# mirror relies on that run; it runs on the host (it builds sandboxes and
-# runs the probe, which drives compose itself), between the lint phase and
-# bats, so the no-flag compose dispatch is split in two around it.
-@test "test.sh: a no-flag run lints, then runs the roster, then runs bats (base#1461)" {
-  _main_calls 0
+# why: the no-flag run stands for the pull request gate on this machine, so
+# one that ran the roster would be stricter than the CI it mirrors.
+@test "test.sh: a no-flag run is one compose run that lints and runs bats, without the roster (base#2177)" {
+  _main_calls
   assert_success
-  assert_equal "$(grep -E '^(compose|roster)' <<< "${output}")" "compose ci 0 lint=1 bats=0
-roster
-compose ci 0 lint=0 bats=1"
+  assert_equal "$(grep -E '^(compose|roster)' <<< "${output}")" "compose ci 0 lint=0 bats=0"
 }
 
-# why: A red roster is a red `just test`, and bats does not run after it.
-@test "test.sh: a red roster fails the no-flag run before bats (base#1461)" {
-  _main_calls 1
-  assert_failure
-  assert_line 'roster'
-  refute_line --partial 'bats=1'
-}
-
-# why: The CI lint legs run the roster as a step of their own and the
-# coverage modes are not the local gate; neither calls it a second time.
+# why: No other dispatch runs it either.
 @test "test.sh: --lint --group and --coverage do not run the roster (base#1461)" {
-  _main_calls 0 --lint --group 1/4
+  _main_calls --lint --group 1/4
   refute_line roster
   assert_line --partial 'compose ci 0 lint=1'
-  _main_calls 0 --coverage
+  _main_calls --coverage
   refute_line roster
 }
 
-# why: `--ci` is the in-container dispatch every compose run lands in -- the
-# two halves of the no-flag run among them -- so a roster call there would
-# run it inside the test-tools container, once per half, and in every CI job
-# that reaches it. The phases it does run are stubbed and printed, so the
-# case proves the dispatch ran and still made no roster call.
+# why: every compose run lands in `--ci`, so a roster call there would run
+# it inside the test-tools container and in every CI job that reaches it.
 @test "test.sh: --ci runs its in-container phases and not the roster (base#1461)" {
-  _main_calls 0 --ci
+  _main_calls --ci
   assert_success
-  assert_line 'in-container lint'
-  assert_line 'in-container bats'
-  refute_line roster
+  assert_equal "$(grep -E '^(in-container|roster)' <<< "${output}")" "in-container lint
+in-container bats"
   run env "${_MAIN_ROUTING_UNSET[@]}" LINT_ONLY=1 LINT_GROUP=1/4 bash -c '
     source /source/script/test/test.sh
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
     _run_lint_group() { printf "in-container lint group %s\n" "$1"; }
-    _run_mutation_required() { printf "roster\n"; }
+    bash() {
+      [[ "$*" != *mutation_required.sh* ]] || { printf "roster\n"; return 0; }
+      command bash "$@"
+    }
     main --ci
   '
   assert_success
@@ -1214,7 +1247,10 @@ compose ci 0 lint=0 bats=1"
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
     _run_tests() { printf "in-container bats\n"; }
-    _run_mutation_required() { printf "roster\n"; }
+    bash() {
+      [[ "$*" != *mutation_required.sh* ]] || { printf "roster\n"; return 0; }
+      command bash "$@"
+    }
     main --ci
   '
   assert_success
