@@ -4,7 +4,8 @@
 # (`_upsert_conf_value`, `_write_setup_conf`) emit TOML when the file
 # they write is a `.toml` file.
 #
-# How a value is spelled and how an array entry lands are in conf/.
+# More cases of value spelling are in conf/toml_value_spelling_spec.bats,
+# and of array entries in conf/toml_array_entry_spec.bats.
 #
 # why: Every `setup.sh set` / `add` / `remove` and the `mount_1` bootstrap
 # in setup_detect.sh go through these two writers. Until they learned
