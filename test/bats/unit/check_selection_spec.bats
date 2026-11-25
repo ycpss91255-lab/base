@@ -29,12 +29,12 @@ setup() {
 # The ten map names, in the map's output order: the nine of base#1584
 # (design r7 sec. 2), then test-tools-image-arm64, which a docs-only pull
 # request skips (base#2110). There is one per select_* key the diff
-# decides; a release-only job (mutation-roster) has a key the event decides,
-# so the map does not name it (base#2177). Each self-test.yaml job whose
-# `if:` reads classify reads one of those keys; config-gen names the one
-# key, select_config_gen, that both config-gen-gates and config-gen-redpath
-# read (base#1547 split one job in two). classify_testtools_spec.bats
-# (cycle 4) holds the workflow's gated jobs to these keys.
+# decides; a release-only job (mutation-roster, config-gen-redpath) has a
+# key the event decides, so the map does not name it (base#2177). Each
+# self-test.yaml job whose `if:` reads classify reads one of those keys;
+# config-gen names select_config_gen, the key config-gen-gates reads.
+# classify_testtools_spec.bats (cycle 4) holds the workflow's gated jobs to
+# these keys.
 GATED_JOBS="config-gen coverage coverage-gate acceptance system worker-selftest shellcheck hadolint bats-fragile test-tools-image-arm64"
 # Every gated job but config-gen: what a config-gen deny-list path runs.
 NOT_CONFIG_GEN="coverage coverage-gate acceptance system worker-selftest shellcheck hadolint bats-fragile test-tools-image-arm64"
@@ -110,7 +110,7 @@ _commit() {
 }
 
 # why: cycle 4's job list. The map's names are the select_* keys the diff
-# decides, config-gen standing for both config-gen jobs; --jobs must name
+# decides, config-gen standing for config-gen-gates; --jobs must name
 # exactly those, in the output order. A release-only job is not one of them
 # (base#2177): no path's answer for it could be used, because no change runs
 # it.

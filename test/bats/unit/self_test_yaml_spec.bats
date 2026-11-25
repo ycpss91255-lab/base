@@ -4403,8 +4403,9 @@ ${_bad}"
 
 # ── config-gen: the Go gates job, in both workflows (base#1462) ──────────────
 #
-# `just test go` is the one command every environment runs for the config
-# generator's gates (ADR-00000039). A job that merely MENTIONS it is not a
+# `just test go` is go-gates and then go-redpath. The self-hosted workflow
+# runs it whole; the hosted one runs each recipe in a job of its own, the
+# redpath for a release only. A job that merely MENTIONS its command is not a
 # job that runs it: an `if: false` on the step, a `shell:` that never starts
 # bash, a `continue-on-error`, a workflow-level BASH_ENV that exits 0 before
 # the step body runs -- each leaves the job green with the gates unrun. So
