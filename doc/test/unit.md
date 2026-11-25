@@ -1425,7 +1425,7 @@ code, base#1562.
 | `lint groups: a zero-padded spec is read as decimal, not as octal (base#1071)` | The one shape the digits-only regex accepts and bash arithmetic rejects. `1/08` is a well-formed spec by every rule stated above and an INVALID OCTAL CONSTANT to `(( ))`, so the range checks printed a raw "value too great for base" from the shell itself and then refused for a reason that was not the reason -- a padded index reported as "outside its own total", a padded total as "asks for 08 groups". A spec is read in the base it is written in, and a padded one names the same group as its bare twin. |
 | `_run_via_compose: routes default mode to the ci service with COVERAGE=0` | Service routing — fast path |
 | `_run_via_compose: routes coverage mode to the coverage service with COVERAGE=1` | Service routing — coverage path |
-| `main: dispatches no-flag default to the ci service` | End-to-end default dispatch. The required-kill roster the no-flag run calls between its lint and bats compose runs (base#1461) is stubbed: it builds real sandboxes, and pre_pr_mirror_parity_spec holds its order. |
+| `main: dispatches no-flag default to the ci service` | End-to-end default dispatch. PATH holds the docker mock alone, so a no-flag run that started anything else on the host fails here: the required-kill roster is not part of it (base#2177). |
 | `_run_tests: passes --jobs N when parallel is on PATH` | Parallel-present branch, and the count it is handed is FLOORED rather than equal to the core count -- `_run_tests` is one of the runners with no kcov in the loop, so there is no line set to move and nothing to hold it at the machine's size (base#1068). The assertion is `> the mocked cores`, not a number: it says WHICH SIDE of the policy this runner is on, which is the part a re-tune must not silently flip. |
 | `_run_tests: omits --jobs when parallel is absent (graceful fallback)` | Parallel-missing branch |
 | `main: dispatches --coverage to the coverage service` | End-to-end --coverage dispatch |
@@ -5695,7 +5695,7 @@ the outer run's value, which is the wrong mode's value.
 | `the PR template file exists` | Without the file GitHub has nothing to auto-load, so authors lose the whole checklist |
 | `the PR template has every section heading` | A heading that is gone drops its checklist items from every new PR |
 
-### test/bats/unit/pre_pr_mirror_parity_spec.bats (42)
+### test/bats/unit/pre_pr_mirror_parity_spec.bats (41)
 
 The pre-PR mirror attested "CI passed locally" while running the bats suite
 plain (CI's main unit gate is the kcov `coverage` matrix) and while skipping
@@ -5772,10 +5772,9 @@ local mode with it.
 | `pre-PR mirror: --base hands its base to the commit-attribution leg, not origin/main (base#1989)` | A run with `--base X` hands X to every planned command as PRE_PR_MIRROR_BASE. Without it the attribution leg fell back to origin/main and walked commits a PR from X would never carry, and no spec noticed. Here the offender is the base itself and origin/main points below it, so only a leg that walks <base>..HEAD passes. |
 | `pre-PR mirror: --commit-attribution with no base walks origin/main..HEAD (base#1989)` | Run on its own, with no PRE_PR_MIRROR_BASE, the attribution leg walks origin/main..HEAD, the commits a PR from HEAD would carry. Dropping that default left every other spec green, since each one hands the leg a base. Here origin/main sits below an offending commit, so only a leg that falls back to origin/main reaches the offender and names its sha. |
 | `pre-PR mirror: --commit-attribution with a base that does not resolve fails naming the base (base#1989)` | A base that names no commit is a mistake in the mirror's own input, so the leg refuses it there and names it. A leg that dropped the guard handed an empty BASE_SHA to the check, which failed on its own variable, and the reader never learned which base was wrong. So a base that does not resolve must fail, name the base, and stop before the check runs (no BASE_SHA in the output). |
-| `test.sh: a no-flag run lints, then runs the roster, then runs bats (base#1461)` | The roster is one of the checks `just test` attests and the pre-PR mirror relies on that run; it runs on the host (it builds sandboxes and runs the probe, which drives compose itself), between the lint phase and bats, so the no-flag compose dispatch is split in two around it. |
-| `test.sh: a red roster fails the no-flag run before bats (base#1461)` | A red roster is a red `just test`, and bats does not run after it. |
-| `test.sh: --lint --group and --coverage do not run the roster (base#1461)` | The CI lint legs run the roster as a step of their own and the coverage modes are not the local gate; neither calls it a second time. |
-| `test.sh: --ci runs its in-container phases and not the roster (base#1461)` | `--ci` is the in-container dispatch every compose run lands in -- the two halves of the no-flag run among them -- so a roster call there would run it inside the test-tools container, once per half, and in every CI job that reaches it. The phases it does run are stubbed and printed, so the case proves the dispatch ran and still made no roster call. |
+| `test.sh: a no-flag run is one compose run that lints and runs bats, without the roster (base#2177)` | The no-flag run stands for the pull request gate on this machine, and no pull request runs the roster, so a no-flag run that still ran it would be stricter than the CI it mirrors. The dispatch was split in two only to put the roster between the lint phase and bats; without it one compose run does both, in that order (the `--ci` case below). |
+| `test.sh: --lint --group and --coverage do not run the roster (base#1461)` | No other dispatch runs it either. |
+| `test.sh: --ci runs its in-container phases and not the roster (base#1461)` | `--ci` is the in-container dispatch every compose run lands in -- the no-flag run among them, which lints and then runs bats there -- so a roster call there would run it inside the test-tools container, and in every CI job that reaches it. The phases it does run are stubbed and printed, so the case proves the dispatch ran, in that order, and still made no roster call. |
 
 ### test/bats/unit/prepare_prev_release_spec.bats (15)
 

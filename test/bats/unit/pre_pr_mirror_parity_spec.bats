@@ -1117,16 +1117,17 @@ STUB
   refute_output --partial "BASE_SHA"
 }
 
-# ── the required-kill roster in the no-flag `just test` (base#1461) ──────────
+# ── `just test` runs no release-only check (base#2177) ───────────────────────
 #
-# The mirror attests the roster through `just test`, so the no-flag
-# test.sh main is where the roster has to run: on the host, after the lint
-# phase and before bats. Each case sources test.sh and stubs the two
-# dispatches, so what is asserted is the order main calls them in and what
-# a red roster stops.
+# The required-kill roster gates no pull request (base#2177), so no
+# test.sh dispatch runs it; `just test mutation-required` does, before a
+# release. Each case sources test.sh and stubs the compose dispatch, so
+# what is asserted is the calls main makes. The roster is seen by its
+# driver: main may start it through any function or recipe, and the two
+# commands that can (`bash`, `just`) print `roster` when they are handed it.
 
-# _main_calls <roster-rc> <args>... -- run the sourced main with the compose
-# dispatch and the roster stubbed; each call prints one line. LINT_ONLY and
+# _main_calls <args>... -- run the sourced main with the compose dispatch
+# stubbed; each call prints one line. LINT_ONLY and
 # BATS_ONLY are cleared first: this suite itself runs under BATS_ONLY=1, and
 # an inherited value would read as main's own. Unset and 0 both print 0.
 # The rest of the in-container routing (BATS_FILE, the shard and coverage
@@ -1137,10 +1138,16 @@ _MAIN_ROUTING_UNSET=(-u LINT_ONLY -u BATS_ONLY -u LINT_TOOL -u LINT_GROUP
   -u BATS_INTEGRATION -u COVERAGE -u COVERAGE_PATH -u COVERAGE_SHARD
   -u COVERAGE_LOCAL_JOBS)
 _main_calls() {
-  local _rc="${1}"
-  shift
-  run env "${_MAIN_ROUTING_UNSET[@]}" ROSTER_RC="${_rc}" bash -c '
+  run env "${_MAIN_ROUTING_UNSET[@]}" bash -c '
     source /source/script/test/test.sh
+    bash() {
+      [[ "$*" != *mutation_required.sh* ]] || { printf "roster\n"; return 0; }
+      command bash "$@"
+    }
+    just() {
+      [[ "$*" != *mutation-required* ]] || { printf "roster\n"; return 0; }
+      command just "$@"
+    }
     _invalidate_coverage_head() { :; }
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
@@ -1149,7 +1156,6 @@ _main_calls() {
         "$([[ "${LINT_ONLY:-0}" == 1 ]] && echo 1 || echo 0)" \
         "$([[ "${BATS_ONLY:-0}" == 1 ]] && echo 1 || echo 0)"
     }
-    _run_mutation_required() { printf "roster\n"; return "${ROSTER_RC}"; }
     _run_all_lint_tools() { printf "in-container lint\n"; }
     _run_lint_group() { printf "in-container lint group %s\n" "$1"; }
     _run_tests() { printf "in-container bats\n"; }
@@ -1157,53 +1163,43 @@ _main_calls() {
   ' _ "$@"
 }
 
-# why: The roster is one of the checks `just test` attests and the pre-PR
-# mirror relies on that run; it runs on the host (it builds sandboxes and
-# runs the probe, which drives compose itself), between the lint phase and
-# bats, so the no-flag compose dispatch is split in two around it.
-@test "test.sh: a no-flag run lints, then runs the roster, then runs bats (base#1461)" {
-  _main_calls 0
+# why: The no-flag run stands for the pull request gate on this machine, and
+# no pull request runs the roster, so a no-flag run that still ran it would
+# be stricter than the CI it mirrors. The dispatch was split in two only to
+# put the roster between the lint phase and bats; without it one compose
+# run does both, in that order (the `--ci` case below).
+@test "test.sh: a no-flag run is one compose run that lints and runs bats, without the roster (base#2177)" {
+  _main_calls
   assert_success
-  assert_equal "$(grep -E '^(compose|roster)' <<< "${output}")" "compose ci 0 lint=1 bats=0
-roster
-compose ci 0 lint=0 bats=1"
+  assert_equal "$(grep -E '^(compose|roster)' <<< "${output}")" "compose ci 0 lint=0 bats=0"
 }
 
-# why: A red roster is a red `just test`, and bats does not run after it.
-@test "test.sh: a red roster fails the no-flag run before bats (base#1461)" {
-  _main_calls 1
-  assert_failure
-  assert_line 'roster'
-  refute_line --partial 'bats=1'
-}
-
-# why: The CI lint legs run the roster as a step of their own and the
-# coverage modes are not the local gate; neither calls it a second time.
+# why: No other dispatch runs it either.
 @test "test.sh: --lint --group and --coverage do not run the roster (base#1461)" {
-  _main_calls 0 --lint --group 1/4
+  _main_calls --lint --group 1/4
   refute_line roster
   assert_line --partial 'compose ci 0 lint=1'
-  _main_calls 0 --coverage
+  _main_calls --coverage
   refute_line roster
 }
 
 # why: `--ci` is the in-container dispatch every compose run lands in -- the
-# two halves of the no-flag run among them -- so a roster call there would
-# run it inside the test-tools container, once per half, and in every CI job
-# that reaches it. The phases it does run are stubbed and printed, so the
-# case proves the dispatch ran and still made no roster call.
+# no-flag run among them, which lints and then runs bats there -- so a
+# roster call there would run it inside the test-tools container, and in
+# every CI job that reaches it. The phases it does run are stubbed and
+# printed, so the case proves the dispatch ran, in that order, and still
+# made no roster call.
 @test "test.sh: --ci runs its in-container phases and not the roster (base#1461)" {
-  _main_calls 0 --ci
+  _main_calls --ci
   assert_success
-  assert_line 'in-container lint'
-  assert_line 'in-container bats'
-  refute_line roster
+  assert_equal "$(grep -E '^(in-container|roster)' <<< "${output}")" "in-container lint
+in-container bats"
   run env "${_MAIN_ROUTING_UNSET[@]}" LINT_ONLY=1 LINT_GROUP=1/4 bash -c '
     source /source/script/test/test.sh
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
     _run_lint_group() { printf "in-container lint group %s\n" "$1"; }
-    _run_mutation_required() { printf "roster\n"; }
+    bash() { printf "roster\n"; }
     main --ci
   '
   assert_success
@@ -1214,7 +1210,7 @@ compose ci 0 lint=0 bats=1"
     _stamp_coverage_head() { :; }
     _check_suite_prerequisites() { :; }
     _run_tests() { printf "in-container bats\n"; }
-    _run_mutation_required() { printf "roster\n"; }
+    bash() { printf "roster\n"; }
     main --ci
   '
   assert_success
