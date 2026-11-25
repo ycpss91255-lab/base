@@ -259,7 +259,7 @@ _with() {
   local _j
   _j="$(_needs_json true success)"
   _j="$(_with "${_j}" '.["config-gen-gates"].result = "skipped" | .["config-gen-redpath"].result = "skipped"
-      | .classify.outputs.select_config_gen = "false"')"
+      | .classify.outputs.select_config_gen = "false" | .classify.outputs.select_config_gen_redpath = "false"')"
   run _rollup_json "${_j}"
   assert_success
   refute_output --partial 'doc-only'
@@ -284,9 +284,8 @@ _with() {
 # own select_* key `false` and fails with it `true`. The job set is read
 # from `needs` and each job's `if:`, not from the rollup's text, and the
 # key is the one the job's `if:` reads, never a rewrite of the job's name:
-# config-gen-gates and config-gen-redpath both read select_config_gen
-# (base#1547 split one job into two), and a rollup that guessed
-# select_config_gen_gates from the name failed both decided skips.
+# config-gen-gates reads select_config_gen, and a rollup that guessed
+# select_config_gen_gates from the name failed its decided skip.
 @test "self-test: the rollup passes a gated skip only when its own select key is false (base#1584)" {
   local _job _k _if _base _n=0 _bad=""
   _base="$(_needs_json true success)"

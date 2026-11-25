@@ -749,17 +749,17 @@ _acceptance_code() {
 # and config-gen ran 111 min (run 42549448309). base#1584 has a pull
 # request run a heavy job only when classify's map selected it, so
 # config-gen must read its own select_config_gen output, not the
-# shared code_changed answer. base#1547 split config-gen into
-# config-gen-gates and the config-gen-redpath matrix; both read the same
-# inputs, so both gate on the one select_config_gen key, the whole `if:`
-# compared, not a substring.
-@test "self-test.yaml: both config-gen jobs' job-level if: gates on classify's select_config_gen (base#1584)" {
-  local _j
-  for _j in config-gen-gates config-gen-redpath; do
-    run env LP_J="${_j}" yq '.jobs[strenv(LP_J)].if' "${WF}"
-    assert_success
-    assert_output "needs.classify.outputs.select_config_gen == 'true'"
-  done
+# shared code_changed answer. config-gen-gates gates on that key, which the
+# diff decides, and config-gen-redpath on select_config_gen_redpath, which
+# the event decides, so the redpath can skip where the gates run. The whole
+# `if:` is compared, not a substring.
+@test "self-test.yaml: each config-gen job's job-level if: gates on a classify key of its own (base#1584, base#2176)" {
+  run yq '.jobs["config-gen-gates"].if' "${WF}"
+  assert_success
+  assert_output "needs.classify.outputs.select_config_gen == 'true'"
+  run yq '.jobs["config-gen-redpath"].if' "${WF}"
+  assert_success
+  assert_output "needs.classify.outputs.select_config_gen_redpath == 'true'"
 }
 
 # ── buildx GHA cache on test-tools builds ────────────────
@@ -4426,7 +4426,8 @@ ${_bad}"
 # updated; that friction is intended, and the message names file, layer
 # and key set.
 
-CG_GATE_IF="needs.classify.outputs.select_config_gen == 'true'"
+CG_GATES_IF="needs.classify.outputs.select_config_gen == 'true'"
+CG_REDPATH_IF="needs.classify.outputs.select_config_gen_redpath == 'true'"
 CG_STEP_NAME='Run the config-gen gates'
 CG_STEP_RUN='just test go'
 # The hosted workflow splits `just test go` into its two recipes (base#1547):
@@ -4548,8 +4549,8 @@ _cg_job_id() {
 }
 
 # _cg_expected_job <self-test|self-test-redpath|coverage-local> -- that
-# job less its free-text name and timeout, canonical JSON. Both hosted
-# jobs gate on the one select_config_gen key (CG_GATE_IF, base#1584);
+# job less its free-text name and timeout, canonical JSON. Each hosted
+# job gates on its own classify key (CG_GATES_IF, CG_REDPATH_IF);
 # coverage-local's `if` is the fork guard its sibling job carries. The redpath matrix is
 # shard 1..N, N read from the shard table's header and never from the
 # workflow, with the shard holding rerun's one row labelled (base#1547).
@@ -4566,10 +4567,10 @@ _cg_expected_job() {
   esac
   case "${1}" in
     self-test)
-      CG_IF="${CG_GATE_IF}" CG_STEPS="${_steps}" yq -n -o json -I0 \
+      CG_IF="${CG_GATES_IF}" CG_STEPS="${_steps}" yq -n -o json -I0 \
         '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
     self-test-redpath)
-      CG_IF="${CG_GATE_IF}" CG_STEPS="${_steps}" CG_SHARD_LIST="[$(seq -s, 1 "${_n}")]" CG_K="${_k}" \
+      CG_IF="${CG_REDPATH_IF}" CG_STEPS="${_steps}" CG_SHARD_LIST="[$(seq -s, 1 "${_n}")]" CG_K="${_k}" \
         yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest",
           "strategy": {"fail-fast": false, "matrix": {"shard": env(CG_SHARD_LIST),
             "include": [{"shard": env(CG_K), "label": " + rerun, the baseline"}]}},
@@ -4921,21 +4922,25 @@ _rollup_honours_every_need() {
   assert_output ""
 }
 
-# why: config-gen skips where classify's map deselects it; the rollup must
+# why: config-gen skips where classify deselects it; the rollup must
 # read that skip as a pass and a failure or cancel as red. The skip passes
-# only on the classify answer it came from (select_config_gen=false); a
-# skip classify did not decide fails, whatever code_changed says
-# (base#1584).
-@test "self-test.yaml: ci-rollup passes config-gen success and a decided skip, fails failure and cancelled (base#1462)" {
-  local _j
-  for _j in config-gen-gates config-gen-redpath; do
+# only on the classify answer it came from, the job's own key: the other
+# config-gen job's key does not excuse it, and a skip classify did not
+# decide fails, whatever code_changed says (base#1584).
+@test "self-test.yaml: ci-rollup passes config-gen success and a decided skip, fails failure and cancelled (base#1462, base#2176)" {
+  local _j _k _other
+  while read -r _j _k _other; do
     assert_equal "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"success\"")" 0
-    assert_equal "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\" | .classify.outputs.select_config_gen = \"false\"")" 0
-    assert_equal "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\" | .classify.outputs.select_config_gen = \"true\"")" 1
+    assert_equal "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\" | .classify.outputs.${_k} = \"false\"")" 0
+    assert_equal "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\" | .classify.outputs.${_k} = \"true\"")" 1
+    assert_equal "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\" | .classify.outputs.${_other} = \"false\"")" 1
     assert_equal "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\" | .classify.outputs.code_changed = \"false\"")" 1
     [[ "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"failure\"")" != 0 ]] || fail "ci-rollup passes a failed ${_j}"
     [[ "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"cancelled\"")" != 0 ]] || fail "ci-rollup passes a cancelled ${_j}"
-  done
+  done <<'JOBS'
+config-gen-gates select_config_gen select_config_gen_redpath
+config-gen-redpath select_config_gen_redpath select_config_gen
+JOBS
 }
 
 # why: The rollup check must see a need the verify step leaves out, or it
