@@ -1978,8 +1978,8 @@ for the knobs the conf sets.
 ### test/bats/unit/conf/toml_array_entry_spec.bats (6)
 
 entry N of the array IS the key `<prefix>_N`, so a write has to land at the
-index it names with every field in its place. Every case writes and reads
-back through the bridge.
+index it names with every field in its place. Every case reads the file back
+through the bridge.
 
 | Test | Description |
 |------|-------------|

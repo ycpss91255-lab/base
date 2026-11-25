@@ -5,8 +5,8 @@
 # an array of tables in a `.toml` file.
 #
 # why: entry N of the array IS the key `<prefix>_N`, so a write has to land
-# at the index it names with every field in its place. Every case writes
-# and reads back through the bridge.
+# at the index it names with every field in its place. Every case reads
+# the file back through the bridge.
 
 bats_require_minimum_version 1.5.0
 
