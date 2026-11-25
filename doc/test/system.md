@@ -131,7 +131,7 @@ with `deploy.sh down`. A tiny alpine `runtime` stage keeps it fast; the
 point is the orchestration (build -> save -> load -> compose up ->
 mount-wins override -> down), not a heavy image. Needs the `ci-system`
 service's docker.sock plus the `docker compose` plugin + `xz` baked into the
-test-tools image; auto-skips cleanly when any is absent.
+test-tools image; skips when any is absent, which fails a CI run.
 
 The fixture repo is a real git tree carrying a tag, with a run-unique
 basename: the deploy stamp resolves to that tag rather than the `unknown`
