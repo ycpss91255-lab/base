@@ -34,6 +34,45 @@ _job() {
   awk -v j="  ${1}:" '$0 == j {flag=1; next} /^  [a-z]/{flag=0} flag' "${WF}"
 }
 
+# What the stand-in check.sh writes: the report on stderr, and on stdout two
+# rows in the shape `--drift-tsv` prints.
+readonly _REPORT='stand-in report line'
+readonly _ROWS=$'toola\tv1.0.0\tv1.1.0\tdockerfile/Dockerfile.a\t12\ntoolb\t2.0\t3.0\tdir/b.yaml\t7\n'
+readonly _MATRIX='[{"name":"toola","from":"v1.0.0","to":"v1.1.0","file":"dockerfile/Dockerfile.a","line":"12"},{"name":"toolb","from":"2.0","to":"3.0","file":"dir/b.yaml","line":"7"}]'
+
+# _run_scan <status> <rows> -- RUN the scan step's own script, with a check.sh
+# that prints <rows>, writes the report and exits <status>. The step declares
+# no `shell:`, so the runner starts it as `bash -e {0}`, and so does this.
+# GITHUB_OUTPUT and GITHUB_STEP_SUMMARY land in ${SCAN}/output and
+# ${SCAN}/summary.
+_run_scan() {
+  SCAN="${BATS_TEST_TMPDIR}/scan"
+  mkdir -p "${SCAN}/script/watch"
+  : > "${SCAN}/output"
+  : > "${SCAN}/summary"
+  cat > "${SCAN}/script/watch/check.sh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s' "${STUB_ROWS}"
+printf '%s\n' "${STUB_REPORT}" >&2
+exit "${STUB_STATUS}"
+STUB
+  chmod +x "${SCAN}/script/watch/check.sh"
+
+  local _body
+  _body="$(yaml_step_run "${WF}" scan scan)" || fail "${_body}"
+  [[ -n "${_body}" ]] || fail "no scan step with a run script in ${WF}"
+  # The step's report file has one fixed name under /tmp, which the cases of
+  # a parallel run would share. Moving it is the only edit to the script.
+  [[ "${_body}" == *'/tmp/'* ]] \
+    || fail "the scan step writes nothing under /tmp; give its report file a per-test path here"
+  printf '%s\n' "${_body//\/tmp\//${SCAN}/}" > "${SCAN}/step.sh"
+
+  cd "${SCAN}"
+  run env STUB_STATUS="${1}" STUB_ROWS="${2}" STUB_REPORT="${_REPORT}" \
+    GITHUB_OUTPUT="${SCAN}/output" GITHUB_STEP_SUMMARY="${SCAN}/summary" \
+    bash -e "${SCAN}/step.sh"
+}
+
 # ════════════════════════════════════════════════════════════════════
 # It runs on a schedule, and by hand
 # ════════════════════════════════════════════════════════════════════
@@ -237,6 +276,58 @@ _job() {
   run _job scan
   assert_success
   assert_output --partial '-ne 10'
+}
+
+# why: base#2135. `bash -e` ended the step at check.sh's non-zero status, so a
+# run that failed never said which pin or why; the failure alone is not
+# enough, the report has to be there. Rows handed over beside it would bump
+# on a comparison that did not finish.
+@test "tool-version-watch: check.sh exiting 1 fails the scan step with the report printed (base#2135)" {
+  _run_scan 1 "${_ROWS}"
+  assert_failure 1
+  assert_output --partial "${_REPORT}"
+  assert_line --regexp '^::error::.*UNRESOLVED'
+  run cat "${SCAN}/output"
+  assert_output ''
+}
+
+# why: base#2135. Exit 10 is the answer the watch exists to give. Under
+# `bash -e` it failed the step instead, so bump never ran and no drift could
+# ever open a proposal.
+@test "tool-version-watch: check.sh exiting 10 passes the scan step and hands bump the matrix (base#2135)" {
+  _run_scan 10 "${_ROWS}"
+  assert_success
+  assert_output --partial "${_REPORT}"
+  run sed -n 's/^drift=//p' "${SCAN}/output"
+  assert_output "${_MATRIX}"
+  run sed -n 's/^count=//p' "${SCAN}/output"
+  assert_output '2'
+  run cat "${SCAN}/summary"
+  assert_output --partial "${_REPORT}"
+}
+
+# why: base#2135. Worked before the fix and has to keep working: count=0 is
+# what skips bump in a week with nothing to do.
+@test "tool-version-watch: check.sh exiting 0 passes the scan step with an empty matrix (base#2135)" {
+  _run_scan 0 ''
+  assert_success
+  assert_output --partial "${_REPORT}"
+  run sed -n 's/^drift=//p' "${SCAN}/output"
+  assert_output '[]'
+  run sed -n 's/^count=//p' "${SCAN}/output"
+  assert_output '0'
+}
+
+# why: base#2135. A status the step does not know (a usage error, a check.sh
+# that could not start) is not a clean week either, and it too ended the step
+# without a word.
+@test "tool-version-watch: check.sh exiting any other status fails the scan step with that status (base#2135)" {
+  _run_scan 2 "${_ROWS}"
+  assert_failure 2
+  assert_output --partial "${_REPORT}"
+  assert_line --regexp '^::error::.*2'
+  run cat "${SCAN}/output"
+  assert_output ''
 }
 
 # why: Two walks can disagree, and each costs a request per pin against a 60/hour

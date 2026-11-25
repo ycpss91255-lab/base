@@ -9481,7 +9481,7 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `tool provenance: REFUSES a workflow file it could read no job out of` | The reader commits to the two-space job key this repo's workflows all use, because widening it starts reading a job's own nested keys as jobs. The floor is what makes that commitment safe: a whole-TREE floor only fires when NO file yielded a job, so one file written another way is skipped in silence beside nine that are not -- while the clean line still counts it among the workflows scanned, which reads as coverage it does not have. Every GitHub workflow declares `jobs:`, so a file that yielded none is a reader that stopped reading, not a workflow without work. |
 | `tool provenance: REFUSES an empty roster` | The roster is the population of tools. If the accessor stops answering, the scan has nothing to look for and passes having looked at nothing. |
 
-### test/bats/unit/tool_version_watch_yaml_spec.bats (23)
+### test/bats/unit/tool_version_watch_yaml_spec.bats (27)
 
 | Test | Description |
 |------|-------------|
@@ -9502,6 +9502,10 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `tool-version-watch: it does NOT treat a closed proposal as a refusal` | A closed proposal is dependabot's silent opt-out; the refusal here has to be skip= in the file that declares the pin |
 | `tool-version-watch: an unresolved upstream FAILS the scan job` | Exit 1 means a source did not answer, and treating that as an empty matrix would look exactly like a clean week |
 | `tool-version-watch: it separates 'drift found' from 'could not resolve'` | Drift and unresolved take opposite actions, so collapsing the two exit codes would either skip real bumps or bump on no answer |
+| `tool-version-watch: check.sh exiting 1 fails the scan step with the report printed (base#2135)` | base#2135. `bash -e` ended the step at check.sh's non-zero status, so a run that failed never said which pin or why; the failure alone is not enough, the report has to be there. Rows handed over beside it would bump on a comparison that did not finish. |
+| `tool-version-watch: check.sh exiting 10 passes the scan step and hands bump the matrix (base#2135)` | base#2135. Exit 10 is the answer the watch exists to give. Under `bash -e` it failed the step instead, so bump never ran and no drift could ever open a proposal. |
+| `tool-version-watch: check.sh exiting 0 passes the scan step with an empty matrix (base#2135)` | base#2135. Worked before the fix and has to keep working: count=0 is what skips bump in a week with nothing to do. |
+| `tool-version-watch: check.sh exiting any other status fails the scan step with that status (base#2135)` | base#2135. A status the step does not know (a usage error, a check.sh that could not start) is not a clean week either, and it too ended the step without a word. |
 | `tool-version-watch: it walks the upstream APIs once per run` | Two walks can disagree, and each costs a request per pin against a 60/hour anonymous limit |
 | `tool-version-watch: it authenticates to the GitHub API` | An anonymous walk runs out of quota mid-run, which surfaces as an upstream that did not answer rather than as the quota problem it is |
 | `tool-version-watch: the report reaches the run summary, not just the log` | The report is the run's human output; buried in the log it is read only by whoever already suspected something |
