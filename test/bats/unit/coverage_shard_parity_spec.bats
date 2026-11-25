@@ -396,7 +396,7 @@ export SHARD_WEIGHTS_FILE="${BATS_TEST_TMPDIR}/weights"
 COVERAGE_JOBS=4 _run_coverage 2/2 >/dev/null 2>&1'
   assert_success
 
-  # 714 is every spec of the shard once: 300, four of 100, fourteen of 1.
+  # 714 is the shard's total weight: 300, four of 100, fourteen of 1.
   run _slice_loads "${_log}" "${_wf}"
   assert_success
   assert_output "max=300 total=714"
