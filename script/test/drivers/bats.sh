@@ -406,6 +406,22 @@ _coverage_pool_files() {
   done | LC_ALL=C sort
 }
 
+# _lpt_assign <bins>
+#   Read `<weight> <path>` lines, echo `<bin> <path>` (bins 1..<bins>):
+#   heaviest first, each to the lightest bin. Ties go by path and to the
+#   lowest bin, so the same input always gives the same bins.
+_lpt_assign() {
+  sort -k1,1nr -k2,2 \
+    | awk -v t="${1:?BUG: _lpt_assign expects <bins>}" '
+        BEGIN { for (i = 1; i <= t; i++) load[i] = 0 }
+        {
+          min = 1
+          for (i = 2; i <= t; i++) if (load[i] < load[min]) min = i
+          load[min] += $1
+          print min, $2
+        }'
+}
+
 _shard_unit_files() {
   # Shared shard-partition primitive for the coverage matrix. Echoes the
   # newline-separated subset of test/bats/unit/*_spec.bats for shard <n>
@@ -434,11 +450,6 @@ _shard_unit_files() {
        || (( _shard < 1 || _shard > _total )); then
     _die ci_invalid_shard "Invalid shard spec '${_spec}'. Need 1<=n<=total."
   fi
-  # Greedy longest-processing-time bin-packing. awk reads `<count> <path>`
-  # lines (heaviest first), maintains a running load per shard, assigns
-  # each spec to the lightest shard, and prints only the files landing in
-  # the requested shard. The `sort -k1` secondary on the path keeps the
-  # partition deterministic across runs (ties broken by name).
   # find, so the walk descends into per-lib sub-folders
   # (test/bats/unit/<lib>/<subunit>_spec.bats, ADR-00000015) exactly as
   # `bats --recursive` does; each foldered spec is still its own
@@ -449,16 +460,8 @@ _shard_unit_files() {
     while IFS= read -r _f; do
       printf '%s %s\n' "$(_spec_weight "${_f}")" "${_f}"
     done < <(_coverage_pool_files) \
-      | sort -k1,1nr -k2,2 \
-      | awk -v want="${_shard}" -v t="${_total}" '
-          BEGIN { for (i = 1; i <= t; i++) load[i] = 0 }
-          {
-            # pick the lightest shard (ties -> lowest index for stability)
-            min = 1
-            for (i = 2; i <= t; i++) if (load[i] < load[min]) min = i
-            load[min] += $1
-            if (min == want) print $2
-          }'
+      | _lpt_assign "${_total}" \
+      | awk -v want="${_shard}" '$1 == want { print $2 }'
   )
   if [[ -z "${_files}" ]]; then
     _die ci_empty_shard "No spec files matched shard ${_spec}. Empty test/bats/{unit,integration}/ ?"
