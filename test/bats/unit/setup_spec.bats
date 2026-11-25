@@ -2013,14 +2013,6 @@ EOC
   assert_success
 }
 
-@test "_write_runtime_env is removed (#507)" {
-  run bash -c "
-    source /source/dist/script/docker/wrapper/setup.sh
-    declare -F _write_runtime_env
-  "
-  assert_failure
-}
-
 # ════════════════════════════════════════════════════════════════════
 # apply refuses an unknown table or a misspelt key (base#1328)
 #

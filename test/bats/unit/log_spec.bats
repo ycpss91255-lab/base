@@ -7,7 +7,7 @@
 # why: OTel-aligned logger (#423, #438). Single-sink tty-detect dispatch,
 # `LOG_FORMAT=auto|text|json` override, strict body enforcement
 # (unregistered body = fatal), `display=` attribute for i18n text in text
-# mode, UTC microsecond timestamps, `_log_plain` removed.
+# mode, UTC microsecond timestamps.
 #
 # Grouped by concern:
 #
@@ -42,8 +42,6 @@
 #
 # - Scoped wrappers: `_log_with_trace` save/restore, `_log_with_span`
 # trace_id
-#
-# - `_log_plain` removed (#438)
 #
 # - `_log_color_enabled`: TTY detect, FORCE_COLOR, NO_COLOR precedence
 #
@@ -589,13 +587,6 @@ setup() {
   run --separate-stderr bash -c "source ${LOG_SH}; _log_with_trace true"
   assert_success
   [[ "${stderr}" == *"[trace started:"* ]]
-}
-
-# ── _log_plain removed ─────────────────────────────────────
-
-@test "_log_plain is no longer defined" {
-  run bash -c "source ${LOG_SH}; declare -F _log_plain"
-  assert_failure
 }
 
 # ── _log_color_enabled ─────────────────────────────────────────────

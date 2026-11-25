@@ -4981,12 +4981,12 @@ rather than reporting what it managed.
 | `_run_log_event_registry: DIES when no _log_ call site is read anywhere` | The blind-detector case, and the one that matters most: 271 direct call sites exist today, so zero means the detector stopped matching -- a renamed helper, a changed argument order -- and a blind detector reports every id registered |
 | `_run_log_event_registry: DIES when nothing forwards its first argument into a body slot` | The wrapper half is where two of base#1220's four hid, and it is the half that can vanish silently: with no forwarding wrapper found the scan shrinks to the direct call sites and the thirty-odd lint drivers' events leave the population without anything saying so |
 
-### test/bats/unit/log_spec.bats (70)
+### test/bats/unit/log_spec.bats (69)
 
 OTel-aligned logger (#423, #438). Single-sink tty-detect dispatch,
 `LOG_FORMAT=auto|text|json` override, strict body enforcement (unregistered
 body = fatal), `display=` attribute for i18n text in text mode, UTC
-microsecond timestamps, `_log_plain` removed.
+microsecond timestamps.
 
 Grouped by concern:
 
@@ -5020,8 +5020,6 @@ OK, error names body + file
 - Missing service rejected, `_log_fatal` does not auto-exit
 
 - Scoped wrappers: `_log_with_trace` save/restore, `_log_with_span` trace_id
-
-- `_log_plain` removed (#438)
 
 - `_log_color_enabled`: TTY detect, FORCE_COLOR, NO_COLOR precedence
 
@@ -5087,7 +5085,6 @@ OK, error names body + file
 | `_log_with_trace without prior TRACEPARENT unsets on return` | - |
 | `_log_with_span preserves trace_id from parent` | - |
 | `_log_with_trace prints trace started message to stderr` | - |
-| `_log_plain is no longer defined` | - |
 | `_log_color_enabled returns non-zero on non-TTY without overrides` | The default for a pipe or a CI log, where ANSI codes are noise. |
 | `_log_color_enabled returns 0 with FORCE_COLOR=1` | - |
 | `_log_color_enabled returns non-zero with NO_COLOR=1 + FORCE_COLOR=1` | The two overrides contradict each other, and the opt-out is the one that has to win. |
@@ -7874,7 +7871,7 @@ sanitization, `detect_ws_path`, and `_reconcile_workspace_path` (#569).
 | `_setup_ssh_x11_cookie returns 1 with warning when nmerge pipe exits non-zero (#688)` | - |
 | `_setup_ssh_x11_cookie returns 1 with warning when xauth is not installed (#321)` | - |
 
-### test/bats/unit/setup_spec.bats (137)
+### test/bats/unit/setup_spec.bats (136)
 
 The `setup.sh` orchestrator spec. `main` subcommand dispatch (`set` / `show`
 / `remove` for `[logging]` #328 and `[lifecycle]` #478, `reset`, `--lang` /
@@ -8017,7 +8014,6 @@ duplicate-target guards, and S7 `runtime.env` retirement (#507).
 | `apply warns when device and volume have same target path (#450 P4)` | - |
 | `apply does NOT warn duplicate when device and volume targets differ (#450 P4)` | - |
 | `apply no longer emits runtime.env; [environment] still reaches the container (#868)` | - |
-| `_write_runtime_env is removed (#507)` | - |
 | `apply refuses an unknown table in setup.toml, naming the file and the table (base#1328)` | - |
 | `apply refuses an unknown table that carries no key, naming the file and the table (base#1328)` | - |
 | `apply refuses an unknown table whose only key is an empty array (base#1328)` | - |
