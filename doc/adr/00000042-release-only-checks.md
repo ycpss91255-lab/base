@@ -6,9 +6,10 @@
 - **Date:** 2026-11-26
 - **Status:** Accepted
 - **Relates to:** #1592 (the owner's decision), #2177 (`mutation-roster`),
-  #2176 (`config-gen-redpath`, decided in #1592 and not implemented yet),
-  #1461 (the required-kill roster), #1584 and #1587 (per-job selection, the
-  merge queue), ADR-00000017 (CI throughput), ADR-00000027 (release cadence)
+  #2176 (`config-gen-redpath`), #1461 (the required-kill roster), #1547 (the
+  redpath's shards), #1584 and #1587 (per-job selection, the merge queue),
+  ADR-00000017 (CI throughput), ADR-00000027 (release cadence),
+  ADR-00000039 (the config generator's gates)
 
 ## Context
 
@@ -34,10 +35,16 @@ It is about a third of every run, and 21 jobs of a 20-job concurrency cap
 pull request waits for. Of its 354 rows, 46 mutate what base ships
 (`dist/`); 180 mutate the test tooling and 107 the version watch.
 
+The config generator's redpath plants one defect per Go gate in a scratch
+copy and requires each to go red on its own gate. Its hosted job,
+`config-gen-redpath`, ran on the same three runs, as 46, 49 and 56 machine
+minutes over 5 shards. Its slowest shard, 742 s, 967 s and 984 s, was the
+longest job of each run; the next was a coverage shard at 655 to 667 s.
+
 ## Decision
 
-The owner decided on 2026-11-26 (#1592) that the roster no longer blocks
-every change and blocks a release instead.
+The owner decided on 2026-11-26 (#1592) that the roster and the redpath no
+longer block every change and block a release instead.
 
 1. **A release-only check** is a hosted job of `self-test.yaml` that a tag
    push and a `workflow_dispatch` run select, and that a pull request, a
@@ -46,6 +53,7 @@ every change and blocks a release instead.
    | job | since | before a release, locally |
    |---|---|---|
    | `mutation-roster` | #2177 | `just test mutation-required` |
+   | `config-gen-redpath` | #2176 | `just test go-redpath` |
 
 2. **The event alone decides.** The `classify` job's diff step writes the
    `select_<job>` key of each release-only job from the event and the ref,
@@ -59,30 +67,38 @@ every change and blocks a release instead.
    succeeded, not when it skipped.
 4. **Local matches hosted.** The no-flag `just test` and the pre-PR mirror
    stand for the pull request gate, so they do not run it either. The mirror
-   lists it as excluded, with the recipe to run.
+   lists it as excluded, with the recipe to run. For the config generator the
+   mirror runs `just test go-gates`, the recipe of the hosted gates job;
+   `just test go` stays the gates and then the redpath, all that a tag runs
+   for it.
 5. **Before a release**, run it on the commit to be tagged: `gh workflow run
    self-test.yaml --ref main`, or the local command in the table.
    `workflow_dispatch` is kept for this.
 
 No roster row is removed or changed, and the specs that read the roster as
 data (every row still applies to its subject, has a witness, and fits its
-leg) still run on every pull request.
+leg) still run on every pull request. No redpath case is removed or changed
+either, and `config_gen_gates_spec.bats` still runs the redpath against a
+stub runner on every pull request that selects coverage. `config-gen-gates`
+keeps its own selection, and ADR-00000039's rule that one recipe runs the Go
+gates in every environment stands: that recipe is `just test go-gates`.
 
 ## Consequences
 
 - About a third of the machine time of every pull request, merge group and
-  push to `main` goes away, and 21 jobs of each. The wait for one pull
-  request does not get visibly shorter.
-- **A test that stops killing its mutant can reach `main`** and is found
-  only at the next release or dispatch, after later changes have landed on
-  top of it.
-- **A red roster on a tag comes after the tag exists.** The tag also starts
-  `release-test-tools.yaml`, which publishes the test-tools images without
-  waiting for it. Only the GitHub Release is withheld. Running the roster
-  before tagging is what avoids this.
-- A run whose `ci-rollup` is green no longer says the roster passed. The
-  rollup's notice names the jobs that did not run.
-- #2176 adds `config-gen-redpath` to the table above by the same mechanism.
+  push to `main` goes away with the roster, and 21 jobs of each. The wait for
+  one pull request does not get visibly shorter by that.
+- About another fifth goes away with the redpath, and 5 jobs of each. The
+  longest job of a run is then a coverage shard, about 11 minutes.
+- **A test that stops killing its mutant, or a Go gate that can no longer go
+  red, can reach `main`** and is found only at the next release or dispatch,
+  after later changes have landed on top of it.
+- **A red release-only check on a tag comes after the tag exists.** The tag
+  also starts `release-test-tools.yaml`, which publishes the test-tools
+  images without waiting for it. Only the GitHub Release is withheld. Running
+  the checks before tagging is what avoids this.
+- A run whose `ci-rollup` is green no longer says the release-only checks
+  passed. The rollup's notice names the jobs that did not run.
 
 ## Alternatives
 
