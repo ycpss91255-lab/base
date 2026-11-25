@@ -526,16 +526,27 @@ finished, and a failing run publishes no pass. The first INT / TERM is
 forwarded to every row's probe, which restores and stops; the run exits
 130 / 143 with no verdict.
 
-**Where it runs.** The no-flag `just test` runs it on the host after the
-lint phase and before bats, and a red roster stops the run before bats.
-Every leg of the hosted `mutation-roster` job runs `just test
+**Where it runs.** It is a release-only check (ADR-00000042, base#2177). The
+hosted `mutation-roster` job runs on a tag push, whose `release` job needs
+it, and on `workflow_dispatch`; a pull request, a merge group and a push to
+`main` skip it. Every leg of that job runs `just test
 mutation-required --shard <its shard>` (rows are dealt by their seconds in
 `seconds.txt`, heaviest first, each to the shard holding the fewest seconds
-so far, so the twenty legs together probe every row; every leg still
+so far, so the legs together probe every row; every leg still
 validates every row), and the self-hosted `config-gen` job in
 `coverage-local.yaml` runs the whole roster; each as a step of its own, with
-no `if:` and no `continue-on-error`. The pre-PR mirror covers it through
-`just test`. `--lint`, `--ci` and the coverage modes do not run it.
+no `if:` and no `continue-on-error`. No `test.sh` mode runs it, the no-flag
+`just test` included, and the pre-PR mirror lists it as excluded.
+
+**Before a release**, run it on the commit to be tagged, in one of two ways:
+
+```bash
+gh workflow run self-test.yaml --ref main   # hosted: the whole CI, the roster included
+just test mutation-required                 # local: the roster alone
+```
+
+A roster that is red on the tag itself withholds the GitHub Release, but by
+then the tag exists and `release-test-tools.yaml` has published its images.
 
 ## Maintaining these docs
 
