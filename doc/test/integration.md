@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **290 tests**.
+Integration specs under `test/bats/integration/`: **295 tests**.
 
 > Part of the `just test` self-test suite — in CI, the `coverage` matrix and
 > the `bats-fragile` job run it. See [TEST.md](TEST.md) for the index across
