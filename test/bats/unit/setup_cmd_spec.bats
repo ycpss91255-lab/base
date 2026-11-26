@@ -4494,8 +4494,10 @@ esac'
   assert_output 1
   run grep -cE '^image inspect config-gen:[0-9a-f]{12}$' "${_RO_LOG}"
   assert_output 1
+  # base#2234: 12 -> 5 -- the two-layer merge once, each single layer
+  # once, `--empty-families` twice (not a merged load, not memoised).
   run grep -c '^run .* toml-bridge:' "${_RO_LOG}"
-  assert_output 12
+  assert_output 5
   run grep -c '^run .* config-gen:' "${_RO_LOG}"
   assert_output 2
   # Both inspects come before the first run: the first run's line number
