@@ -203,6 +203,9 @@ jobs:
       testtools_changed: ${{ steps.diff.outputs.testtools_changed }}
       # A skipped trust step (push, pull_request) reads as untrusted.
       merge_group_same_repo: ${{ steps.trust.outputs.same_repo || 'false' }}
+      # full_run: `false` only on a push to main, which skips the jobs no
+      # diff deselects; the merge queue ran them on the same tree.
+      full_run: ${{ steps.diff.outputs.full_run }}
       # select_<job>: whether the diff can affect each classify-gated job
       # (base#1584). Each gated job's `if:` reads its own key, and the
       # rollup passes that job's skip only when the same key is `false`.
@@ -291,6 +294,11 @@ jobs:
           for job in "${release_jobs[@]}"; do
             echo "select_${job}=${release_run}" >> "${GITHUB_OUTPUT}"
           done
+          # main's commit is the tree the merge queue tested, so a push to
+          # main reruns only the cache writers and their inputs.
+          full_run=true
+          [[ "${EVENT_NAME}:${EVENT_REF:-}" == push:refs/heads/main ]] && full_run=false
+          echo "full_run=${full_run}" >> "${GITHUB_OUTPUT}"
           if [[ "${EVENT_NAME}" != "pull_request" ]]; then
             # push to main / tag push / workflow_dispatch -- no diff narrows it.
             #
@@ -700,8 +708,9 @@ jobs:
     # it. So the local gate and the CI gate needed an explicit join, and
     # this is it, calling the same driver the lint phase calls.
     #
-    # Ungated on purpose (no `if: code_changed`): the catalogue can also be
-    # broken by editing doc/test/*.md by hand, which is not a code change.
+    # No diff gate: the catalogue can also be broken by editing
+    # doc/test/*.md by hand, which is not a code change. Only a push to main
+    # skips it, through classify's full_run.
     #
     # Inside the test-tools image, like every lint job (base#1412): the
     # driver is pure bash + diff, but "pure bash" on the ubuntu runner is
@@ -709,6 +718,7 @@ jobs:
     # the image's. One host for both gates is what makes a green local
     # gate predict this job.
     needs: [actionlint, classify, test-tools-image-amd64]
+    if: needs.classify.outputs.full_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -998,18 +1008,18 @@ jobs:
     # and doc-counts keep jobs of their own, whose results ci-rollup reads
     # by name.
     #
-    # Ungated on purpose (no `if: code_changed`), like doc-counts: the
-    # ADR-numbering and ADR-structure lints read doc/adr/ and the README sync lint
-    # reads README.md + doc/readme/**, both of which classify scores as a
-    # doc-only change, so a code_changed gate would skip them on exactly
-    # the PR they exist to catch. A matrix shares one job-level `if:`, so
-    # the choice is all-or-nothing anyway.
+    # No diff gate, like doc-counts: the ADR-numbering and ADR-structure
+    # lints read doc/adr/ and the README sync lint reads README.md +
+    # doc/readme/**, both of which classify scores as a doc-only change, so
+    # a code_changed gate would skip them on exactly the PR they exist to
+    # catch. Only a push to main skips it, through classify's full_run.
     #
     # Adding a lint to the phase without a CI join still fails the
     # completeness guard in test/bats/unit/self_test_yaml_spec.bats, which
     # reads test.sh's _LINT_TOOLS table and asks, of every entry, whether a
     # dedicated job runs it or exactly one group holds it.
     needs: [actionlint, classify, test-tools-image-amd64]
+    if: needs.classify.outputs.full_run == 'true'
     runs-on: ubuntu-latest
     # 30: the lint group alone. The required-kill roster that pushed this
     # to 150 runs in the mutation-roster job below (base#1571).
@@ -1078,14 +1088,15 @@ jobs:
         run: ./script/ci/reclaim.sh --run "${CI_RUN_KEY}" --stale 12h
 
   single-issue-pr:
-    # A PR closes one issue (base#1629). No job-level `if:` and no
-    # classify key on purpose: a doc-only PR is where a bundled PR slips
-    # through, and a skip would need a select_ key the rollup excuses.
-    # The job always runs; on merge_group, push and dispatch there is no PR
-    # to read, so it exits 0 (a queued PR was already checked). It reads
-    # the PR live through the API, so "Re-run failed jobs" after a body
-    # edit gives the right verdict. Enforcement goes through ci-rollup,
-    # the only required context.
+    # A PR closes one issue (base#1629). No diff gate: a doc-only PR is
+    # where a bundled PR slips through. It runs on every run but a push to
+    # main (classify's full_run); on merge_group, other pushes and dispatch
+    # there is no PR to read, so it exits 0 (a queued PR was already
+    # checked). It reads the PR live through the API, so "Re-run failed
+    # jobs" after a body edit gives the right verdict. Enforcement goes
+    # through ci-rollup, the only required context.
+    needs: [classify]
+    if: needs.classify.outputs.full_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -2225,7 +2236,10 @@ jobs:
     # Fails a pull request or merge group whose own commits carry AI
     # attribution (base#1989). Only the range is walked: commits already on
     # main are out of scope. The full history is fetched so the base commit
-    # exists to walk from. No `if:`: a push or tag run passes with a notice.
+    # exists to walk from. A push to main skips it (classify's full_run);
+    # any other push or a tag run passes with a notice.
+    needs: [classify]
+    if: needs.classify.outputs.full_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -2251,17 +2265,19 @@ jobs:
     # classify key its `if:` reads is exactly `false`. The verify step
     # finds that key through an explicit job-to-key map, never a rewrite
     # of the job name. A job with no key in the map (actionlint /
-    # classify / test-tools-image-amd64 / commit-attribution /
-    # doc-counts / lint-static / single-issue-pr / compute-shards) carries
-    # no `if:`, so its SKIPPED is a workflow bug
+    # classify / test-tools-image-amd64 / compute-shards) carries no `if:`,
+    # so its SKIPPED is a workflow bug
     # and fails, as does a skip whose key is `true`, empty or missing, and
     # every failure or cancel. The job set is read from `needs` itself, so
     # a job added there is covered with no edit here; one that gains an
-    # `if:` but no map entry fails on its first skip. doc-counts and lint-static carry no `if:` because a doc-only
-    # edit can break them (#866). The amd64 test-tools-image builder
-    # (base#1588) has none because doc-counts and lint-static always run
-    # and consume its tar, so it always runs too and stays out of the map
-    # on purpose.
+    # `if:` but no map entry fails on its first skip. The amd64
+    # test-tools-image builder (base#1588) feeds doc-counts and lint-static
+    # on every run but a push to main, and coverage on that push, so it
+    # always runs and stays out of the map on purpose.
+    #
+    # doc-counts / lint-static / single-issue-pr / commit-attribution have
+    # no diff gate, because a doc-only edit can break them; they read
+    # classify's full_run, which is `false` only on a push to main.
     #
     # Conditionally-gated jobs (shellcheck / hadolint / bats-fragile /
     # coverage / coverage-gate / acceptance / system / worker-selftest /
@@ -2338,7 +2354,11 @@ jobs:
               "config-gen-gates": "select_config_gen",
               "config-gen-redpath": "select_config_gen_redpath",
               "mutation-roster": "select_mutation_roster",
-              "test-tools-image-arm64": "select_test_tools_image_arm64"
+              "test-tools-image-arm64": "select_test_tools_image_arm64",
+              "doc-counts": "full_run",
+              "lint-static": "full_run",
+              "single-issue-pr": "full_run",
+              "commit-attribution": "full_run"
             } as $keys
             | (.classify.outputs // {}) as $c
             | to_entries[]

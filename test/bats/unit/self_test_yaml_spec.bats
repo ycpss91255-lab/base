@@ -316,8 +316,8 @@
 # test-tools image (#376, base#1412)
 #
 # - `doc-counts` job declared + `needs: [actionlint, classify]` + runs
-# `test.sh --lint --doc-counts` inside the test-tools image + carries NO
-# `code_changed` gate + is hard-mandatory in `ci-rollup` (#864, base#1412)
+# `test.sh --lint --doc-counts` inside the test-tools image + carries no
+# diff gate, only classify's full_run (#864, base#1412)
 #
 # - `hadolint` job declared + `needs: [actionlint, classify]` + `if:
 # code_changed == 'true'` + lints both template-owned Dockerfiles via
@@ -1854,19 +1854,24 @@ _builder_setups_out_of_step_with_their_consumer() {
 # why: The ungated jobs never skip on purpose, so a SKIPPED there is a
 # workflow bug the strict loop must not collapse into a pass.
 @test "self-test.yaml: ci-rollup requires hard-mandatory jobs to be success (#337 + #377)" {
-  # actionlint + classify + doc-counts + lint-static + compute-shards +
-  # the amd64 image builder are hard-mandatory: they carry no `if:` gate and no
-  # select_* key, so SKIPPED there indicates a workflow bug, not an
-  # intentional gate. Proven by running the step with each one skipped
-  # and every select_* key `false`, the most permissive classify
-  # (base#1584).
-  _rollup_hard_mandatory actionlint classify doc-counts lint-static \
-      compute-shards test-tools-image-amd64
+  # actionlint + classify + compute-shards + the amd64 image builder are
+  # hard-mandatory: they carry no `if:` gate and no key, so SKIPPED there
+  # indicates a workflow bug, not an intentional gate. Proven by running
+  # the step with each one skipped and every classify output `false`, the
+  # most permissive classify.
+  local _j _bad=""
+  for _j in actionlint classify compute-shards test-tools-image-amd64; do
+    [[ "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\"
+        | .classify.outputs |= with_entries(.value = \"false\")")" == 1 ]] \
+      || _bad+=" ${_j}"
+  done
+  [[ -z "${_bad}" ]] || fail "ci-rollup passes a skip of:${_bad}"
 }
 
 # why: The amd64 test-tools-image builder (base#1588) feeds doc-counts and
-# lint-static, which carry no `if:`, so it must run on every event too --
-# merge_group included (base#1587) -- and its skip must fail the rollup
+# lint-static on every run but a push to main, and coverage on that push,
+# so it must run on every event -- merge_group included -- and its skip
+# must fail the rollup
 # even beside a select_* key its name could be rewritten to. The arm64
 # builder feeds only acceptance, so a docs-only pull request skips it on
 # its own key (base#2110).
@@ -2467,20 +2472,16 @@ EOF
   assert_output --partial './script/test/test.sh --lint --doc-counts'
 }
 
-@test "self-test.yaml: doc-counts carries NO code_changed gate (#864)" {
-  # Deliberately ungated, unlike its sibling lint jobs: the catalogue can
-  # be broken by hand-editing doc/test/*.md, which classify scores as a
-  # doc-only change. A code_changed gate would skip the gate on exactly
-  # the PR that hand-edited a count.
+@test "self-test.yaml: doc-counts carries no diff gate, only full_run (#864, base#2190)" {
+  # No diff gate, unlike its sibling lint jobs: the catalogue can be
+  # broken by hand-editing doc/test/*.md, which classify scores as a
+  # doc-only change. A diff gate would skip it on exactly the PR that
+  # hand-edited a count. full_run is `false` only on a push to main.
   run yaml_job_lines "${WF}" doc-counts
   assert_success
-  # Non-vacuity: an absent job yields an empty block, against which the
-  # refute below would pass while asserting nothing.
   assert_output --partial './script/test/test.sh --lint --doc-counts'
-  # The gate form its sibling lint jobs use. Matching on that rather than
-  # the bare word keeps the job's own comment (which explains WHY it is
-  # ungated, and so names the gate) from satisfying the refutation.
-  refute_output --partial 'if: needs.classify.outputs'
+  run yq '.jobs["doc-counts"].if' "${WF}"
+  assert_output "needs.classify.outputs.full_run == 'true'"
 }
 
 # why: base#2110. A docs-only pull request runs the jobs that carry no
@@ -2504,15 +2505,13 @@ EOF
   assert_output ''
 }
 
-@test "self-test.yaml: ci-rollup treats doc-counts as hard-mandatory, not SKIPPED-tolerant (#864)" {
-  # It has no `if:` gate, so SKIPPED means a workflow bug. It must sit in
-  # the success-only loop with actionlint / classify, never in the
-  # skipped-tolerated one. The success-only loop is the one whose body
-  # compares against "success" alone; grep the two lines following the
-  # ACTIONLINT/CLASSIFY loop header to see what else it iterates.
+@test "self-test.yaml: ci-rollup excuses a doc-counts skip only when full_run is false (#864, base#2190)" {
+  # No diff answer excuses its skip: it fails with every select_* key
+  # `false`, and passes only with full_run `false`.
   run yaml_job_needs "${WF}" ci-rollup
   assert_line doc-counts
   _rollup_hard_mandatory doc-counts
+  _rollup_full_run_excused doc-counts
 }
 
 # ── lint-static groups (the rest of the lint phase) ────────────
@@ -2522,29 +2521,25 @@ EOF
   assert_success
 }
 
-@test "self-test.yaml: lint-static carries NO code_changed gate (#866)" {
-  # Ungated on purpose, like doc-counts. Two of the matrix entries
-  # are breakable by a change classify scores as doc-only: the
-  # ADR-numbering lint reads doc/adr/ filenames, and the localized README
-  # sync lint reads README.md + doc/readme/**. Gating on code_changed
-  # would skip them on exactly the PR they exist to catch. A matrix
-  # shares ONE job-level `if:`, so the gate would be all-or-nothing
-  # anyway.
+@test "self-test.yaml: lint-static carries no diff gate, only full_run (#866, base#2190)" {
+  # No diff gate, like doc-counts. Two of the matrix entries are
+  # breakable by a change classify scores as doc-only: the ADR-numbering
+  # lint reads doc/adr/ filenames, and the localized README sync lint
+  # reads README.md + doc/readme/**. A diff gate would skip them on
+  # exactly the PR they exist to catch.
   run yaml_job_lines "${WF}" lint-static
   assert_success
-  # Non-vacuity: an absent job yields an empty block, against which the
-  # refute below would pass while asserting nothing.
   assert_output --partial './script/test/test.sh --lint --group'
-  refute_output --partial 'if: needs.classify.outputs'
+  run yq '.jobs["lint-static"].if' "${WF}"
+  assert_output "needs.classify.outputs.full_run == 'true'"
 }
 
-@test "self-test.yaml: ci-rollup treats lint-static as hard-mandatory, not SKIPPED-tolerant (#866)" {
-  # No `if:` gate, so SKIPPED means a workflow bug -- same contract as
-  # doc-counts. It must sit in the success-only loop, never the
-  # skipped-tolerated one.
+@test "self-test.yaml: ci-rollup excuses a lint-static skip only when full_run is false (#866, base#2190)" {
+  # Same contract as doc-counts.
   run yaml_job_needs "${WF}" ci-rollup
   assert_line lint-static
   _rollup_hard_mandatory lint-static
+  _rollup_full_run_excused lint-static
 }
 
 @test "self-test.yaml: every lint the just test lint phase runs has a CI join (#866)" {
@@ -4925,6 +4920,18 @@ _rollup_hard_mandatory() {
       || _bad+=" ${_j}"
   done
   [[ -z "${_bad}" ]] || fail "ci-rollup passes a skip of:${_bad}"
+}
+
+# _rollup_full_run_excused <job>... -- each <job>'s skip passes the step
+# with full_run `false` and every select_* key `true`.
+_rollup_full_run_excused() {
+  local _j _bad=""
+  for _j in "$@"; do
+    [[ "$(_rollup_rc "${WF}" ".[\"${_j}\"].result = \"skipped\"
+        | .classify.outputs.full_run = \"false\"")" == 0 ]] \
+      || _bad+=" ${_j}"
+  done
+  [[ -z "${_bad}" ]] || fail "ci-rollup fails a full_run=false skip of:${_bad}"
 }
 
 # _rollup_honours_every_need <file> -- the verify step reads the whole
