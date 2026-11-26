@@ -1827,6 +1827,25 @@ _setup_apply() {
     _base_path="$(cd -- "${_SETUP_SCRIPT_DIR}/../../../../.." && pwd -P)"
   fi
 
+  # Each tool image is resolved once, here in the top-level shell: the
+  # readers below run inside $(...), where a memo written is lost and every
+  # call would inspect the image again (base#1844). A native binary needs
+  # no image; an override (TOML_BRIDGE_IMAGE / CONFIG_GEN_IMAGE) is taken
+  # verbatim by the resolver.
+  if ! _toml_bridge_use_native; then
+    _toml_bridge_resolve_image || return 1
+  fi
+  # The native verdict is taken once too, and handed down as a dynamically
+  # scoped pin: _config_gen_use_native re-derives the image tag (a digest
+  # over the build inputs) on every call, and config_gen_tables asks it
+  # once per layer (base#1844).
+  local _CONFIG_GEN_NATIVE_PINNED=0
+  if _config_gen_use_native; then
+    _CONFIG_GEN_NATIVE_PINNED=1
+  else
+    config_gen_resolve || return 1
+  fi
+
   _announce_template_default_fallback "${_base_path}"
 
   # A table or key no reader knows is refused before anything is

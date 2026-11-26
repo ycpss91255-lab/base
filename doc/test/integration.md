@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **310 tests**.
+Integration specs under `test/bats/integration/`: **318 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -63,7 +63,7 @@ together, and a caller that grants nothing beyond `contents: read` passes.
 | `compose.yaml: an unset BASE_CHECKOUT_PATH fails naming the entry point to use (#995)` | - |
 | `compose.yaml: the label it stamps is the path the caller supplied (#995)` | - |
 
-### test/bats/integration/compose_test_tools_image_spec.bats (3)
+### test/bats/integration/compose_test_tools_image_spec.bats (5)
 
 How the repo-root `compose.yaml` resolves `TEST_TOOLS_IMAGE` -- the one
 variable naming both the image the build-only `test-tools` service writes
@@ -77,6 +77,8 @@ because the text is not what decides which image a run pulls.
 | `compose.yaml: with TEST_TOOLS_IMAGE unset the tag the test-tools build writes is the tag the ci run reads (#896)` | #896 build side vs run side |
 | `compose.yaml: with TEST_TOOLS_IMAGE unset every consumer service reaches the same outcome as the build (#896)` | #896 coverage / ci-system too |
 | `compose.yaml: an unset TEST_TOOLS_IMAGE fails naming the just recipe to run (#896)` | #896 loud, and actionable |
+| `compose.yaml: ci-system hands the container the TEST_TOOLS_IMAGE it runs (base#2173)` | a tag the caller pinned cannot be derived inside the container |
+| `compose.yaml: ci-system forwards GITHUB_ACTIONS when it is set, and nothing when it is not (base#2173)` | GITHUB_ACTIONS is how _run_system knows a CI runner from a local run |
 
 ### test/bats/integration/config_gen_admit_spec.bats (5)
 
@@ -130,7 +132,7 @@ stated expectation and a stale row can never stand for a deleted one.
 | `config-gen binary on a size-limited stdout exits 4 with one frame and a golden prefix` | the Go fault writer covers a write that fails at byte N in-process; this is the same contract on the built binary against a real file whose size limit (RLIMIT_FSIZE via prlimit) lets it take some bytes and then refuse with EFBIG, which /dev/full (0 bytes, ENOSPC) can not show. The answer is exit 4, exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations), and a non-empty stdout that is a strict prefix of the bridge golden (base#1469 I/O contract). SIGXFSZ is ignored so the write returns EFBIG instead of killing the process. prlimit must be on PATH in every environment the spec runs in (test-tools installs util-linux-misc); a missing prlimit fails here, it is never skipped. The same /dev/full and prlimit cases also run under `go test` in Dockerfile.config-gen's test stage (TestTablesDevFullStdoutIsExit4AndOneFrame, TestTablesSizeLimitedStdoutIsExit4AndAGoldenPrefix); this leg holds the shipped static binary to them. |
 | `config-gen binary on a closed stdout pipe exits 4 with one frame, not SIGPIPE` | prlimit and /dev/full fail the write on a file; a reader that is gone is the fourth way the single answer write fails, and the only one a signal can end first: a pipe whose read end is closed before the binary starts, as in `config-gen tables ... \| true`. The binary must not be killed by SIGPIPE (rc 141 from the shell, nothing on stderr); it exits 4 with exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations; stdout is the failing sink, so `-`) (base#1469 I/O contract). The golden is more than 65536 bytes, the default pipe buffer, so the case can not pass by the answer fitting into the buffer before the reader goes. |
 
-### test/bats/integration/config_gen_gitignore_golden_spec.bats (5)
+### test/bats/integration/config_gen_gitignore_golden_spec.bats (8)
 
 Before any Go code replaces the gitignore parsing, today's shell behaviour
 is pinned as goldens. The shell function is the oracle: this spec re-runs it
@@ -154,6 +156,9 @@ that pin events add that normalisation.
 | `s82 prune: a file with no marker is unchanged` | with no marker nothing is claimed as managed, so nothing is pruned. |
 | `s82 prune: an absent target is a no-op and creates no file` | an absent target is a no-op: rc 0 and no file is created. |
 | `s82 prune: the empty production retired list leaves the file unchanged` | the production retired list is empty today, so a marker alone prunes nothing; this case keeps the production function. |
+| `s82 sync: a first sync terminates the last line and adds marker and entries` | first sync of a file whose last line has no newline: the newline is added, then the marker and all 18 canonical entries follow (base#2213). |
+| `s82 sync: an absent target is created with marker and entries` | an absent target is created holding the marker and all 18 entries (base#2213). |
+| `s82 sync: a lone trailing newline gets the marker with no extra blank line` | a file already ending in a lone blank line gets the marker right after it, with no extra blank line (base#2213). |
 
 ### test/bats/integration/config_gen_mutation_targets_spec.bats (40)
 
@@ -246,7 +251,7 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 stage golden: a missing Dockerfile gives empty output and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty output and rc 0. |
 | `s43 stage golden: every fixture has exactly one golden and no extra` | a fixture with no golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
 
-### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (4)
+### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (7)
 
 Before any Go code reads `docker info` or `dpkg-query` output, the shell's
 reading of it is pinned. Each corpus file under
@@ -263,6 +268,9 @@ golden with no corpus file.
 | `s93: the nine named corpus files exist` | the issue names nine corpus files; a missing one would silently shrink what is pinned. |
 | `s93: detect_docker_hub_user result matches every golden` | detect_docker_hub_user reads the second field of the Username line and falls back to USER when the line or the value is absent. |
 | `s93: detect_gpu result matches every golden` | detect_gpu is true only when some status line starts with ii. |
+| `s93: the four named nvidia-smi corpus files exist` | base#2072 (S93b) names four nvidia-smi -L corpus files; a missing one would silently shrink what is pinned. |
+| `s93: detect_gpu_count result matches every golden` | detect_gpu_count counts only lines starting with "GPU "; indented MIG lines and "No devices were found" do not count. |
+| `s93: the four gpu goldens hold the issue's counts` | the worked counts come from the issue, not from the shell. |
 | `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)
