@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **310 tests**.
+Integration specs under `test/bats/integration/`: **313 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -246,7 +246,7 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 stage golden: a missing Dockerfile gives empty output and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty output and rc 0. |
 | `s43 stage golden: every fixture has exactly one golden and no extra` | a fixture with no golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
 
-### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (4)
+### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (7)
 
 Before any Go code reads `docker info` or `dpkg-query` output, the shell's
 reading of it is pinned. Each corpus file under
@@ -263,6 +263,9 @@ golden with no corpus file.
 | `s93: the nine named corpus files exist` | the issue names nine corpus files; a missing one would silently shrink what is pinned. |
 | `s93: detect_docker_hub_user result matches every golden` | detect_docker_hub_user reads the second field of the Username line and falls back to USER when the line or the value is absent. |
 | `s93: detect_gpu result matches every golden` | detect_gpu is true only when some status line starts with ii. |
+| `s93: the four named nvidia-smi corpus files exist` | base#2072 (S93b) names four nvidia-smi -L corpus files; a missing one would silently shrink what is pinned. |
+| `s93: detect_gpu_count result matches every golden` | detect_gpu_count counts only lines starting with "GPU "; indented MIG lines and "No devices were found" do not count. |
+| `s93: the four gpu goldens hold the issue's counts` | the worked counts come from the issue, not from the shell. |
 | `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)
