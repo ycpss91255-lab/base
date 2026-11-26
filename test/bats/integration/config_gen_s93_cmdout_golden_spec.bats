@@ -32,9 +32,11 @@ _shell_result() {
       source /source/dist/script/docker/lib/setup_detect.sh
       docker() { cat -- "${CORPUS_FILE}"; }
       dpkg-query() { cat -- "${CORPUS_FILE}"; }
+      nvidia-smi() { cat -- "${CORPUS_FILE}"; }
       case "${STEM}" in
         s93_docker_*) detect_docker_hub_user _out ;;
         s93_dpkg_*)   detect_gpu _out ;;
+        s93_gpu_*)    detect_gpu_count _out ;;
         *) printf "unknown stem: %s\n" "${STEM}" >&2; exit 2 ;;
       esac
       printf "%s\n" "${_out}"
@@ -86,6 +88,33 @@ _check_prefix() {
 @test "s93: detect_gpu result matches every golden" {
   run _check_prefix s93_dpkg_
   [ "${status}" -eq 0 ] || { printf '%s\n' "${output}"; return 1; }
+}
+
+# why: base#2072 (S93b) names four nvidia-smi -L corpus files; a missing one
+# would silently shrink what is pinned.
+@test "s93: the four named nvidia-smi corpus files exist" {
+  local _s
+  for _s in s93_gpu_two s93_gpu_mig_lines s93_gpu_empty s93_gpu_no_devices; do
+    [[ -f "${CORPUS}/${_s}.txt" ]] || { echo "missing corpus: ${_s}"; return 1; }
+  done
+}
+
+# why: detect_gpu_count counts only lines starting with "GPU "; indented MIG
+# lines and "No devices were found" do not count.
+@test "s93: detect_gpu_count result matches every golden" {
+  run _check_prefix s93_gpu_
+  [ "${status}" -eq 0 ] || { printf '%s\n' "${output}"; return 1; }
+}
+
+# why: the worked counts come from the issue, not from the shell.
+@test "s93: the four gpu goldens hold the issue's counts" {
+  local _pair _stem _want
+  for _pair in s93_gpu_two:2 s93_gpu_mig_lines:1 s93_gpu_empty:0 \
+               s93_gpu_no_devices:0; do
+    _stem="${_pair%%:*}"; _want="${_pair##*:}"
+    [[ -f "${GOLDEN}/${_stem}.golden" ]] || { echo "missing golden: ${_stem}"; return 1; }
+    [ "$(cat -- "${GOLDEN}/${_stem}.golden")" = "${_want}" ] || { echo "wrong golden: ${_stem}"; return 1; }
+  done
 }
 
 # why: a golden whose corpus file was deleted would stand for nothing.
