@@ -1835,7 +1835,14 @@ _setup_apply() {
   if ! _toml_bridge_use_native; then
     _toml_bridge_resolve_image || return 1
   fi
-  if ! _config_gen_use_native; then
+  # The native verdict is taken once too, and handed down as a dynamically
+  # scoped pin: _config_gen_use_native re-derives the image tag (a digest
+  # over the build inputs) on every call, and config_gen_tables asks it
+  # once per layer (base#1844).
+  local _CONFIG_GEN_NATIVE_PINNED=0
+  if _config_gen_use_native; then
+    _CONFIG_GEN_NATIVE_PINNED=1
+  else
     config_gen_resolve || return 1
   fi
 
