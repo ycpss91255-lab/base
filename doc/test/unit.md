@@ -9008,7 +9008,7 @@ is where a whole-tree scan belongs (base#1075).
 | `_run_test_name_backtick: DIES when the tree holds no spec file at all` | An empty population is the shape that goes green by construction: the specs moved, the lint reads nothing and reports a clean tree |
 | `_run_test_name_backtick: DIES when the spec files carry no '@test' line` | The blind-detector case, and the one that matters most: 4848 '@test' lines exist today, so zero means the anchor stopped matching -- a renamed keyword, a changed convention -- and a blind detector reports every name clean |
 
-### test/bats/unit/test_tools_config_gen_digest_spec.bats (6)
+### test/bats/unit/test_tools_config_gen_digest_spec.bats (7)
 
 Dockerfile.test-tools stamps `-X main.contentDigest=${CONFIG_GEN_DIGEST}`
 and the shell shim compares that stamp with `tool_image_derive config_gen`.
@@ -9017,12 +9017,13 @@ _ensure_test_tools_image must run script/ci/config_gen_digest.sh and hand
 its output to `docker compose build test-tools` as CONFIG_GEN_DIGEST, and
 compose.yaml must list the arg in the bare form so compose passes it on.
 
-The tree is a scratch copy so a config-gen source can be edited. The
-expected digest is the literal observed from the shell library itself
-(`tool_image_derive config_gen` -> config-gen:2173903f6c17 on the seeded
-tree), not recomputed here. The seeded tree is the live
-dockerfile/config-gen, so any edit to those sources moves this literal. Unit
-level (ADR-00000018).
+The tree is a scratch copy so a config-gen source can be edited. Its
+dockerfile/ holds a small FIXED synthetic config-gen, not a copy of the live
+dockerfile/config-gen, so adding a file there (a corpus testdata file, say)
+cannot move the expected digest (base#2201, same as base#2104). The expected
+digest is the literal observed from the shell library itself
+(`tool_image_derive config_gen` on the seeded tree), not recomputed here.
+Unit level (ADR-00000018).
 
 | Test | Description |
 |------|-------------|
@@ -9032,6 +9033,7 @@ level (ADR-00000018).
 | `_ensure_test_tools_image: an edit outside dockerfile/config-gen keeps the recorded digest` | acceptance 4. An edit outside dockerfile/config-gen leaves it alone. |
 | `_ensure_test_tools_image: a failing config_gen_digest.sh refuses and does not build` | acceptance 3. A script failure refuses through ci_tooling_build_failed and never reaches `docker compose build`. |
 | `_ensure_test_tools_image: a caller-pinned TEST_TOOLS_IMAGE builds nothing` | acceptance 2. A caller-pinned image returns early and never runs the script, so no build happens. |
+| `_ensure_test_tools_image: an extra testdata file in the live checkout does not move the digest` | base#2201. The spec must not read the live dockerfile/config-gen: a checkout whose config-gen holds an extra testdata file records the same pinned digest. |
 
 ### test/bats/unit/test_tools_pins_spec.bats (18)
 
