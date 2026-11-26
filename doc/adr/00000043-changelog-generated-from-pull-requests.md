@@ -119,8 +119,9 @@ PR 編號，若有編號不在該 tag 的章節中就拒絕發布。比對只看
 | `.github/workflows/self-test.yaml` | 修改：`single-issue-pr` job 加一個步驟（第 3 節）；`release` job 加比對防護 | 3、4 |
 | `script/ci/config_gen_paths.sh` | 修改：產生腳本若放在 `script/release/`，與其他 release 腳本一樣列入 | 2 |
 | specs：`changelog_entry_lint_spec`、`changelog_layout_lint_spec`、`changelog_index_spec`、`release_notes_spec`、`gitattributes_spec`、`self_test_yaml_spec`、`justfile_spec` | 第一個隨 driver 移除；layout、gitattributes、self-test、justfile 的 spec 隨對應修改更新；index 與 release notes 的 spec 不變 | 2–5 |
-| `script/ci/release/archive.manifest` | 不變：它只列整個 `doc/` | — |
 | `dist/script/base/init.sh` | 不變：只替下游建立初始的 `CHANGELOG.md` | — |
+
+`script/ci/release/archive.manifest` 不變，它只列整個 `doc/`。
 
 release bump 目前由 harness 端的 `release-bump.sh` 執行，不在本 repo。它改為
 呼叫新的 recipe，是 harness 那邊的修改，不在本 ADR 範圍。
