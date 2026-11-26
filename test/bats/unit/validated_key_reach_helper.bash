@@ -190,6 +190,7 @@ mode = "off"
 [network]
 mode = "host"
 [lifecycle]
+# tool-pin: ignore -- a compose restart policy, not a third-party version
 restart = "on-failure:5"
 '
   [init]='[deploy]
