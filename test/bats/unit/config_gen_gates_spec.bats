@@ -709,7 +709,7 @@ _digest_of() {
 # reason and the measured efficacy, then the gate's own record (base#1467).
 @test "config_gen_gates.sh: a per-package mutation failure reaches the runner's records with its pkg, reason and measured (base#1467)" {
   assert_spec_subject "${RUNNER}" "the config-gen gates runner (base#1462)"
-  local _p=github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/locate
+  local _p=github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/locate
   _root
   _stub_docker
   { _gate_log admission fmt vet lint race coverage
@@ -814,13 +814,13 @@ gate|fmt-parse|fmt
 gate|corpus-join|race
 gate|corpus-helper|race
 gate|corpus-var|race
-gate|mut-unstaged|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzmut|below|0.0
-gate|mut-staged|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzmut|below|0.0
-gate|mut-timeout|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzloop|below|75.0
-gate|mut-untracked-lived|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzlive|below|0.0
-gate|corpus|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzweak|below|0.0
+gate|mut-unstaged|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzmut|below|0.0
+gate|mut-staged|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzmut|below|0.0
+gate|mut-timeout|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzloop|below|75.0
+gate|mut-untracked-lived|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzlive|below|0.0
+gate|corpus|mutation||config_gen_mutation_package_failed|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzweak|below|0.0
 gate|notes|mutation||config_gen_mutation_unmapped|dockerfile/config-gen/notes.txt
-gate|sens-per-golden|corpus_sensitivity||github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzglob|golden/s1/zz.golden
+gate|sens-per-golden|corpus_sensitivity||github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzglob|golden/s1/zz.golden
 refusal|no-context|config_gen_manifest_missing
 stale|stale-edit|dockerfile/config-gen/cmd/config-gen/main.go|sha_mismatch
 stale|stale-edit-locale|dockerfile/config-gen/cmd/config-gen/main.go|sha_mismatch
@@ -2361,7 +2361,7 @@ _glibc_getconf() {
 # package's, so the retro case must count either form (base#1546).
 @test "config_gen_redpath.sh: a retro verdict glued after gremlins' Gathering coverage progress still counts (base#1546)" {
   assert_spec_subject "${REDPATH}" "the config-gen redpath (base#1462)"
-  local _row _verdict _c="${S}/canned/retro.err" _pkg='github.com/ycpss91255-docker/base/dockerfile/config-gen/cmd/cg-gates'
+  local _row _verdict _c="${S}/canned/retro.err" _pkg='github.com/ycpss91255-lab/base/dockerfile/config-gen/cmd/cg-gates'
   for _row in glued_ok glued_no_mutants; do
     rm -rf "${S}/repo" "${S}/canned" "${S}"/runner.* "${S}"/calls.* "${S}/nested"
     _redpath_repo
@@ -2373,7 +2373,7 @@ _glibc_getconf() {
     awk -v want="#30 1.00 ${_pkg} ok efficacy=100.0" -v verdict="${_verdict}" '
       $0 == want {
         print "#24 3.653 Starting..."
-        print "#24 3.653 Gathering coverage... github.com/ycpss91255-docker/base/dockerfile/config-gen/cmd/cg-gates " verdict
+        print "#24 3.653 Gathering coverage... github.com/ycpss91255-lab/base/dockerfile/config-gen/cmd/cg-gates " verdict
         next
       }
       { print }' "${_c}" > "${_c}.new"
@@ -2396,7 +2396,7 @@ _glibc_getconf() {
 # ok and no-mutants (base#1546).
 @test "config_gen_redpath.sh: a retro verdict after other text than gremlins' progress, or cut short, does not count (base#1546)" {
   assert_spec_subject "${REDPATH}" "the config-gen redpath (base#1462)"
-  local _row _line _c="${S}/canned/retro.err" _pkg='github.com/ycpss91255-docker/base/dockerfile/config-gen/cmd/cg-gates'
+  local _row _line _c="${S}/canned/retro.err" _pkg='github.com/ycpss91255-lab/base/dockerfile/config-gen/cmd/cg-gates'
   for _row in forged_fail forged_done partial_digit partial_value glued_partial_digit glued_partial_value \
     forged_fail_no_mutants partial_no_mutants glued_partial_no_mutants; do
     rm -rf "${S}/repo" "${S}/canned" "${S}"/runner.* "${S}"/calls.* "${S}/nested"
@@ -2448,7 +2448,7 @@ _glibc_getconf() {
 # than pass slowly or vacuously (base#1615).
 @test "config_gen_redpath.sh: a producer-state green case passes only when the mutation gate judged exactly cmd/config-gen (base#1615)" {
   assert_spec_subject "${REDPATH}" "the config-gen redpath (base#1462)"
-  local _row _case _want _p='github.com/ycpss91255-docker/base/dockerfile/config-gen'
+  local _row _case _want _p='github.com/ycpss91255-lab/base/dockerfile/config-gen'
   local -a _cases=(names rename-recreate untrack rename-move copies typechange)
   for _row in before none after; do
     rm -rf "${S}/repo" "${S}/canned" "${S}"/runner.* "${S}"/calls.* "${S}/nested"

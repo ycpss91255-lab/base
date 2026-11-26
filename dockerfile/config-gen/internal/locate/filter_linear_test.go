@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // TestFilterWorkIsLinearOnLargeCorpus counts the records filter examines

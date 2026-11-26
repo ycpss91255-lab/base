@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // The members of an inline table inside a deferred array keep the order

@@ -13,7 +13,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/locate"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/locate"
 )
 
 // Refusal is one key the decode refused: the event id, the TOML path of

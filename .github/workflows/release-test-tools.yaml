@@ -2,10 +2,10 @@ name: Release test-tools image to GHCR
 
 # Multi-arch (linux/amd64 + linux/arm64) build of
 # dockerfile/Dockerfile.test-tools, pushed to
-# ghcr.io/ycpss91255-docker/test-tools tagged with the release version
+# ghcr.io/ycpss91255-lab/test-tools tagged with the release version
 # (and :latest, for a finished release). Downstream repo Dockerfiles
 # consume this via
-# `ARG TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:<ver>`,
+# `ARG TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:<ver>`,
 # avoiding the cross-step image-store isolation that sank the previous
 # `test-tools:local` approach (v0.9.11 pre-D migration).
 #
@@ -113,7 +113,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/ycpss91255-docker/test-tools
+  IMAGE: ghcr.io/ycpss91255-lab/test-tools
 
 jobs:
   # Parse the target platforms into a native-runner matrix, mirroring

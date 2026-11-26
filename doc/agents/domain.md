@@ -8,7 +8,7 @@ when exploring the codebase.
 **This repo's documentation directory is `doc/`.** The stock templates that
 ship with the `setup-matt-pocock-skills` skill say `docs/` throughout, and
 every one of those paths is wrong here. This file is where that is recorded,
-per `ycpss91255-docker/base#1170`: when a skill's own text names `docs/adr/`
+per `ycpss91255-lab/base#1170`: when a skill's own text names `docs/adr/`
 or `docs/`, read it as `doc/adr/` and `doc/`. There is no `docs/` directory in
 this repo and creating one would split the documentation in two.
 

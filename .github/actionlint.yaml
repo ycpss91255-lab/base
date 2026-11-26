@@ -11,7 +11,7 @@
 # are `self-hosted,Linux,X64,gpu`. That is the machine the full-suite
 # coverage workflow is written for. Verify with:
 #
-#     gh api /orgs/ycpss91255-docker/actions/runners \
+#     gh api /orgs/ycpss91255-lab/actions/runners \
 #       --jq '.runners[] | {name, status, labels: [.labels[].name]}'
 #
 # WHAT THIS DOES NOT CHECK, and why nothing here can. Declaring a label does

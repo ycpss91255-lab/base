@@ -1,4 +1,4 @@
-module github.com/ycpss91255-docker/base/dockerfile/config-gen
+module github.com/ycpss91255-lab/base/dockerfile/config-gen
 
 go 1.27
 
