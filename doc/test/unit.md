@@ -10816,6 +10816,31 @@ before reading an empty result as a clean one.
 | `workflows: every job that runs steps bounds them (#1014)` | A hung buildx burns GitHub's six-hour default before anyone sees it. The population is every workflow file, not the reusable workers alone: the workers were bounded first because a worker spends the CALLER's minutes, but the jobs that actually run a build here are self-test's eight-shard coverage matrix and its two-arch `acceptance` matrix, both self-hosted-eligible and both unbounded -- so the hazard the rule names lived entirely outside the set the rule scanned. The bound is per job rather than per workflow because that is the only place GitHub accepts one, and the roster is derived from the directory so the ninth workflow cannot land unbounded. |
 | `workflows: every workflow a trigger can start declares its own default permission (#1116)` | The posture is correct and nothing in the tree says so. Both the repo and the org report `default_workflow_permissions: read`, so the fourteen jobs of base's own CI workflow that declare no block of their own are read-only -- held entirely by a checkbox on a settings page, which no diff, no review and no spec can see. Flip it and those jobs get write on contents, packages, actions, issues and pull-requests, on a workflow that checks out fourteen times with a persisted token and then runs the whole suite and scaffolds a repo. The caller-token question is a different one, asked of the reusable workers in reusable_worker_permissions_spec.bats over exactly the complement of this population; this is the repository default, so it is asked here, of the workflows a trigger can start. Five of the six already declare one, so the exception was a house convention nothing enforced. |
 
+### test/bats/unit/workflow_run_name_lint_spec.bats (13)
+
+Unit tests for `script/test/drivers/workflow_run_name.sh`
+(`_run_workflow_run_name`), the "every workflow has a dynamic run-name"
+lint. Without a run-name every run in the Actions list shows only the
+workflow name, so a run cannot be traced to its PR, push or tag. Each case
+plants a small `.github/workflows/` tree and checks which shapes pass and
+which fail, including the ways the lint could pass having checked nothing.
+
+| Test | Description |
+|------|-------------|
+| `_run_workflow_run_name: a one-line dynamic run-name passes` | The shape every workflow here uses passes |
+| `_run_workflow_run_name: a workflow without run-name fails and is named` | A missing run-name fails and names the file; an expression in another top-level key does not count |
+| `_run_workflow_run_name: a static run-name fails` | Static text is the default title spelled out, so it fails |
+| `_run_workflow_run_name: a folded dynamic run-name passes` | A folded block scalar is read across its lines |
+| `_run_workflow_run_name: a folded static run-name fails` | A folded block with static lines only fails |
+| `_run_workflow_run_name: a commented-out run-name fails` | A commented-out run-name is not a run-name |
+| `_run_workflow_run_name: an indented run-name does not count` | Only the top-level key names the run; an indented one does not |
+| `_run_workflow_run_name: a .yml workflow is checked` | GitHub also loads .yml files, so they are checked too |
+| `_run_workflow_run_name: zero workflow files fails` | An empty or missing workflow directory must fail, not pass having checked nothing |
+| `workflow-run-name: is a member of the lint phase's tool table` | A lint nobody runs is a comment |
+| `workflow-run-name: has a lint-static CI join` | Exactly one lint-static group runs it: none gates nothing and two pay twice |
+| `workflow-run-name: its failure event id is registered` | An unregistered event id is an anonymous exit |
+| `workflow-run-name: the dispatcher has a case arm for it` | The driver must be dispatchable by the name the table carries |
+
 ### test/bats/unit/workflow_unchecked_producer_spec.bats (6)
 
 `while ... done < <(cmd)` hands the loop cmd's OUTPUT and never cmd's
