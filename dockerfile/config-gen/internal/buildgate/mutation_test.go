@@ -49,7 +49,7 @@ func TestTargets(t *testing.T) {
 // test) and cmd/x (imports helper, no test). In that output the .test
 // packages whose Deps hold testcorpus, or its own test variant, are b.test,
 // d.test and testcorpus.test.
-const fixtureModule = "github.com/ycpss91255-docker/base/dockerfile/config-gen"
+const fixtureModule = "github.com/ycpss91255-lab/base/dockerfile/config-gen"
 
 func TestMapRootTestdataTargetsTestcorpusImporters(t *testing.T) {
 	body, err := os.ReadFile("testdata/golist-testcorpus.json")
@@ -360,7 +360,7 @@ func TestMapRefusesAListedPackageThatDoesNotExist(t *testing.T) {
 		t.Fatalf("DecodeList: %v", err)
 	}
 	const want = "cg_event config_gen_mutation_no_such_package " +
-		"pkg=github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzghost"
+		"pkg=github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzghost"
 	cases := []struct {
 		name     string
 		manifest string
@@ -546,7 +546,7 @@ func TestMapPackageTestdataOfAMissingPackage(t *testing.T) {
 		t.Errorf("Map = %+v, want no target and internal/zzgone removed", got)
 	}
 	const want = "cg_event config_gen_mutation_no_such_package " +
-		"pkg=github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzgone"
+		"pkg=github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzgone"
 	if _, err := Map(header+"A\tdockerfile/config-gen/internal/zzgone/testdata/in.txt\n", fixtureModule, pkgs); err == nil ||
 		err.Error() != want {
 		t.Errorf("Map error = %v, want %q", err, want)

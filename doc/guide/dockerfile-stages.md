@@ -57,7 +57,7 @@ Notes:
   downloaded asset (`asset:`), as for shellcheck and hadolint. The downstream `devel-test` stage consumes it through
   the `ARG TEST_TOOLS_IMAGE` build arg, which has **no default**: `build.sh`
   passes the version-scoped `test-tools:<base-version>` it builds into the host
-  Docker daemon, and CI passes `ghcr.io/ycpss91255-docker/test-tools:<version>`
+  Docker daemon, and CI passes `ghcr.io/ycpss91255-lab/test-tools:<version>`
   (the pre-built multi-arch image `.github/workflows/release-test-tools.yaml`
   pushes on every tag), so buildx pulls the arch-correct binaries instead of
   rebuilding them per run. Leaving it unset resolves an empty base image and

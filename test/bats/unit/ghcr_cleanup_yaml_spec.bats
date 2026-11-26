@@ -403,7 +403,7 @@ _exclude_tags() {
     '      - run: |' \
     '          gh api \' \
     '            --method DELETE \' \
-    '            "/orgs/ycpss91255-docker/packages/container/test-tools/versions/${id}"'
+    '            "/orgs/ycpss91255-lab/packages/container/test-tools/versions/${id}"'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output "${SCRATCH}/wf/bespoke.yaml"
@@ -419,7 +419,7 @@ _exclude_tags() {
     'jobs:' \
     '  prune:' \
     '    steps:' \
-    '      - run: gh api --method DELETE orgs/ycpss91255-docker/packages/container/test-tools/versions/123'
+    '      - run: gh api --method DELETE orgs/ycpss91255-lab/packages/container/test-tools/versions/123'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output "${SCRATCH}/wf/slashless.yaml"
@@ -460,7 +460,7 @@ _exclude_tags() {
     'jobs:' \
     '  prune:' \
     '    steps:' \
-    '      - run: curl --request DELETE https://api.github.com/orgs/ycpss91255-docker/packages/container/test-tools/versions/123'
+    '      - run: curl --request DELETE https://api.github.com/orgs/ycpss91255-lab/packages/container/test-tools/versions/123'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output --partial "${SCRATCH}/wf/request.yaml"
@@ -479,7 +479,7 @@ _exclude_tags() {
     'jobs:' \
     '  prune:' \
     '    steps:' \
-    '      - run: gh api --method "DELETE" orgs/ycpss91255-docker/packages/container/test-tools/versions/123'
+    '      - run: gh api --method "DELETE" orgs/ycpss91255-lab/packages/container/test-tools/versions/123'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output --partial "${SCRATCH}/wf/quotedverb.yaml"
@@ -502,7 +502,7 @@ _exclude_tags() {
     '    steps:' \
     '      - run: |' \
     '          delete_rule="delete-untagged"' \
-    '          gh api "/orgs/ycpss91255-docker/packages/container/test-tools/versions"'
+    '          gh api "/orgs/ycpss91255-lab/packages/container/test-tools/versions"'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output ''
@@ -521,7 +521,7 @@ _exclude_tags() {
     'jobs:' \
     '  prune:' \
     '    steps:' \
-    '      - run: curl -X DELETE https://api.github.com/orgs/ycpss91255-docker/packages/container/test-tools/versions/123'
+    '      - run: curl -X DELETE https://api.github.com/orgs/ycpss91255-lab/packages/container/test-tools/versions/123'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output --partial "${SCRATCH}/wf/absolute.yaml"
@@ -559,7 +559,7 @@ _exclude_tags() {
     'jobs:' \
     '  prune:' \
     '    steps:' \
-    '      - run: gh api --method=DELETE orgs/ycpss91255-docker/packages/container/test-tools/versions/123'
+    '      - run: gh api --method=DELETE orgs/ycpss91255-lab/packages/container/test-tools/versions/123'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output --partial "${SCRATCH}/wf/attached.yaml"
@@ -580,7 +580,7 @@ _exclude_tags() {
     'jobs:' \
     '  prune:' \
     '    steps:' \
-    '      - run: gh api -XDELETE orgs/ycpss91255-docker/packages/container/test-tools/versions/123'
+    '      - run: gh api -XDELETE orgs/ycpss91255-lab/packages/container/test-tools/versions/123'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output --partial "${SCRATCH}/wf/short.yaml"
@@ -631,7 +631,7 @@ _exclude_tags() {
     'jobs:' \
     '  list:' \
     '    steps:' \
-    '      - run: gh api "/orgs/ycpss91255-docker/packages/container/test-tools/versions"'
+    '      - run: gh api "/orgs/ycpss91255-lab/packages/container/test-tools/versions"'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output ''
@@ -647,12 +647,12 @@ _exclude_tags() {
   _wf prose \
     '# Deliberately NOT uses: actions/delete-package-versions@v5 --' \
     '# its delete-only-untagged-versions filter never opens a manifest.' \
-    '#       --method DELETE /orgs/ycpss91255-docker/packages/container/x' \
+    '#       --method DELETE /orgs/ycpss91255-lab/packages/container/x' \
     'name: Something else' \
     'jobs:' \
     '  build:' \
     '    steps:' \
-    '      - run: docker pull ghcr.io/ycpss91255-docker/test-tools:main'
+    '      - run: docker pull ghcr.io/ycpss91255-lab/test-tools:main'
   run _deletion_surfaces "${SCRATCH}/wf"
   assert_success
   assert_output ''
@@ -665,7 +665,7 @@ _exclude_tags() {
     'jobs:' \
     '  build:' \
     '    env:' \
-    '      TEST_TOOLS_IMAGE: "ghcr.io/ycpss91255-docker/test-tools:main"' \
+    '      TEST_TOOLS_IMAGE: "ghcr.io/ycpss91255-lab/test-tools:main"' \
     '    steps:' \
     '      - run: docker pull "${TEST_TOOLS_IMAGE}"'
   run _deletion_surfaces "${SCRATCH}/wf"
@@ -924,7 +924,7 @@ _exclude_tags() {
   run _with_block
   assert_success
   assert_output --partial 'package: test-tools'
-  assert_output --partial 'owner: ycpss91255-docker'
+  assert_output --partial 'owner: ${{ github.repository_owner }}'
 }
 
 # why: `expand-packages` would widen this to every package in the org

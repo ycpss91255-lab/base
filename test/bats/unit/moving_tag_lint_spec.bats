@@ -51,7 +51,7 @@ _write() {
 @test "_run_moving_tag: FAILS on a workflow that pulls test-tools:latest, naming file and line (base#1647)" {
   _write ".github/workflows/x.yaml" \
     'jobs:' \
-    '  image: ghcr.io/ycpss91255-docker/test-tools:latest'
+    '  image: ghcr.io/ycpss91255-lab/test-tools:latest'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *".github/workflows/x.yaml:2"* ]]
@@ -62,7 +62,7 @@ _write() {
 @test "_run_moving_tag: FAILS on test-tools:latest on a last line with no trailing newline (base#1647)" {
   mkdir -p "${SCRATCH}/.github/workflows"
   printf '%s\n%s' 'jobs:' \
-    '  image: ghcr.io/ycpss91255-docker/test-tools:latest' \
+    '  image: ghcr.io/ycpss91255-lab/test-tools:latest' \
     > "${SCRATCH}/.github/workflows/x.yaml"
   run _run_moving_tag
   [ "${status}" -ne 0 ]
@@ -96,7 +96,7 @@ _write() {
     '    steps:' \
     '      - with:' \
     '          build-args: |' \
-    '            TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:${{ inputs.test_tools_version }}'
+    '            TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:${{ inputs.test_tools_version }}'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *".github/workflows/build-worker.yaml:13"* ]]
@@ -106,7 +106,7 @@ _write() {
 @test "_run_moving_tag: FAILS on an untagged qualified test-tools base that a later line suffixes with :latest, naming the base line (base#1647)" {
   _write ".github/workflows/publish.yaml" \
     'env:' \
-    '  IMAGE: ghcr.io/ycpss91255-docker/test-tools' \
+    '  IMAGE: ghcr.io/ycpss91255-lab/test-tools' \
     'jobs:' \
     '  push:' \
     '    steps:' \
@@ -121,14 +121,14 @@ _write() {
 @test "_run_moving_tag: FAILS on a variable test-tools tag in a Dockerfile, compose.yaml and the justfile, one violation each (base#1647)" {
   _write "dist/dockerfile/Dockerfile" \
     'ARG ver' \
-    'FROM ghcr.io/ycpss91255-docker/test-tools:${ver} AS tools'
+    'FROM ghcr.io/ycpss91255-lab/test-tools:${ver} AS tools'
   _write "compose.yaml" \
     'services:' \
     '  devel:' \
-    '    image: ghcr.io/ycpss91255-docker/test-tools:${ver}'
+    '    image: ghcr.io/ycpss91255-lab/test-tools:${ver}'
   _write "justfile" \
     'lint:' \
-    '    docker run --rm ghcr.io/ycpss91255-docker/test-tools:${ver} lint'
+    '    docker run --rm ghcr.io/ycpss91255-lab/test-tools:${ver} lint'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"dist/dockerfile/Dockerfile:2"* ]]
@@ -142,10 +142,10 @@ _write() {
 @test "_run_moving_tag: FAILS on test-tools:latest in the root init.sh and upgrade.sh, one violation each (base#1647)" {
   _write "init.sh" \
     '#!/usr/bin/env bash' \
-    'docker pull ghcr.io/ycpss91255-docker/test-tools:latest'
+    'docker pull ghcr.io/ycpss91255-lab/test-tools:latest'
   _write "upgrade.sh" \
     '#!/usr/bin/env bash' \
-    'docker pull ghcr.io/ycpss91255-docker/test-tools:latest'
+    'docker pull ghcr.io/ycpss91255-lab/test-tools:latest'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"init.sh:2: moving"* ]]
@@ -162,12 +162,12 @@ _write() {
 # CI. Every unanchored .gitignore name inside a root is skipped, and
 # doc/, test/ and Markdown are out of scope.
 @test "_run_moving_tag: PASSES when a moving tag sits only in git-ignored or unscanned paths (base#1647)" {
-  local _hit='image: ghcr.io/ycpss91255-docker/test-tools:latest'
+  local _hit='image: ghcr.io/ycpss91255-lab/test-tools:latest'
   _write ".github/workflows/clean.yaml" 'name: clean'
   _write ".prev-release/v0.41.0/.github/workflows/build-worker.yaml" "${_hit}"
-  _write ".env" "TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:latest"
-  _write "dist/.env" "TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:latest"
-  _write "dist/.env.local" "TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:latest"
+  _write ".env" "TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:latest"
+  _write "dist/.env" "TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:latest"
+  _write "dist/.env.local" "TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:latest"
   _write "dist/.setup.conf.local" "${_hit}"
   _write "script/log/x.sh" "${_hit}"
   _write "script/coverage/x.sh" "${_hit}"
@@ -193,17 +193,17 @@ _write() {
   _write ".github/workflows/pinned.yaml" \
     'jobs:' \
     '  a:' \
-    '    container: ghcr.io/ycpss91255-docker/test-tools:v0.43.0' \
+    '    container: ghcr.io/ycpss91255-lab/test-tools:v0.43.0' \
     '  b:' \
-    '    container: ghcr.io/ycpss91255-docker/test-tools:v0.43.0-rc1' \
+    '    container: ghcr.io/ycpss91255-lab/test-tools:v0.43.0-rc1' \
     '  c:' \
-    '    container: ghcr.io/ycpss91255-docker/test-tools@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' \
+    '    container: ghcr.io/ycpss91255-lab/test-tools@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' \
     '  d:' \
     '    uses: ./.github/workflows/release-test-tools.yaml'
   _write "script/ci/a.sh" \
     '#!/usr/bin/env bash' \
-    'echo "pull ghcr.io/ycpss91255-docker/test-tools:<ver>"' \
-    'echo "or ghcr.io/ycpss91255-docker/test-tools:vX.Y.Z"' \
+    'echo "pull ghcr.io/ycpss91255-lab/test-tools:<ver>"' \
+    'echo "or ghcr.io/ycpss91255-lab/test-tools:vX.Y.Z"' \
     'docker run --rm test-tools:local' \
     'docker run --rm test-tools:0123456789ab' \
     'docker build -f dockerfile/Dockerfile.test-tools .'
@@ -246,11 +246,11 @@ _write() {
 # hint is a new consumer, not a second exception.
 @test "_run_moving_tag: FAILS when an entry's anchored occurrences outnumber its count, naming every matched line (base#1647)" {
   _moving_tag_allowlist() {
-    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|1|ghcr.io/ycpss91255-docker/test-tools:main|fixture'
+    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|1|ghcr.io/ycpss91255-lab/test-tools:main|fixture'
   }
   _write "script/ci/a.sh" \
-    'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"' \
-    'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"'
+    'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"' \
+    'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"pins 1, saw 2"* ]]
@@ -296,7 +296,7 @@ _write() {
     'jobs:' \
     '  build:' \
     '    steps:' \
-    '      - run: echo TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:${{ inputs.test_tools_version }}'
+    '      - run: echo TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:${{ inputs.test_tools_version }}'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *".github/workflows/build-worker.yaml:9: input-default"* ]]
@@ -321,7 +321,7 @@ _write() {
     'jobs:' \
     '  build:' \
     '    steps:' \
-    '      - run: echo TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:${{ inputs.test_tools_version }}'
+    '      - run: echo TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:${{ inputs.test_tools_version }}'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *".github/workflows/build-worker.yaml:9: input-default"* ]]
@@ -345,9 +345,9 @@ _write() {
 # not keep a slot a new consumer could later fill unnoticed.
 @test "_run_moving_tag: FAILS as stale when an entry matches fewer occurrences than its count (base#1647)" {
   _moving_tag_allowlist() {
-    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|2|ghcr.io/ycpss91255-docker/test-tools:main|fixture'
+    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|2|ghcr.io/ycpss91255-lab/test-tools:main|fixture'
   }
-  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"'
+  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"script/ci/a.sh"*"stale"* ]]
@@ -358,7 +358,7 @@ _write() {
 # the table forever. A count must be a positive integer.
 @test "_run_moving_tag: FAILS on an allow-list entry whose count is 0 (base#1647)" {
   _moving_tag_allowlist() {
-    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|0|ghcr.io/ycpss91255-docker/test-tools:main|fixture'
+    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|0|ghcr.io/ycpss91255-lab/test-tools:main|fixture'
   }
   _write "script/ci/a.sh" 'echo "no image here"'
   run _run_moving_tag
@@ -371,9 +371,9 @@ _write() {
 # every entry must say why the moving reference is sanctioned.
 @test "_run_moving_tag: FAILS on an allow-list entry with an empty reason (base#1647)" {
   _moving_tag_allowlist() {
-    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|1|ghcr.io/ycpss91255-docker/test-tools:main|'
+    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|1|ghcr.io/ycpss91255-lab/test-tools:main|'
   }
-  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"'
+  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"script/ci/a.sh"*"reason"* ]]
@@ -384,9 +384,9 @@ _write() {
 # rule must not be met by whitespace padding.
 @test "_run_moving_tag: FAILS on an allow-list entry whose reason is only blanks (base#1647)" {
   _moving_tag_allowlist() {
-    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|1|ghcr.io/ycpss91255-docker/test-tools:main|   '
+    printf '%s\n' 'script/ci/a.sh|moving|line:HINT|1|ghcr.io/ycpss91255-lab/test-tools:main|   '
   }
-  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"'
+  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"script/ci/a.sh"*"reason"* ]]
@@ -397,9 +397,9 @@ _write() {
 # line of the file, the file-wide entry the per-line scope rules out.
 @test "_run_moving_tag: FAILS on an allow-list entry whose line scope has an empty anchor (base#1647)" {
   _moving_tag_allowlist() {
-    printf '%s\n' 'script/ci/a.sh|moving|line:|1|ghcr.io/ycpss91255-docker/test-tools:main|fixture'
+    printf '%s\n' 'script/ci/a.sh|moving|line:|1|ghcr.io/ycpss91255-lab/test-tools:main|fixture'
   }
-  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"'
+  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"script/ci/a.sh"*"anchor"* ]]
@@ -413,7 +413,7 @@ _write() {
   _moving_tag_allowlist() {
     printf '%s\n' 'script/ci/a.sh|moving|line:HINT|1||fixture'
   }
-  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"'
+  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"script/ci/a.sh:1: moving"* ]]
@@ -426,7 +426,7 @@ _write() {
   _moving_tag_allowlist() {
     printf '%s\n' 'script/ci/a.sh|indirect|line:HINT|1|test-tools:main|fixture'
   }
-  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-docker/test-tools:main"'
+  _write "script/ci/a.sh" 'echo "HINT ghcr.io/ycpss91255-lab/test-tools:main"'
   run _run_moving_tag
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"script/ci/a.sh:1: moving"* ]]
@@ -490,7 +490,7 @@ _run_seeded() {
   _seed_test_sh
   _write ".github/workflows/x.yaml" \
     'jobs:' \
-    '  image: ghcr.io/ycpss91255-docker/test-tools:latest'
+    '  image: ghcr.io/ycpss91255-lab/test-tools:latest'
   _run_seeded '
     printf "%s\n" "${_LINT_TOOLS[@]}" | grep -cx moving-tag
     _run_lint_tools moving-tag'
@@ -508,7 +508,7 @@ _run_seeded() {
   _seed_test_sh
   _write ".github/workflows/x.yaml" \
     'jobs:' \
-    '  image: ghcr.io/ycpss91255-docker/test-tools:latest'
+    '  image: ghcr.io/ycpss91255-lab/test-tools:latest'
   _run_seeded 'main --moving-tag-only'
   [ "${status}" -ne 0 ]
   [[ "${output}" == *".github/workflows/x.yaml:2: moving"* ]]

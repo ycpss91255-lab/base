@@ -1,7 +1,7 @@
 # base — Context
 
 `base` is the shared container template that downstream repos under the
-`ycpss91255-docker` org vendor as a `.base/` subtree: it owns the
+`ycpss91255-lab` org vendor as a `.base/` subtree: it owns the
 wrappers, the `setup.conf` -> `.env`/`compose.yaml` resolution, and the
 self-test gate. This glossary fixes the domain vocabulary so future work
 and architecture reviews stop re-coining terms. It is a glossary only —
@@ -14,7 +14,7 @@ issues.
 ### Domain
 
 **base**:
-The container-template SOURCE repo (this repo, `ycpss91255-docker/base`;
+The container-template SOURCE repo (this repo, `ycpss91255-lab/base`;
 formerly named "template", renamed to base); the single source downstream
 repos vendor.
 _Avoid_: template repo (that is a different, distinct repo — see **template
@@ -80,7 +80,7 @@ ADR-00000023 sec. 4).
 _Avoid_: app image (acceptable informally), product image.
 
 **template repo**:
-`ycpss91255-docker/template`, the GitHub Template repo — a pre-scaffolded
+`ycpss91255-lab/template`, the GitHub Template repo — a pre-scaffolded
 downstream skeleton with `.base/` already vendored, used to bootstrap new
 downstream repos. Distinct from **base** and from **`just template`**.
 _Avoid_: starter, skeleton repo (informal only).
@@ -435,7 +435,7 @@ _Avoid_: versioned migration, release migration.
   Three environment knobs re-aim it, each with a working default and no
   reason to be set in normal use (`--help` reprints them):
   - `BASE_REPO` — the upstream polled for `releases/latest`. Default
-    `ycpss91255-docker/base`, from the shared upstream constant
+    `ycpss91255-lab/base`, from the shared upstream constant
     (`dist/script/base/upstream.sh`) that also gives `upgrade.sh` its
     `TEMPLATE_REMOTE` default. It is **also the repo named in the release
     link of the issue the monitor files**, so a wrong value both answers

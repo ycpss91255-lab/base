@@ -9,7 +9,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // corpusFile reads the one corpus/s6 file named base through testcorpus.

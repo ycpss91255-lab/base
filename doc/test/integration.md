@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **296 tests**.
+Integration specs under `test/bats/integration/`: **310 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -130,6 +130,31 @@ stated expectation and a stale row can never stand for a deleted one.
 | `config-gen binary on a size-limited stdout exits 4 with one frame and a golden prefix` | the Go fault writer covers a write that fails at byte N in-process; this is the same contract on the built binary against a real file whose size limit (RLIMIT_FSIZE via prlimit) lets it take some bytes and then refuse with EFBIG, which /dev/full (0 bytes, ENOSPC) can not show. The answer is exit 4, exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations), and a non-empty stdout that is a strict prefix of the bridge golden (base#1469 I/O contract). SIGXFSZ is ignored so the write returns EFBIG instead of killing the process. prlimit must be on PATH in every environment the spec runs in (test-tools installs util-linux-misc); a missing prlimit fails here, it is never skipped. The same /dev/full and prlimit cases also run under `go test` in Dockerfile.config-gen's test stage (TestTablesDevFullStdoutIsExit4AndOneFrame, TestTablesSizeLimitedStdoutIsExit4AndAGoldenPrefix); this leg holds the shipped static binary to them. |
 | `config-gen binary on a closed stdout pipe exits 4 with one frame, not SIGPIPE` | prlimit and /dev/full fail the write on a file; a reader that is gone is the fourth way the single answer write fails, and the only one a signal can end first: a pipe whose read end is closed before the binary starts, as in `config-gen tables ... \| true`. The binary must not be killed by SIGPIPE (rc 141 from the shell, nothing on stderr); it exits 4 with exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations; stdout is the failing sink, so `-`) (base#1469 I/O contract). The golden is more than 65536 bytes, the default pipe buffer, so the case can not pass by the answer fitting into the buffer before the reader goes. |
 
+### test/bats/integration/config_gen_gitignore_golden_spec.bats (5)
+
+Before any Go code replaces the gitignore parsing, today's shell behaviour
+is pinned as goldens. The shell function is the oracle: this spec re-runs it
+on every input in a scratch directory and fails on any byte difference from
+the stored golden. One golden per input:
+
+rc=<exit code> mode=<octal mode of the target file after the call, or
+absent> --- file <exact bytes of the target file after the call> --- stdout
+<stdout of the call> --- stderr <one event per line: SEVERITY body key=value
+...>
+
+The scratch directory path is written as TMP. Names carry the s82_ prefix,
+since corpus basenames are unique across slices. The cases here emit no
+event, so stderr is empty and no event field needs dropping; later children
+that pin events add that normalisation.
+
+| Test | Description |
+|------|-------------|
+| `s82 corpus: every input has a golden and every golden an input` | a fixture with no golden would be read against nothing, and a stale golden would stand for a case no longer run. |
+| `s82 prune: retired entries go below the marker only` | the managed half is the lines below the marker; the entry above it is the user's own and stays, both retired entries below go, the missing final newline is added, and the file keeps mode 640 (base#1356). |
+| `s82 prune: a file with no marker is unchanged` | with no marker nothing is claimed as managed, so nothing is pruned. |
+| `s82 prune: an absent target is a no-op and creates no file` | an absent target is a no-op: rc 0 and no file is created. |
+| `s82 prune: the empty production retired list leaves the file unchanged` | the production retired list is empty today, so a marker alone prunes nothing; this case keeps the production function. |
+
 ### test/bats/integration/config_gen_mutation_targets_spec.bats (40)
 
 The build context has no Git history, and on main after a merge origin/main
@@ -220,6 +245,25 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 stage golden: baseline goldens are 0-byte files` | an empty stage list is a 0-byte file, not a file holding a blank line. |
 | `s43 stage golden: a missing Dockerfile gives empty output and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty output and rc 0. |
 | `s43 stage golden: every fixture has exactly one golden and no extra` | a fixture with no golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
+
+### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (4)
+
+Before any Go code reads `docker info` or `dpkg-query` output, the shell's
+reading of it is pinned. Each corpus file under
+dockerfile/config-gen/testdata/corpus/s93 is the text a stubbed `docker`
+(s93_docker_*) or `dpkg-query` (s93_dpkg_*) prints; the golden under
+testdata/golden/s93/<stem>.golden is the one line `detect_docker_hub_user` /
+`detect_gpu` (dist/script/docker/lib/setup_detect.sh) leaves in its outvar,
+followed by a newline. The spec regenerates every golden from the shell and
+fails on any byte difference, on a corpus file with no golden, and on a
+golden with no corpus file.
+
+| Test | Description |
+|------|-------------|
+| `s93: the nine named corpus files exist` | the issue names nine corpus files; a missing one would silently shrink what is pinned. |
+| `s93: detect_docker_hub_user result matches every golden` | detect_docker_hub_user reads the second field of the Username line and falls back to USER when the line or the value is absent. |
+| `s93: detect_gpu result matches every golden` | detect_gpu is true only when some status line starts with ii. |
+| `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)
 
@@ -569,7 +613,7 @@ would restore the silence.
 | `test-tools image: the bundled toml-bridge emits the KV lines conf.sh reads (#1222)` | KV is the mode conf.sh actually loads a config through, and it is the one that carries a TYPE decision across the boundary: an unquoted TOML integer has to arrive as the bare digits bash compares, not as a quoted string or a Python repr. |
 | `test-tools image: the bundled toml-bridge refuses malformed TOML under its own name (#1222)` | The case that keeps the two above from being satisfied by anything that merely produces bytes. A real parser REFUSES malformed input and says so under its own name; an interpreter that never started fails too, which is why the message is read and not just the status. |
 
-### test/bats/integration/upgrade_spec.bats (51)
+### test/bats/integration/upgrade_spec.bats (56)
 
 End-to-end verification for `upgrade.sh` driving a real subtree update
 against a fake template remote (bare repo with `v0.9.5` / `v0.9.7` tags on a
@@ -589,6 +633,11 @@ run.
 |------|-------------|
 | `upgrade.sh v0.9.7: bumps .base/.version, pulls new content, updates main.yaml` | - |
 | `upgrade.sh v0.9.7: the upgrade commit names the refs it actually rewrote (#1112)` | The commit message used to assert a general rule, and it was false on exactly the repos whose unnamed worker ref it had just left behind (#1112) |
+| `upgrade.sh v0.9.7: the upgrade commit tells a moved org from a bumped @ref (base#2118)` | A ref that is not a release tag moves to the current org but is not bumped, so a commit message that lists it as updated to the new version records something that did not happen (base#2118) |
+| `upgrade.sh v0.9.7: the upgrade commit names every bumped worker and no other (base#2118)` | The message names what changed, so it has to read the ref that changed: a comment behind it, or a second ref on the same line, must not stand in for it, and a worker two jobs call is still one worker (base#2118) |
+| `upgrade.sh v0.9.7: a worker ref the rewrite cannot reach is reported (base#2118)` | A ref the rewrite cannot reach stays at an org that no longer resolves, or at the old release. Exiting 0 over it and recording that nothing needed updating hides a job that will fail on the next run (base#2118) |
+| `upgrade.sh v0.9.7: a worker ref pinned to a commit sha is moved or reported (base#2172)` | A ref pinned to a commit sha has no version for the rewrite to match, so an upgrade left it at the old commit and said nothing. A sha whose line names the release it is moves to the target's commit; any other sha that is not that commit is named with its line (base#2172) |
+| `upgrade.sh v0.9.7: a sha ref is moved to the commit of an annotated tag, not to the tag object (base#2172)` | An annotated tag has a sha of its own, and a workflow ref written with it does not start. The sha written is the commit the tag points at (base#2172) |
 | `upgrade.sh Step 5 announces the migration pass (#567)` | Step 5 runs the declarative migration dispatcher |
 | `upgrade.sh heals a legacy wrapper-COPY Dockerfile via the migration list (#567 m1)` | End-to-end wrapper-copy heal + staged into the upgrade commit |
 | `upgrade.sh nounset-guards a sibling entrypoint ROS source (#567 m8 / #579)` | End-to-end entrypoint nounset guard around the ROS setup.bash source |

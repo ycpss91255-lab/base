@@ -57,7 +57,7 @@ setup() {
 @test "build-worker.yaml: preflight fetches the validator at the worker's own ref (job_workflow_sha, no drift) (#800)" {
   run code_grep -F 'ref: ${{ github.job_workflow_sha }}' "${BUILD_WF}"
   assert_success
-  run code_grep -F 'repository: ycpss91255-docker/base' "${BUILD_WF}"
+  run code_grep -F 'repository: ycpss91255-lab/base' "${BUILD_WF}"
   assert_success
 }
 

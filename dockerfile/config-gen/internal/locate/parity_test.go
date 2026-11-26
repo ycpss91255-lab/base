@@ -11,9 +11,9 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/locate"
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/schema"
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/locate"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/schema"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // failLeaf refuses whatever it is given, so the library wraps the refusal

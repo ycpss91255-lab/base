@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // readSectionRows reads corpus/s6/s6_sections.tsv into the rows it

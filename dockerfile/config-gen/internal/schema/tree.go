@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/locate"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/locate"
 )
 
 // errShape is the panic bind raises when the locator's tree and the value

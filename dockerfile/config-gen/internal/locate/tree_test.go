@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/locate"
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/locate"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // childKeys lists the keys of n's children in order.
