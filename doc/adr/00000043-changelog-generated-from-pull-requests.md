@@ -97,7 +97,8 @@
 比對防護：release PR 產生後到合併前，main 可能又合併了其他 PR，這些 PR 會落在
 tag 的範圍裡，卻不在章節裡。所以 tag 的 `release` job 重新算出範圍內有段落的
 PR 編號，若有編號不在該 tag 的章節中就拒絕發布。比對只看 PR 編號，不比對文字，
-因為文字允許在 release PR 上修改。拒絕或只警告，是待決問題 5。細節在步驟 4。
+因為文字允許在 release PR 上修改。`release` job 現在的 checkout 是淺的，比對需要
+取得到上一個 tag 為止的歷史。拒絕或只警告，是待決問題 5。細節在步驟 4。
 
 ### 2. 現有工具的去留
 
@@ -147,6 +148,11 @@ release bump 目前由 harness 端的 `release-bump.sh` 執行，不在本 repo�
 4. 段落有內容，同時又修改 `doc/changelog/` 的 `[Unreleased]`：失敗。這條只在
    過渡期有用（第 4 節），步驟 5 移除。
 
+這個檢查不保證合併時的內容。`pull_request` 事件沒有設定 `types:`，只在開啟、
+推送與重新開啟時觸發；檢查通過後再改標題或內文，不會重新檢查，修改會直接進入
+merge commit。merge commit 無法再改，所以產生腳本不能因為這種 PR 永久擋住
+release，處理方式見第 6 節。
+
 job 名稱不再只描述「一個 issue」，是否改名是待決問題 4。
 
 ### 4. 現有手寫的 `[Unreleased]` 條目如何銜接：過渡版本兩者合併
@@ -183,17 +189,24 @@ job 名稱不再只描述「一個 issue」，是否改名是待決問題 4。
 | `feat` | `Added` |
 | `fix` | `Fixed` |
 | `perf`、`refactor`、`revert`、`docs`、`test`、`ci`、`build`、`chore`、`style` | `Changed` |
-| 其他類型，或不是 `type(scope): ...` 格式 | 無法對應：有段落時檢查失敗，產生腳本拒絕 |
+| 其他類型，或不是 `type(scope): ...` 格式 | 無法對應：有段落時 PR 檢查失敗；產生腳本不拒絕，列為待處理（第 6 節） |
 
 - BREAKING 只看標題的 `!`，不看內文的 `BREAKING CHANGE:`，來源只有一個。
 - `Deprecated`、`Removed`、`Security` 無法從類型得到（待決問題 1）。
 - 非使用者可見的類型對應到 `Changed`，因為有沒有條目已由段落決定（待決問題 2）。
 
-### 6. 沒有段落的 PR
+### 6. 沒有段落的 PR，與無法自動處理的 PR
 
-不產生條目。產生腳本另外把範圍內沒有條目的 PR 編號與標題印在 stderr，release
-bump PR 的內文附上這份清單，審查者可以看出漏寫。補救方式是在 release PR 裡直接
-加條目，因為合併後改 PR 內文不會改到 merge commit。
+沒有段落的 PR 不產生條目。產生腳本把範圍內的 PR 分成兩份清單印在 stderr：
+
+- **沒有條目**：沒有段落，或段落是空的。
+- **待處理**：有段落，但標題無法對應分類，或段落超過 700 字元。這種 PR 是在檢查
+  通過後才修改的（第 3 節）。它的條目不寫進章節。
+
+release bump PR 的內文附上這兩份清單。審查者可以看出漏寫，並在 release PR 裡
+直接加上或改寫條目。合併後改 PR 內文不會改到 merge commit，所以這是唯一的補救
+位置。產生腳本只在無法判斷範圍時拒絕（第 8 節），不因單一 PR 的內容拒絕，
+否則一個已合併、無法再改的 PR 會永遠擋住 release。
 
 ### 7. 條目文字的來源與格式
 
@@ -201,7 +214,8 @@ bump PR 的內文附上這份清單，審查者可以看出漏寫。補救方式
   離線產生，結果固定，bats 可以用 fixture repo 測。代價：合併後改 PR 內文不會
   生效，以及依賴上述 repo 設定（`PR_TITLE`、`PR_BODY`）。
 - 段落是 `## Changelog` 標題到下一個 `## ` 標題之間的文字（標題名稱見待決
-  問題 3），去掉 HTML 註解。
+  問題 3），去掉 HTML 註解。標題比對是完全相同的一整行：第 2 層、大小寫相同，
+  fenced code block 內的不算。
 - 一個 PR 一個條目：`- <段落文字> (#N)`。段落第一行是條目的開頭，其餘照
   `CONVENTIONS.md` 的格式縮排接在後面。
 - 同一分類內按合併順序排列；分類按 `CHANGELOG_CATEGORIES` 的順序輸出。
@@ -214,7 +228,8 @@ bump PR 的內文附上這份清單，審查者可以看出漏寫。補救方式
   找到的版本不低於這次的版本時拒絕。
 - 範圍：`<上一個 tag>..<基準 commit>` 的 first-parent commit。上一個 release
   PR 的 merge 正是上一個 tag，所以 release PR 自己不會進入範圍。
-- 範圍內有 commit 的主旨不以 `(#N)` 結尾時拒絕，不猜。
+- 範圍內有 commit 的主旨不以 `(#N)` 結尾時，不猜它屬於哪個 PR，列入第 6 節的
+  待處理清單。main 的 ruleset 只允許經 PR 合併，所以正常情況不會出現。
 
 ### 9. RC
 
@@ -248,7 +263,8 @@ bump PR 的內文附上這份清單，審查者可以看出漏寫。補救方式
   再跑一次 CI。#1210 在 changelog 上的情形消失。
 - 條目落在實際包含它的版本，#1039 的情形消失。
 - release bump PR 多一步：執行產生腳本，審查產生的章節與沒有條目的 PR 清單。
-- 忘了寫段落的 PR 不會被 CI 擋，只會出現在 release PR 的清單上。
+- 忘了寫段落的 PR 不會被 CI 擋，只會出現在 release PR 的清單上。檢查通過後才
+  改壞的段落也一樣，會出現在待處理清單上。
 - 合併後才修改的 PR 內文不會進入 changelog，要在 release PR 上改。
 - 產生腳本依賴 repo 的 merge commit 設定（`PR_TITLE`、`PR_BODY`）。設定改變
   時，所有 PR 都讀不到段落，release PR 的清單會列出範圍內所有 PR，審查者可以
