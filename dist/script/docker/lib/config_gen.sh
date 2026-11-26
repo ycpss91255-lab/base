@@ -81,6 +81,12 @@ config_gen_resolve() {
 #   shell (base#2035, base#1848).
 _CONFIG_GEN_NATIVE_STALE_SAID="${_CONFIG_GEN_NATIVE_STALE_SAID-}"
 _config_gen_use_native() {
+  # A caller that has already asked pins the verdict for the commands it
+  # runs (base#1844): 1 = native, 0 = the image.
+  if [[ -n "${_CONFIG_GEN_NATIVE_PINNED-}" ]]; then
+    [[ "${_CONFIG_GEN_NATIVE_PINNED}" == 1 ]]
+    return
+  fi
   [[ "${CONFIG_GEN_FORCE_DOCKER-}" == 1 ]] && return 1
   command -v config-gen > /dev/null 2>&1 || return 1
   local _tag _own _line _got=""
