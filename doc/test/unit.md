@@ -129,12 +129,11 @@ a refusal as "do not release".
 | `abi-gate: refuses an unparseable upstream compat declaration` | A declaration the gate cannot parse is not a satisfied constraint. It is refused rather than dropped, which is what an ignored unreadable input amounts to. |
 | `abi-gate: a refusal prints nothing on stdout and names the dependency` | The fail-closed property the wiring rests on. A refusal that printed a partial decision would leave an output key for a later job to gate on. It writes to stderr only, so there is no `decision` key at all, and the dependency is named there for whoever reads the log. |
 
-### test/bats/unit/action_ref_agreement_lint_spec.bats (20)
+### test/bats/unit/action_ref_agreement_lint_spec.bats (19)
 
 | Test | Description |
 |------|-------------|
 | `workflows: every action is used at exactly one ref (#949)` | The real tree, read independently of the lint |
-| `_run_action_ref_agreement: FAILS when two workflows disagree on an action's ref (#949)` | The v6/v7 split, as a fixture |
 | `_run_action_ref_agreement: names the action, both refs and every call site (#949)` | A finding you can act on without grepping |
 | `_run_action_ref_agreement: PASSES when every call site agrees (#949)` | The fixed state is green |
 | `_run_action_ref_agreement: FAILS when two entry points of ONE action repo disagree (#949)` | A ref is a tag on the repo, so the sub-path is dropped |
@@ -735,7 +734,7 @@ name, which is exactly the set the compose emitter drops.
 | `stage_names: a missing Dockerfile fails naming the path it looked for` | An unreadable Dockerfile is not "no stages", it is "we do not know". Answering an empty roster there is how a worker skips a build and calls it a pass, and the path has to be in the message or the operator cannot tell which file it failed to find. |
 | `stage_names: an empty DOCKERFILE path fails loudly` | The unset-input case, which a workflow reaches by forgetting one `env:` line. It has to fail at the reader naming the variable, because the alternative -- an empty roster from an empty path -- is a build the worker quietly declines to run. |
 
-### test/bats/unit/build_worker_yaml_spec.bats (87)
+### test/bats/unit/build_worker_yaml_spec.bats (84)
 
 Structural assertions for `.github/workflows/build-worker.yaml` (#195 + #243
 + #272 + #273 + #378 b1). Reusable workflows are not exec'd by these tests;
@@ -877,7 +876,6 @@ matching fails instead of reporting a clean scan
 | `build-worker.yaml: disable_cache empties cache-from and cache-to on the 4 build steps (#1702)` | Pins the one expression spelling that works. `!disable && format(...) \|\| ''` gives the scope string when enabled and '' when disabled (the action then passes no cache flag). The natural-looking `disable && '' \|\| format(...)` does not: '' is falsy, so it falls through to the cache it was meant to turn off. |
 | `build-worker.yaml: declares disable_cache input as boolean default false (#1702)` | Default false is what keeps every existing caller on the cache it uses today; a true default would turn the cache off for all of them without any of them opting in. |
 | `build-worker.yaml: an extra stage's -test companion is found on a --platform FROM line (#1013)` | The reported #1013 miss, asserted on what the step BUILDS rather than on what its text says: the detector allowed one token between FROM and AS, so the cross-build form the arm64 matrix invites declared nothing and the stage's smoke test was silently not built. |
-| `build-worker.yaml: an extra stage with no -test companion builds only itself (#1013)` | The cost of widening a detector, pinned in the opposite direction: inventing a `-test` target the Dockerfile does not declare fails the build outright, which is a worse outcome than the miss it was fixing. |
 | `build-worker.yaml: the extra-stages roster comes from the shared resolver (#1013)` | The structural half, and the one that stops #1013 recurring: two readers of one fact with a comment asserting they agree is what produced the miss. This fails if the file grows a `FROM ... AS` pattern of its own again, which a behavioural case on a correct pattern cannot see. |
 | `build-worker.yaml: an extra stage's name is matched literally, not as a regex (#1013)` | Docker allows `.` in a target name, so a membership test that reads the caller's stage name as a regex finds a DIFFERENT stage: `foo.bar` matches `fooxbar-test` and the step asks buildx for a target nothing declares, failing the build over a companion that was never there. |
 | `build-worker.yaml: the extra-stages step does not pipe its roster into an early-closing reader (#1013)` | The early-close-reader lint cannot reach here -- it scans *.sh under dist/ and script/, and a workflow `run:` block is not a shell file -- so this is the only thing standing between the step and a `grep -q` whose SIGPIPE 141 becomes the pipeline's status under `pipefail`, turning a stage that WAS found into one that reads as absent. |
@@ -890,7 +888,6 @@ matching fails instead of reporting a clean scan
 | `build-worker.yaml + self-test.yaml: every cache-to build step is followed by a warn step gated on its own outcome (base#1602)` | ignore-error=true turns a failed cache export green, so each build that requests one must be followed by a step that reads that build's own record and warns (base#1602). The warn step is gated on the build's outcome: GitHub's steps context gives a skipped step outcome `skipped` and a failed one `failure`, so `steps.<id>.outcome == 'success'` runs the warn only after a build that ran and passed, never after a build skipped by its own `if:` and never on top of a red build. The 6-line roster is the enumeration of every step with `with.cache-to` in both files (the four build-worker steps and the two test-tools builders, base#1588), so a new producer without a warn step, or a gate naming another step, fails here. |
 | `build-worker.yaml: the buildx cache has exactly one backend, chosen by no input (#980)` | The deletion asserted as a property rather than as the absence of one string. `cache_backend: registry` could never work -- its cache export needed `packages: write` on a job that declares a read-only block, and a called job gets exactly the block it declares (#957) -- so every line reachable only through it was unreachable from the day it shipped. What must not come back is any SECOND cache backend selected by an input, because `permissions:` accepts no expression and the next one is unreachable for the same reason. |
 | `build-worker.yaml: cache_variant default preserves zero-diff for single-call callers (#272)` | - |
-| `build-worker.yaml: declares path-filter job (#273)` | - |
 | `build-worker.yaml: path-filter classifier is pure shell (#273 Phase 2: no dorny/paths-filter)` | - |
 | `build-worker.yaml: classifier reads EVENT_NAME / BASE_SHA / HEAD_SHA from env (#273 Phase 2)` | - |
 | `build-worker.yaml: non-pull_request event short-circuits to code_changed=true before git diff (#273 Phase 2)` | - |
@@ -912,7 +909,6 @@ matching fails instead of reporting a clean scan
 | `build-worker.yaml: the workspace path it writes is keyed to the run (#900)` | - |
 | `build-worker.yaml: the build job reclaims its own leftovers on if: always() (#900)` | - |
 | `build-worker.yaml: downstream cleanup is ownership-scoped too (#900)` | - |
-| `build-worker.yaml: the build job carries the same-repo guard AND-ed with its code_changed gate (#766)` | - |
 | `build-worker.yaml: the guard tests the FORK, not the PR (#766)` | - |
 | `build-worker.yaml: build opens on merge_group only on a merge_group_same_repo input that defaults to 'false' (base#1587)` | The guard canon fails closed on merge_group, whose payload names no head repository. The build job may open on a queue run only when the caller passes a resolved answer that the whole group is same-repository, and a caller that passes nothing must stay closed (base#1587). |
 | `build-worker.yaml: docker-build IS_FORK_PR applies the fork rule to a merge group not proven same-repository (base#1587)` | On merge_group `build` is skipped unless the caller proved the group same-repository, and docker-build must then refuse to certify, as it does for a fork PR, or an unproven queue group would pass on a build that never ran (base#1587). |
@@ -1389,7 +1385,7 @@ code, base#1562.
 | `workflows: every ACTIONLINT_IMAGE step pulls via script/ci/retry.sh before a --pull never run (base#1562)` | A Docker Hub 502 on the actionlint image pull failed the lint job because the only pull was the implicit `--pull missing` of the `docker run`, with no retry. Every step that names ACTIONLINT_IMAGE must pre-pull it through retry.sh (more than one attempt) before the run, and the run must say `--pull never`, so dropping the pre-pull or its retry fails loud instead of falling back to the unretried pull, base#1562. |
 | `workflows: every just-pin job installs just via script/ci/install-just.sh and none uses extractions/setup-just (base#1562)` | A GitHub API 504 in extractions/setup-just failed the just install after three quick tries a `uses:` step gives the workflow no way to extend. Every job that checks the just on PATH is the pin must install it through script/ci/install-just.sh (which fetches through retry.sh), fed the pin step's output, and no workflow may keep the unretried action -- so one job (the self-hosted coverage-local one included) reverting to setup-just is a finding, base#1562. |
 
-### test/bats/unit/ci_spec.bats (202)
+### test/bats/unit/ci_spec.bats (201)
 
 | Test | Description |
 |------|-------------|
@@ -1504,7 +1500,6 @@ code, base#1562.
 | `main --bats-path: accepts a directory` | #523 directory path |
 | `main --bats-path: non-existent path dies with ci_bats_path_not_found` | #523 missing-path guard |
 | `main --bats-path: test/bats/system/ path dies with a clear hint` | #523 system guard |
-| `main --bats-path + --coverage is rejected (ci_bats_path_coverage)` | #523 coverage-combo guard |
 | `_run_coverage_path: writes nothing into the checkout's coverage/ (#887)` | The gate's artifacts stay untouched -- no figure can be fabricated from one spec |
 | `_run_coverage_path: the kcov report dir is a throwaway outside the checkout, removed after the run (#887)` | Report lands in container-local scratch and is deleted |
 | `_run_coverage_path: kcov's exactly the named spec, never a shard slice (#887)` | Shard independence: a planted .shard-weights pulls in nothing |
@@ -3832,7 +3827,7 @@ exit $?`; a failing pre-exec hook aborts before `compose exec` runs).
 | `exec.sh post-exec hook failure still overrides a non-zero container rc (#956)` | - |
 | `exec.sh aborts on a failing pre-exec hook and skips compose exec (#690)` | - |
 
-### test/bats/unit/generated_workflow_actions_lint_spec.bats (56)
+### test/bats/unit/generated_workflow_actions_lint_spec.bats (55)
 
 | Test | Description |
 |------|-------------|
@@ -3886,14 +3881,13 @@ exit $?`; a failing pre-exec hook aborts before `compose exec` runs).
 | `generated-workflow-actions: a ${{ }} GitHub expression is excluded by name (#987)` | The one dollar spelling in a uses: value that is not a shell reference at all, so it is excluded by name beside ./ and docker:// |
 | `generated-workflow-actions: a ${{ }} does not excuse a shell reference beside it (#987)` | The exclusion is of the expression, not of any value carrying one; it is what stops the new exclusion becoming a blanket pass |
 | `generated-workflow-actions: an arithmetic left shift is not a reason to refuse a file (#987)` | What the deleted heredoc model cost while working as designed -- a shift read as an unterminated heredoc refused every ref in the file |
-| `generated-workflow-actions: a variable the registry declares is resolved (#987)` | The replacement contract in one case: a variable is what the pin registry says it is, and the registry already names the file, line and value |
 | `generated-workflow-actions: a bare $NAME is a finding, not a resolution (#987)` | A short name substituted into a longer one it prefixes fabricated a ref that appears in no declaration, and the backstop found nothing to refuse |
 | `generated-workflow-actions: an assignment no marker claims is a finding (#987)` | The whole trade in one case: file-scope, unconditional, column 0, above the use -- and still refused, because nothing declares it to the watch |
 | `generated-workflow-actions: one reader -- a declared local resolves too (#987)` | The two lints disagreed about what an assignment is, so one marker on a local produced a record the watch read and this lint refused |
 | `generated-workflow-actions: a generator that is not named *.sh is scanned (#987)` | A *.sh glob is a roster of file shapes, and the non-vacuity backstop cannot notice the gap because the one known generator keeps the count at 1 |
 | `generated-workflow-actions: ignores an UNTRACKED generator (#987)` | This driver shares the pin registry's walk, so an untracked generator is outside its population too -- one population, not two that can drift (#987) |
 
-### test/bats/unit/ghcr_cleanup_yaml_spec.bats (44)
+### test/bats/unit/ghcr_cleanup_yaml_spec.bats (42)
 
 Structural assertions for this repo's GHCR package-DELETION surface, DERIVED
 from `.github/workflows/` by the deletion operation a workflow performs
@@ -3959,8 +3953,6 @@ party can move under a job holding `packages: write`.
 | `GHCR deletion: no workflow here uses actions/delete-package-versions (#1089)` | The unsafe action never returns: its untagged filter never opens a manifest, and a declared path left the ban scoped to one file |
 | `GHCR deletion: no workflow here sets delete-only-untagged-versions (#1089)` | The specific input that breaks live tags, named separately from the action and banned just as widely |
 | `GHCR deletion: the footgun scan reports the workflow and the line (#1089)` | The repo-wide ban is worth exactly its ability to still see the footgun, and the live tree is clean so only a fixture can show it |
-| `ghcr-cleanup.yaml: uses the manifest-aware dataaxiom/ghcr-cleanup-action` | The action that resolves manifest references is the one in use |
-| `ghcr-cleanup.yaml: pins the cleanup action to an immutable commit SHA` | A moved tag would hand deletion rights over our package to unreviewed code |
 | `ghcr-cleanup.yaml: records the pinned action's version in a trailing comment` | Keeps the SHA readable; the form Dependabot rewrites on bump |
 | `ghcr-cleanup.yaml: enables delete-untagged as the delete rule` | Untagged orphans are the only thing this job collects |
 | `ghcr-cleanup.yaml: leaves the tagged-image delete rules off` | `delete-tags` / ghost / partial / orphaned can remove TAGGED versions: absent |
@@ -5999,7 +5991,7 @@ here with no daemon.
 | `test.sh --await-project refuses when the project is still held` | the flag is only worth having if its verdict reaches the caller; a query that always exits 0 would let system and smoke run into the wedge. |
 | `system, smoke and acceptance all ask before they build` | none of them goes through the dispatcher, so none inherits the question. They are the flows most likely to leave a container behind; acceptance joined them when it became a local recipe (base#1409). |
 
-### test/bats/unit/prune_sh_spec.bats (41)
+### test/bats/unit/prune_sh_spec.bats (40)
 
 Unit tests for the new `script/docker/prune.sh` wrapper (#319) — atomic
 docker garbage cleanup with conservative per-target `--filter until=`
@@ -6089,7 +6081,6 @@ fallback is present.
 | `prune.sh --worktree-orphans: other-owner image → SAFETY skip` | - |
 | `prune.sh --worktree-orphans --repo <name> filter` | - |
 | `prune.sh --worktree-orphans --dry-run prints plan, no real rmi` | - |
-| `prune.sh --worktree-orphans -y skips confirmation` | - |
 | `prune.sh --worktree-orphans without --workspace + empty .env → exit 2` | - |
 | `prune.sh --worktree-orphans --workspace <flag> wins over .env WS_PATH` | - |
 | `prune.sh --worktree-orphans --owner <flag> wins over .env DOCKER_HUB_USER` | - |
@@ -7053,7 +7044,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (165)
+### test/bats/unit/self_test_yaml_spec.bats (155)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7375,7 +7366,6 @@ rolling tag itself (#697, #1010)
 |------|-------------|
 | `self-test.yaml: declares actionlint job` | - |
 | `self-test.yaml: actionlint job runs rhysd/actionlint via Docker with pinned tag` | - |
-| `self-test.yaml: declares classify job (#317)` | - |
 | `self-test.yaml: classify job declares code_changed output (#317)` | - |
 | `self-test.yaml: classify job declares system_relevant output (#317)` | - |
 | `self-test.yaml: classify uses doc-only allow-list 'doc/**' + 'README.md' + 'LICENSE' + 'CONTEXT.md' (#317)` | - |
@@ -7429,9 +7419,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: coverage-gate refuses a matrix that did not cover the suite (#1114)` | The detector half, and the one that would have caught the defect from the outside: coverage-gate already holds every shard's timings, so it can say whether the twelve slices covered the suite it just published a rate for. It must read the file the merge step wrote, so the order of the two steps is part of the assertion. Since base#1411 the check runs inside the one coverage verdict (`coverage_gate.sh --verdict`), whose manifest is the merged weights file. |
 | `self-test.yaml: coverage-gate merges shard timings into the weights file (#733)` | - |
 | `self-test.yaml: coverage-gate saves the shard-weights cache only on push (#733)` | - |
-| `self-test.yaml: declares ci-rollup job (#337)` | Branch protection requires ci-rollup alone; without the job every other check is advisory. |
 | `self-test.yaml: ci-rollup needs every sibling PR-check job incl coverage (#337 + #376 + #377 + #615 + #677)` | A PR check outside ci-rollup's needs is one whose red never blocks a merge; the exact list is what makes adding or dropping one a reviewed edit. |
-| `self-test.yaml: no bats-integration job, and neither ci-rollup nor release needs it (base#1573)` | The coverage shards already run every integration spec (the pool in script/test/drivers/bats.sh holds test/bats/integration), so a separate bats-integration job ran each of them a second time. With the job gone, neither the merge gate nor the tag gate may still wait on it: the two lists below are main's lists at b091f8e3 with that one entry removed and the mutation-roster job (base#1571) added, written out by hand rather than read back from the workflow. |
 | `self-test.yaml: ci-rollup DOES need coverage now (#615 amends #377)` | The sharded kcov run is the primary unit gate; out of the rollup, a kcov failure would merge. |
 | `self-test.yaml: ci-rollup runs unconditionally via if: always() (#337)` | Without it a failed need skips the rollup, and branch protection reads a skipped required check as missing rather than red. |
 | `self-test.yaml: ci-rollup verify step consumes every needs result incl coverage (#337 + #376 + #377 + #615)` | A need the verify step never reads is waited on and then ignored: its failure turns nothing red. |
@@ -7443,7 +7431,6 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: ci-rollup inspects every job it needs (#1009)` | Joining `needs:` is only half a gate, so the guard above is not enough on its own. A job that is needed but whose result the verify step never reads is waited for and then ignored, which is the same green as never having been needed, with a needs list that reads as correct. Since base#1584 the step walks every key of ${{ toJSON(needs) }}, so the proof is behavioural: every need's failure, cancel and unexcused skip fails the step, and an all-success run passes. |
 | `self-test.yaml: the tag path requires exactly what the merge gate requires (#1009)` | The two guards above cover the PR path only. `release` does not go through ci-rollup -- ci-rollup is not in its `needs:` -- so the merge gate and the tag path were independent hand-kept lists of the same thing with nothing making them agree, and coverage-gate sat in one of them only. That left the coverage floor enforced on every PR and unenforced on the one path that publishes a Release, which is the half of #1009 no assertion about either roster could have found. |
 | `self-test.yaml: the closure walk reports a dangling needs: entry instead of walking forever (#1009)` | The guard above compares a transitive closure, so it is worth no more than the walk that computes it -- this is the test that keeps that one from being vacuous. `yaml_job_needs` answers an undeclared job id with a `BUG:` line and a non-zero status; a walk that reads the line and drops the status queues the diagnostic as another job id, and since each bogus id yields a new and longer line the seen-set never dedupes, the walk never ends. That turns exactly the roster drift this spec exists to catch -- a renamed job still named in a `needs:` entry -- into `just test` hanging with no TAP output and a container left spinning, which is the worst failure mode available to it. |
-| `self-test.yaml: ci-rollup fails a fork PR instead of reporting a partial run as green (#766)` | - |
 | `self-test.yaml: the fork-PR branch is a hard failure, not an advisory note (#766)` | - |
 | `self-test.yaml: the self-hosted guard lint has a lint-static CI join (#766)` | - |
 | `self-test.yaml: classify publishes merge_group_same_repo from a merge_group-only trust step (base#1587)` | A merge_group payload has no pull_request object, so only the API can say whether a queued group is same-repository; classify must ask it on merge_group and publish the answer, failing closed (base#1587) |
@@ -7459,24 +7446,20 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: worker-selftest needs actionlint + classify and gates on select_worker_selftest (#802, base#1584)` | - |
 | `self-test.yaml: ci-rollup consumes worker-selftest as a SKIPPED-tolerant gate (#802)` | - |
 | `self-test.yaml: release gate requires worker-selftest before publishing a tag (#802)` | The tag path does not go through ci-rollup; a gate missing from release's needs is one a release can ship past. |
-| `self-test.yaml: declares shellcheck job (#376)` | - |
 | `self-test.yaml: shellcheck job needs actionlint + classify and gates on select_shellcheck (#376, base#1584)` | - |
 | `self-test.yaml: shellcheck job runs test.sh --lint --shellcheck inside the test-tools image (#376, base#1412)` | - |
 | `self-test.yaml: shellcheck job installs no shellcheck on the runner (base#1412)` | base#1080 made the runner install the pinned tarball so CI stopped running whatever ubuntu-latest shipped. base#1412 moved the job into the test-tools image, which carries the pin; a tarball install left behind would be a second, unused route to the binary, and a runner-side shellcheck is exactly what the image path exists to retire. |
 | `self-test.yaml: shellcheck job does not restate a tool version (#1080)` | One declaration, not a second copy of the number. The version lives in dockerfile/Dockerfile.test-tools and reaches this job through the image, so a version literal in the job would be a second place to forget. |
-| `self-test.yaml: declares doc-counts job (#864)` | - |
 | `self-test.yaml: doc-counts job runs test.sh --lint --doc-counts inside the test-tools image (#864, base#1412)` | - |
 | `self-test.yaml: doc-counts carries NO code_changed gate (#864)` | - |
 | `self-test.yaml: the jobs a docs-only pull request runs start no bats (base#2110)` | base#2110. A docs-only pull request runs the jobs that carry no classify gate, and none of them may run bats, coverage or a mutation row: those run in the merge queue, where classify selects every job. What such a job calls of the test driver is a lint. |
 | `self-test.yaml: ci-rollup treats doc-counts as hard-mandatory, not SKIPPED-tolerant (#864)` | - |
-| `self-test.yaml: declares lint-static job (#866)` | - |
 | `self-test.yaml: lint-static carries NO code_changed gate (#866)` | - |
 | `self-test.yaml: ci-rollup treats lint-static as hard-mandatory, not SKIPPED-tolerant (#866)` | - |
 | `self-test.yaml: every lint the just test lint phase runs has a CI join (#866)` | - |
 | `self-test.yaml: lint-static runs one job per lint GROUP, not one per lint (base#1071)` | The shape itself. One job per DRIVER spent more runner startup than the drivers spent working, and took up to twenty of the free plan's ~twenty org-wide concurrent slots in the same second the coverage shards -- the run's critical path -- asked for theirs. One job per GROUP is the trade, and it is only a trade if the job still runs the same drivers the local phase runs, in the same test-tools image (base#1412), with one failing group not cancelling its siblings. |
 | `self-test.yaml: the lint-static matrix names group positions, never drivers (base#1071)` | The anti-roster assertion, stated over the workflow rather than over the partition. A matrix entry that NAMES a driver is the roster coming back: the day a driver is added it is not in the list, and nothing says so. Every entry must therefore be a position in the partition and nothing else -- and the positions must be a partition: one total shared by all of them, each index once, as many entries as the total. A matrix of ['1/4', '2/4'] would run half the lint phase and go green over it. |
 | `self-test.yaml: each lint-static leg's lint step is named for every lint its group runs (base#1571)` | A leg named only `lint-static (2/4)` says nothing on the checks page about which lints it ran (base#1571). The membership is computed from test.sh's _LINT_TOOLS table (base#1071), so a list written into the workflow would be a roster; the name of the step that runs the group must instead read the members from an earlier step's output. The test runs that earlier step for every group, renders the step name with what it wrote, and checks the name against the group's members as `test.sh --lint-group-members` prints them. |
-| `self-test.yaml: declares hadolint job (#376)` | - |
 | `self-test.yaml: hadolint job needs actionlint + classify and gates on select_hadolint (#376, base#1584)` | - |
 | `self-test.yaml: hadolint job runs the driver, not the hadolint-action (#650)` | - |
 | `workflows: no step runs a lint on the host, whatever the spelling (base#1412)` | base#1412, the negative half. No step of any workflow may reach a lint on the host: that is the parity the local gate and CI share, and it is decided by what the step does when bash runs it, so no spelling of a host arm is invisible to it. |
@@ -7492,11 +7475,9 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: the release body is assembled by a script that can refuse (#926)` | The extraction has to live somewhere a spec can drive it AND somewhere that can exit non-zero; inline in the workflow it was neither. This is what stops it drifting back into a `run:` block where a no-match is a silent success. |
 | `self-test.yaml: the release page carries the curated notes alone (#926)` | With both sources the larger drowns the smaller: the measured v0.42.0 body was 26,690 characters of which the curated part was five lines and the rest raw PR titles. The workflow input is the only place that choice is expressed, so it is the only place it can regress. |
 | `self-test.yaml: the release job verifies the tagged commit is on main before creating the Release (base#1712)` | The release job's needs: are test gates, which a green PR head also passes, so a v* tag pushed on a commit that is not on main would publish a Release. The base#1143 guard ran only in the reusable worker (release-worker.yaml); base's own tag path had none (base#1712). |
-| `self-test.yaml: declares bats-fragile job (#677)` | - |
 | `self-test.yaml: bats-fragile is a single job (no shard matrix) (#677)` | - |
 | `self-test.yaml: bats-fragile invokes test.sh --bats-fragile (#677)` | - |
 | `self-test.yaml: no bats-unit shard matrix remains after #677` | - |
-| `self-test.yaml: declares coverage job (#377)` | - |
 | `self-test.yaml: coverage now runs on PRs (gated on classify's select_coverage), not main-only (#615 amends #377, base#1584)` | - |
 | `self-test.yaml: coverage runs as the primary kcov unit gate over a DYNAMIC shard matrix (#615 + #677 + #725)` | - |
 | `self-test.yaml: compute-shards job emits a dynamic shard array from vars.CI_SHARDS (default 8, clamped) (#725)` | - |
@@ -9631,7 +9612,7 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `watch: an unreadable tracked file exits 1, not 0 (base#1463)` | An unreadable tracked file used to print `Permission denied` and leave the reader's status 0, so the watch reported the rest as a clean week (base#1463). As root the run drops to nobody, the only user a mode-000 file applies to. |
 | `watch: an unknown option is a usage error, distinct from both` | Exit 2 keeps a typo apart from 1 (nothing compared) and 10 (drift), which is what the workflow branches on |
 
-### test/bats/unit/transcript_lnav_spec.bats (8)
+### test/bats/unit/transcript_lnav_spec.bats (7)
 
 Regex-type lnav format for the plain-text wrapper transcript
 (`transcript.lnav-format.json`, #609): parses `<ISO ts> [service] LEVEL:
@@ -9662,7 +9643,6 @@ does NOT match
 | `transcript.lnav-format.json: regex matches real transcript lines, all 5 levels (#609)` | - |
 | `transcript.lnav-format.json: a raw docker output line does NOT match (falls through as body) (#609)` | - |
 | `transcript.lnav-format.json: every declared sample line matches the pattern (#609)` | - |
-| `log.lnav-format.json (JSON) still coexists unchanged (#609)` | - |
 
 ### test/bats/unit/transcript_spec.bats (36)
 
