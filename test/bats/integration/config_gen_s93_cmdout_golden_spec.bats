@@ -43,6 +43,50 @@ _shell_result() {
     '
 }
 
+# _env_result <stem> -- print what the shell makes of the display variables
+# in <stem>.env (DISPLAY=, WAYLAND_DISPLAY=, SSH_CONNECTION=): "gui=<true|false>"
+# from detect_gui, then "ssh_x11=<0|1>" (the return code of _is_ssh_x11),
+# each followed by a newline (base#2075).
+_env_result() {
+  local _stem="${1}" _line
+  local _d="" _w="" _s=""
+  while IFS= read -r _line || [[ -n "${_line}" ]]; do
+    case "${_line}" in
+      DISPLAY=*)         _d="${_line#DISPLAY=}" ;;
+      WAYLAND_DISPLAY=*) _w="${_line#WAYLAND_DISPLAY=}" ;;
+      SSH_CONNECTION=*)  _s="${_line#SSH_CONNECTION=}" ;;
+    esac
+  done < "${CORPUS}/${_stem}.env"
+  DISPLAY="${_d}" WAYLAND_DISPLAY="${_w}" SSH_CONNECTION="${_s}" \
+    bash -c '
+      source /source/dist/script/docker/lib/setup_detect.sh
+      detect_gui _gui
+      printf "gui=%s\n" "${_gui}"
+      _is_ssh_x11
+      printf "ssh_x11=%d\n" "$?"
+    '
+}
+
+# _check_env_prefix <stem-prefix> -- like _check_prefix for the .env corpus.
+_check_env_prefix() {
+  local _prefix="${1}" _f _stem _bad=0
+  for _f in "${CORPUS}/${_prefix}"*.env; do
+    [[ -e "${_f}" ]] || continue
+    _stem="$(basename -- "${_f}" .env)"
+    if [[ ! -f "${GOLDEN}/${_stem}.golden" ]]; then
+      printf 'corpus with no golden: %s\n' "${_stem}"
+      _bad=1
+      continue
+    fi
+    _env_result "${_stem}" > "${BATS_TEST_TMPDIR}/got"
+    if ! cmp -s -- "${BATS_TEST_TMPDIR}/got" "${GOLDEN}/${_stem}.golden"; then
+      printf 'golden differs: %s\n' "${_stem}"
+      _bad=1
+    fi
+  done
+  return "${_bad}"
+}
+
 # _check_prefix <stem-prefix> -- every corpus file with the prefix has a
 # golden and the shell result matches it byte for byte. Prints one line per
 # violation; returns 1 on any.
@@ -117,13 +161,45 @@ _check_prefix() {
   done
 }
 
+# why: base#2075 (S93c) names seven display-variable corpus files; a missing
+# one would silently shrink what is pinned.
+@test "s93: the seven named env corpus files exist" {
+  local _s
+  for _s in s93_env_none s93_env_x11_local s93_env_wayland s93_env_ssh_x11 \
+            s93_env_ssh_x11_no_screen s93_env_ssh_local_display \
+            s93_env_ssh_bad_display; do
+    [[ -f "${CORPUS}/${_s}.env" ]] || { echo "missing corpus: ${_s}"; return 1; }
+  done
+}
+
+# why: detect_gui and _is_ssh_x11 read DISPLAY, WAYLAND_DISPLAY and
+# SSH_CONNECTION; the shell result must match every golden byte for byte.
+@test "s93: detect_gui and _is_ssh_x11 results match every golden" {
+  run _check_env_prefix s93_env_
+  [ "${status}" -eq 0 ] || { printf '%s\n' "${output}"; return 1; }
+}
+
+# why: the worked results come from the issue, not from the shell.
+@test "s93: the seven env goldens hold the issue's results" {
+  local _pair _stem _want
+  for _pair in s93_env_none:false:1 s93_env_x11_local:true:1 \
+               s93_env_wayland:true:1 s93_env_ssh_x11:true:0 \
+               s93_env_ssh_x11_no_screen:true:1 \
+               s93_env_ssh_local_display:true:1 \
+               s93_env_ssh_bad_display:true:1; do
+    _stem="${_pair%%:*}"; _want="gui=$(cut -d: -f2 <<<"${_pair}")"$'\n'"ssh_x11=${_pair##*:}"
+    [[ -f "${GOLDEN}/${_stem}.golden" ]] || { echo "missing golden: ${_stem}"; return 1; }
+    [ "$(cat -- "${GOLDEN}/${_stem}.golden")" = "${_want}" ] || { echo "wrong golden: ${_stem}"; return 1; }
+  done
+}
+
 # why: a golden whose corpus file was deleted would stand for nothing.
 @test "s93: every golden has a corpus file" {
   local _g _stem _bad=0
   for _g in "${GOLDEN}"/*.golden; do
     [[ -e "${_g}" ]] || continue
     _stem="$(basename -- "${_g}" .golden)"
-    if [[ ! -f "${CORPUS}/${_stem}.txt" ]]; then
+    if [[ ! -f "${CORPUS}/${_stem}.txt" && ! -f "${CORPUS}/${_stem}.env" ]]; then
       printf 'golden with no corpus: %s\n' "${_stem}"
       _bad=1
     fi
