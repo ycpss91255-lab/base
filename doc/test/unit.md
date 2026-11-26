@@ -1592,7 +1592,7 @@ code, base#1562.
 | `_run_via_compose: the real ids are in the environment compose interpolates (#895)` | - |
 | `_fix_permissions: refuses a non-numeric id instead of handing it to chown (#895)` | - |
 
-### test/bats/unit/classify_testtools_spec.bats (34)
+### test/bats/unit/classify_testtools_spec.bats (38)
 
 `testtools_changed` tells every image-consuming job whether to rebuild the
 tooling image from source instead of pulling the rolling `:main`. On a pull
@@ -1643,6 +1643,10 @@ reads the output the step writes.
 | `chain: a tag push and workflow_dispatch run the release-only jobs, and only the tag releases (base#2176, base#2177)` | the tag is where the release-only jobs block, and a dispatch on a branch is how they are checked before the tag exists, with nothing published. |
 | `chain: a tag on which a release-only job fails or never runs publishes no release (base#2176, base#2177)` | the rollup excuses a job classify deselected, so `release` cannot rest on the rollup: it must need each release-only job itself. |
 | `chain: the gated jobs, the map's job list, classify's loop and the release-only jobs are one set, and each selected skip fails the rollup (base#1584, base#2177)` | cycle 4. One source for every gate: the map's names, the map's --jobs and classify's loop list are the same set, and with the release-only jobs the keys the gated jobs' `if:`s read. Each gated job reads exactly one select_* key, the one its `if:` names; config-gen-gates reads select_config_gen. The rollup must resolve each gated job to that same key: its skip fails while the key is `true` and passes once that key alone is `false`. The key comes from the job's `if:`, never from a rewrite of the job's name, so a rollup that guesses the key from the name fails here. |
+| `chain: a tag push or workflow_dispatch with every job green passes release-checks (base#2205)` | the tag ruleset requires the `release-checks` check, so it must go green on a release run in which every job, both release-only ones included, succeeded. |
+| `chain: release-checks fails on a release run when a release-only job or the rollup does not pass (base#2205)` | a release run whose release-only job failed, never ran, or whose rollup failed must leave `release-checks` red, so the tag is refused. |
+| `chain: a PR, a merge group and a push to main never carry the release-checks name (base#2205)` | GitHub counts a skipped check as passed, so the name must not exist on a run that skips the release-only jobs, in any state. |
+| `self-test.yaml: release-gate runs always, needs the rollup and both release-only jobs, and reads their keys (base#2205)` | a skipped job is shown under its id or its unexpanded name, so neither may be the required name; and only `always()` keeps a failed need from skipping it on a release run. |
 
 ### test/bats/unit/code_lines_spec.bats (46)
 
