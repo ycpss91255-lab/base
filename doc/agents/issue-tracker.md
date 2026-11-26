@@ -1,7 +1,7 @@
 # Issue tracker: GitHub
 
 Issues and specs for this repo live as GitHub issues on
-**`ycpss91255-docker/base`**. Every operation goes through the `gh` CLI.
+**`ycpss91255-lab/base`**. Every operation goes through the `gh` CLI.
 
 Creating and editing an issue goes through `.agents/scripts/gh-issue.sh`,
 which checks this repo's conventions before anything reaches GitHub; every
@@ -26,8 +26,8 @@ resolves to an issue.
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run
 inside a clone, and this clone's `origin` is
-`https://github.com/ycpss91255-docker/base.git`. Pass `-R
-ycpss91255-docker/base` explicitly when a command runs from outside the
+`https://github.com/ycpss91255-lab/base.git`. Pass `-R
+ycpss91255-lab/base` explicitly when a command runs from outside the
 worktree, such as from a sibling repo or a scratch directory.
 
 ## 語言
@@ -73,7 +73,7 @@ A self-contained issue has these parts:
   child issues first. Each child is self-contained in its own right.
 
 The guard that enforces this is tracked in
-[ycpss91255-docker/agent_harness#51](https://github.com/ycpss91255-docker/agent_harness/issues/51)
+[ycpss91255-lab/agent_harness#51](https://github.com/ycpss91255-lab/agent_harness/issues/51)
 (the `gh-issue.sh` script is a local copy of that repo's
 `dist/agents/scripts/gh-issue.sh`).
 
@@ -85,7 +85,7 @@ as of 2026-09-09; that file also records what remains from #1182.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue on `ycpss91255-docker/base`, via
+Create a GitHub issue on `ycpss91255-lab/base`, via
 `.agents/scripts/gh-issue.sh create`.
 
 ## When a skill says "fetch the relevant ticket"
@@ -99,15 +99,15 @@ tickets.
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `.agents/scripts/gh-issue.sh create --label wayfinder:map ...`, which still needs its kind label.
 - **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues endpoint). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
-- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation. Add an edge with `gh api --method POST repos/ycpss91255-docker/base/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/ycpss91255-docker/base/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
+- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation. Add an edge with `gh api --method POST repos/ycpss91255-lab/base/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/ycpss91255-lab/base/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
 - **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
 - **Claim**: `.agents/scripts/gh-issue.sh edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body-file <path>`, then `gh issue close <n>`, then append a context pointer to the map's Decisions-so-far.
 
 ## Cross-repo issues
 
-A `#<n>` written in this repo means an issue in `ycpss91255-docker/base`. An
-issue in a sibling repo is written in full, `ycpss91255-docker/<repo>#<n>`,
+A `#<n>` written in this repo means an issue in `ycpss91255-lab/base`. An
+issue in a sibling repo is written in full, `ycpss91255-lab/<repo>#<n>`,
 because a bare number resolves against whichever repo the reader happens to be
 standing in. GitHub shares one number space across issues and pull requests,
 so a bare `#42` may be either: resolve with `gh pr view 42` and fall back to

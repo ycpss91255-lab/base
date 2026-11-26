@@ -29,5 +29,5 @@ nothing would report it.
 
 > The env-file pair, the runtime-stage `ENV` bake, and the self-contained
 > field-deploy bundle land through the
-> [#497](https://github.com/ycpss91255-docker/base/issues/497) epic; this
+> [#497](https://github.com/ycpss91255-lab/base/issues/497) epic; this
 > section documents the routing model they implement.

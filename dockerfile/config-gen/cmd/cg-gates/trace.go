@@ -6,7 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/buildgate"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/buildgate"
 )
 
 // The traced build of internal/testcorpus the sensitivity gate runs each

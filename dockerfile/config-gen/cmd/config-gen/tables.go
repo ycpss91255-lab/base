@@ -10,8 +10,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/diag"
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/tables"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/diag"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/tables"
 )
 
 func init() {

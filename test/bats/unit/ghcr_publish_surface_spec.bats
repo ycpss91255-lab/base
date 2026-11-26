@@ -54,7 +54,7 @@
 # package another repo ships. `release-toml-bridge.yaml` was exactly that
 # (base#1180): an unfiltered `tags: ['v*']` arm plus an
 # `else tags="${tags},${IMAGE}:latest"` branch, on a package
-# `ycpss91255-docker/toml-bridge` now owns and has published `v0.1.0` of,
+# `ycpss91255-lab/toml-bridge` now owns and has published `v0.1.0` of,
 # so the next non-RC tag cut here would have republished the name and
 # moved `:latest` off the image that repo shipped. Nothing in the tree
 # could have said so: that workflow carried no spec at all.
@@ -65,12 +65,12 @@ bats_require_minimum_version 1.5.0
 # owned set below; it does NOT narrow the scan, which reports a GHCR
 # target under any org -- a different org's package is somebody else's by
 # construction, and a scan that only looked here would look past it.
-readonly _ORG='ycpss91255-docker'
+readonly _ORG='ycpss91255-lab'
 
 # The GHCR packages this repo owns and publishes, fully qualified as
 # `<org>/<package>`, one per line. base publishes `test-tools`
 # (`release-test-tools.yaml`) and, since base#1180, nothing else:
-# `toml-bridge` moved to `ycpss91255-docker/toml-bridge`, which owns the
+# `toml-bridge` moved to `ycpss91255-lab/toml-bridge`, which owns the
 # package and publishes it from there.
 readonly _OWNED_PACKAGES="${_ORG}/test-tools"
 
@@ -327,7 +327,7 @@ _wf() {
 }
 
 # why: the named hazard, kept as its own case so the failure says WHY and
-# not merely that a set differs. `ycpss91255-docker/toml-bridge` owns this
+# not merely that a set differs. `ycpss91255-lab/toml-bridge` owns this
 # package and has shipped v0.1.0 of it; a publisher here with an
 # unfiltered `v*` arm moves `:latest` off that image on the next non-RC
 # tag cut from main, silently and green (base#1180).

@@ -506,7 +506,7 @@ main() {
   #
   # The LOCAL tag is version-scoped by the pinned base subtree version
   # (.base/.version), mirroring the version-scoped GHCR tag CI uses
-  # (ghcr.io/ycpss91255-docker/test-tools:<version>) minus the registry
+  # (ghcr.io/ycpss91255-lab/test-tools:<version>) minus the registry
   # prefix. Two base versions (or two downstream repos pinning different
   # versions) on one host therefore get two distinct tags instead of
   # silently clobbering a single, version-agnostic `test-tools:local`.
@@ -546,6 +546,20 @@ main() {
       exit 1
     fi
     _test_tools_image="test-tools:${_tt_ver}"
+    # The local test-tools image reports the digest the config-gen shim
+    # compares, so hand it the same `tool_image_derive config_gen` value
+    # (base#2045, part of base#2037 / base#1848). Refuses loudly, as the
+    # derivation itself does, rather than building an image with no digest.
+    # A subtree without Dockerfile.config-gen has nothing to digest.
+    if [[ -f "${_tools_context}/dockerfile/Dockerfile.config-gen" ]]; then
+      local _cg_tag
+      # Sourced from the same subtree the build context comes from, so the
+      # digest is taken over the checkout being built.
+      # shellcheck source=dist/script/docker/lib/config_gen.sh
+      source "${_tools_context}/dist/script/docker/lib/config_gen.sh"
+      _cg_tag="$(tool_image_derive config_gen)" || exit 1
+      _tools_args+=(--build-arg "CONFIG_GEN_DIGEST=${_cg_tag#*:}")
+    fi
     if [[ "${DRY_RUN}" == true ]]; then
       printf '[dry-run] docker build'
       printf ' %q' "${_tools_args[@]}" -t "${_test_tools_image}" \
