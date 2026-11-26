@@ -105,11 +105,12 @@ _run_case() {
   _write_actual "${_name}" "${_rc}"
 }
 
-# _run_sync_case <name> <input|-> [target-mode|-] -- run _sync_managed_entries with
-# _canonical_gitignore_entries in ${S}/w and write the actual golden to
-# ${S}/actual/<name>.golden, same format as _run_case. <input> is a corpus
-# file copied to the target (given <target-mode> when not `-`, default `-`);
-# `-` calls the function on a missing path (base#2213, base#2215).
+# _run_sync_case <name> <input|-> [target-mode|-] -- run
+# _sync_managed_entries with _canonical_gitignore_entries in ${S}/w and
+# write the actual golden to ${S}/actual/<name>.golden, same format as
+# _run_case. <input> is a corpus file copied to the target (chmod to
+# <target-mode> when not `-`, default `-`); `-` calls the function on a
+# missing path (base#2213, base#2215).
 _run_sync_case() {
   local _name="${1}" _input="${2}" _mode="${3:--}"
   local _tgt="${S}/w/.gitignore" _rc=0
