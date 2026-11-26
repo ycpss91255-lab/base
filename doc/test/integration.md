@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **310 tests**.
+Integration specs under `test/bats/integration/`: **312 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -63,7 +63,7 @@ together, and a caller that grants nothing beyond `contents: read` passes.
 | `compose.yaml: an unset BASE_CHECKOUT_PATH fails naming the entry point to use (#995)` | - |
 | `compose.yaml: the label it stamps is the path the caller supplied (#995)` | - |
 
-### test/bats/integration/compose_test_tools_image_spec.bats (3)
+### test/bats/integration/compose_test_tools_image_spec.bats (5)
 
 How the repo-root `compose.yaml` resolves `TEST_TOOLS_IMAGE` -- the one
 variable naming both the image the build-only `test-tools` service writes
@@ -77,6 +77,8 @@ because the text is not what decides which image a run pulls.
 | `compose.yaml: with TEST_TOOLS_IMAGE unset the tag the test-tools build writes is the tag the ci run reads (#896)` | #896 build side vs run side |
 | `compose.yaml: with TEST_TOOLS_IMAGE unset every consumer service reaches the same outcome as the build (#896)` | #896 coverage / ci-system too |
 | `compose.yaml: an unset TEST_TOOLS_IMAGE fails naming the just recipe to run (#896)` | #896 loud, and actionable |
+| `compose.yaml: ci-system hands the container the TEST_TOOLS_IMAGE it runs (base#2173)` | a tag the caller pinned cannot be derived inside the container |
+| `compose.yaml: ci-system forwards GITHUB_ACTIONS when it is set, and nothing when it is not (base#2173)` | GITHUB_ACTIONS is how _run_system knows a CI runner from a local run |
 
 ### test/bats/integration/config_gen_admit_spec.bats (5)
 
