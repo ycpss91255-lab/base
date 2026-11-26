@@ -932,6 +932,9 @@ jobs:
     #                     entry added to the function fails until the file
     #                     agrees. One-directional (extras allowed), which
     #                     is what _sync_dockerignore does for a consumer
+    #   workflow-run-name every file in this directory sets a top-level
+    #                     run-name holding a ${{ }} expression, so each run
+    #                     in the Actions list names its PR, push or tag
     #
     # GROUPED, not one job per driver, and not one job for the phase
     # (base#1071). One job per driver read best in the checks list -- the
