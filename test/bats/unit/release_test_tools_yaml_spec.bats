@@ -1968,8 +1968,13 @@ _merge_needs() {
   run _smoke_arch_job
   assert_success
   [[ -n "${output}" ]] || fail "no smoke-arch job in the workflow"
+  # needs.compute-matrix is only readable when compute-matrix is a direct
+  # dependency, so the matrix expression requires both entries.
   assert_output --regexp '(^|
-)    needs: build(
+)    needs: \[[^]]*compute-matrix[^]]*\](
+|$)'
+  assert_output --regexp '(^|
+)    needs: \[[^]]*\bbuild\b[^]]*\](
 |$)'
   assert_output --partial 'matrix: ${{ fromJSON(needs.compute-matrix.outputs.matrix) }}'
   assert_output --partial 'runs-on: ${{ matrix.runner }}'
