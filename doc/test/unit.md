@@ -6355,7 +6355,7 @@ rule with nothing comparing them is the #1012 shape with one fewer copy.
 | `release-ref: every prerelease classifier under script/ci is one this spec can ask (#1012)` | "One home per classified thing" is only true while the homes agree wherever their inputs overlap. #1012's own reasoning is that three hand-kept copies of a rule are a defect BECAUSE nothing in the tree compared any pair of them; two hand-kept copies with nothing comparing them is the same shape with one fewer copy. The owner list is derived by the same predicate the site scan uses, so a third classifier lands here the day it lands in script/ci/ -- and it fails until someone states how to ask it, because an interface is the one thing a scan cannot derive. |
 | `release-ref: no two prerelease classifiers disagree where both answer (#1012)` | The two owners accept different grammars on purpose -- a released VERSION must carry the `v` a downstream repo pins, a git REF may be a full `refs/tags/...` -- so each refuses inputs the other reads. What must never happen is the pair ANSWERING a shared input differently: one of them would be marking a Release final or moving the org's `test-tools:latest` for a tag the other calls a release candidate. Only inputs both owners accept are compared; a refusal is not a disagreement. |
 
-### test/bats/unit/release_test_tools_yaml_spec.bats (58)
+### test/bats/unit/release_test_tools_yaml_spec.bats (64)
 
 Structural assertions for `.github/workflows/release-test-tools.yaml`. Locks
 the publish surface that downstream Dockerfile.example's `FROM
@@ -6464,6 +6464,12 @@ each moved `:latest`.
 | `release-test-tools.yaml: the build step passes CONFIG_GEN_DIGEST as a build arg (base#2043)` | computing the digest is not enough; the build step has to carry it as the CONFIG_GEN_DIGEST build arg the Dockerfile declares (base#2043). |
 | `release-test-tools.yaml: the digest step runs before the build step (base#2043)` | a step's output is only readable by steps after it, so the digest step has to come before the build step that consumes it (base#2043). |
 | `release-test-tools.yaml: the digest script's failure fails the step (base#2043)` | a command substitution inside an echo argument discards the script's exit status, so a failing config_gen_digest.sh would still write an empty output and the build would publish with the empty default. The script has to be assigned on its own line so a non-zero exit fails the step (base#2043). |
+| `release-test-tools.yaml: a smoke-arch job runs on the build matrix after build (base#1849)` | the job has to exist, on the same matrix as build, behind build, or the arm64 image is still never run (base#1849). |
+| `release-test-tools.yaml: the smoke-arch job carries the same-repo guard (base#1849)` | smoke-arch is self-hosted-eligible by the static rule, so it carries the same fork guard as build (base#1849). |
+| `release-test-tools.yaml: merge needs both build and smoke-arch (base#1849)` | the merge job attaches the tags, so it has to wait for both architectures to pass (base#1849). |
+| `release-test-tools.yaml: smoke-arch selects the digest whose content equals matrix.platform (base#1849)` | the job has to test the digest built for ITS platform, and refuse when none matches rather than pull nothing (base#1849). |
+| `release-test-tools.yaml: smoke-arch runs config-gen version and requires a toolchain line (base#1849)` | `config-gen version` is the run check; no `toolchain ` line in its output has to fail the job (base#1849). |
+| `release-test-tools.yaml: smoke-arch compares the ELF machine byte of config-gen with the platform (base#1849)` | the ELF machine byte at offset 18 of the binary inside the image is the architecture the binary was built for: 3e amd64, b7 arm64 (ELF e_machine EM_X86_64 / EM_AARCH64) (base#1849). |
 
 ### test/bats/unit/release_version_spec.bats (12)
 
