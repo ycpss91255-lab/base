@@ -1389,7 +1389,7 @@ code, base#1562.
 | `workflows: every ACTIONLINT_IMAGE step pulls via script/ci/retry.sh before a --pull never run (base#1562)` | A Docker Hub 502 on the actionlint image pull failed the lint job because the only pull was the implicit `--pull missing` of the `docker run`, with no retry. Every step that names ACTIONLINT_IMAGE must pre-pull it through retry.sh (more than one attempt) before the run, and the run must say `--pull never`, so dropping the pre-pull or its retry fails loud instead of falling back to the unretried pull, base#1562. |
 | `workflows: every just-pin job installs just via script/ci/install-just.sh and none uses extractions/setup-just (base#1562)` | A GitHub API 504 in extractions/setup-just failed the just install after three quick tries a `uses:` step gives the workflow no way to extend. Every job that checks the just on PATH is the pin must install it through script/ci/install-just.sh (which fetches through retry.sh), fed the pin step's output, and no workflow may keep the unretried action -- so one job (the self-hosted coverage-local one included) reverting to setup-just is a finding, base#1562. |
 
-### test/bats/unit/ci_spec.bats (198)
+### test/bats/unit/ci_spec.bats (161)
 
 | Test | Description |
 |------|-------------|
@@ -1501,43 +1501,6 @@ code, base#1562.
 | `main --bats-path: non-existent path dies with ci_bats_path_not_found` | #523 missing-path guard |
 | `main --bats-path: test/bats/system/ path dies with a clear hint` | #523 system guard |
 | `main --bats-path + --coverage is rejected (ci_bats_path_coverage)` | #523 coverage-combo guard |
-| `_run_coverage_path: writes nothing into the checkout's coverage/ (#887)` | The gate's artifacts stay untouched -- no figure can be fabricated from one spec |
-| `_run_coverage_path: the kcov report dir is a throwaway outside the checkout, removed after the run (#887)` | Report lands in container-local scratch and is deleted |
-| `_run_coverage_path: kcov's exactly the named spec, never a shard slice (#887)` | Shard independence: a planted .shard-weights pulls in nothing |
-| `_run_coverage_path: instruments with the same include/exclude set a coverage shard uses (#887)` | Same instrumented tree as a shard, so the failure reproduces |
-| `_run_coverage_path: propagates the spec's exit status so a red spec is a red run (#887)` | Exit-status propagation -- the loop is useless if failure is swallowed |
-| `_run_coverage_path: BATS_FILTER appends a bats -f name filter (#887)` | Composes with --filter to instrument a single @test |
-| `main --coverage-path: routes one spec to the coverage service with COVERAGE_PATH + BATS_ONLY=1 (#887)` | Dispatch: coverage service, COVERAGE_PATH plumbed, never a shard |
-| `main --ci: COVERAGE=1 with COVERAGE_PATH runs the one spec and reports no coverage figure (#887)` | In-container branch sits ahead of _run_coverage; no report line |
-| `main --coverage-path: non-existent path dies before docker is called (#887)` | Host-side missing-path guard |
-| `main --coverage-path: test/bats/system/ dies with the ci-system hint (#887)` | Host-side system-spec guard (needs the ci-system service) |
-| `main --coverage-path + --coverage-shard is rejected (#887)` | A figure over a partition and one instrumented spec are different asks |
-| `main --coverage-path + --bats-path is rejected (#887)` | Two runners, two services -- refused by name |
-| `main --bats-path + --coverage stays rejected: the fast loop is still kcov-free (#887)` | #523's refusal is intact; the combination is --coverage-path |
-| `main: unknown option dies with ci_unknown_option (#692)` | #692 unknown-flag guard |
-| `main: --hadolint without --lint dies (narrowing flag, not standalone) (#692)` | #692 narrowing-flag typo guard |
-| `main: --group without --lint, or beside a tool, dies before compose (base#1412)` | base#1412. `--group` narrows `--lint` the way `--hadolint` does; standalone it is a typo, and with a tool it asks for two narrowings of one run. Both refuse before compose, so neither costs an image or runs a lint the caller did not ask for. |
-| `main: --lint --group refuses a malformed spec before compose (base#1412)` | base#1412. A malformed group spec is refused on the host, before compose: it is a typo, and a typo should cost no image build. |
-| `main --ci: LINT_GROUP routes the lint-only run to one group (base#1412)` | base#1412. LINT_GROUP is how the in-image lint-static job selects its group; it has to reach `_run_lint_group`, whose refusal of an out-of-range spec is the observable proof that the group branch, not the whole-phase or single-tool branch, took the run. |
-| `_run_lint_tool: every host lint entry point is refused on a CI runner (base#1412)` | base#1412 review round 7. CI lints inside the test-tools image, as the local gate does. A reading of the workflow cannot see every way a step reaches a host arm (a value an earlier step put in $GITHUB_ENV, a step that runs only on some runs), so the one lint dispatch refuses a CI runner's host itself. Every host entry point goes through it: the --<tool>-only family, --hadolint-only, --lint-group and `--ci` run on the host. None of them may reach a driver. |
-| `_run_lint_tool: off a CI runner a host arm still reaches its driver (base#1412)` | base#1412 review round 7. The refusal is the runner's mark, not a refusal of host arms: off a runner an operator still times one driver with them. |
-| `main --ci: unknown LINT_TOOL dies with ci_unknown_lint_tool (#692)` | #692 LINT_TOOL validation |
-| `main --ci: LINT_TOOL=stale-setup-conf runs the stale setup.conf lint (#845)` | #845 stale setup.conf lint reaches the CI gate |
-| `main --ci: LINT_TOOL=readme-sync runs the localized README sync lint (#846)` | #846 localized README sync lint reaches the CI gate |
-| `main --ci: LINT_TOOL=doc-counts runs the doc/test count drift gate (#864)` | #864 doc/test count drift gate reaches the CI gate |
-| `main --doc-counts-only: runs the drift gate on the host, no compose (#864)` | #864 host-direct primitive so a CI job can run the gate without compose |
-| `main --issueref-only: runs the issue-ref comment lint on the host, no compose (#866)` | - |
-| `main --adr-structure-only: runs the ADR-structure lint on the host, no compose (#994)` | - |
-| `main --adr-numbering-only: runs the ADR-numbering lint on the host, no compose (#866)` | - |
-| `main --stale-setup-conf-only: runs the stale setup.conf path lint on the host, no compose (#866)` | - |
-| `main --home-literal-only: runs the hardcoded home path lint on the host, no compose (#799)` | - |
-| `main --changelog-entry-only: runs the changelog entry-length lint on the host, no compose (#917)` | - |
-| `main --action-ref-agreement-only: runs the action ref agreement lint on the host, no compose (#949)` | The CI join is host-direct, like its siblings |
-| `main --readme-sync-only: runs the localized README sync lint on the host, no compose (#866)` | - |
-| `main: _LINT_TOOLS is the one table every lint-phase caller dispatches through (#866)` | - |
-| `main --filter: dispatches with BATS_FILTER + BATS_ONLY=1 and no BATS_FILE` | #523 filter-only dispatch |
-| `_run_bats_path: BATS_FILE runs bats on that path; BATS_FILTER appends -f` | #523 single-path runner |
-| `_run_bats_path: filter-only runs bats across unit + integration` | #523 filter-only runner |
 | `drivers: bats.sh, shellcheck.sh and hadolint.sh driver files exist` | #650 driver files present (incl. hadolint) |
 | `drivers: test.sh sources every driver file in drivers/ (base#1113)` | base#1113 three source lines were checked against a directory of twenty-nine driver files |
 | `_LINT_TOOLS: every lint entry point under drivers/ is in the table or stated exempt (base#1113)` | base#1113 a driver never added to the table is in no lint phase and no CI group, and the guards all read the table |
@@ -2822,6 +2785,51 @@ workflow, whose shape the last section pins.
 | `coverage-local workflow: runs on the self-hosted GPU runner behind the fork guard` | the runner is the point -- an in-job parallel mode measured on a hosted two-core runner would prove nothing about the fat machine it was written for. And a job that can land on the org's self-hosted runner is arbitrary code execution on a shared workstation unless it carries the fork guard, which is what `self-hosted-guard` enforces for every job in this tree. Read off the CODE, comments dropped: this file's header spends a paragraph on why one self-hosted runner is not a PR gate, so the words "self-hosted" are in it whatever the job runs on -- a whole-file read answers the question with the prose that explains the answer. That is the rule the sibling `self-test.yaml` case already applies to `runs-on:`. |
 | `coverage-local workflow: drives test.sh --coverage-local` | the workflow has to drive the MODE, through the same entry an operator uses. A validation job that called `--coverage` would be a second, slower way of running what CI already runs and would never exercise the merge this issue is about. Read as the SET of modes the workflow invokes, off the code, because two things would otherwise pass a broken file: the header comment names `test.sh --coverage-local` twice, so a whole-file `--partial` stays green after the run step is switched back to the serial mode; and there are TWO invocations (with and without `--jobs`), so a `--partial` over either one is satisfied by the other. A set has neither hole -- and the `--jobs` branch matters most, because `--jobs` on the serial mode is an invocation the entry refuses outright. |
 | `self-test.yaml: the PR gate is unchanged -- no self-hosted runner, no local mode` | production must be untouched. The acceptance criterion is explicit that the PR gate keeps the hosted matrix, and the cheapest way for that to rot is a job quietly added to self-test.yaml on the way past. |
+
+### test/bats/unit/coverage_path_spec.bats (37)
+
+the mode writes no coverage figure and does not depend on the shard
+partition; the cases below pin both, and what it refuses.
+
+| Test | Description |
+|------|-------------|
+| `_run_coverage_path: writes nothing into the checkout's coverage/ (#887)` | The gate's artifacts stay untouched -- no figure can be fabricated from one spec |
+| `_run_coverage_path: the kcov report dir is a throwaway outside the checkout, removed after the run (#887)` | Report lands in container-local scratch and is deleted |
+| `_run_coverage_path: kcov's exactly the named spec, never a shard slice (#887)` | Shard independence: a planted .shard-weights pulls in nothing |
+| `_run_coverage_path: instruments with the same include/exclude set a coverage shard uses (#887)` | Same instrumented tree as a shard, so the failure reproduces |
+| `_run_coverage_path: propagates the spec's exit status so a red spec is a red run (#887)` | Exit-status propagation -- the loop is useless if failure is swallowed |
+| `_run_coverage_path: BATS_FILTER appends a bats -f name filter (#887)` | Composes with --filter to instrument a single @test |
+| `main --coverage-path: routes one spec to the coverage service with COVERAGE_PATH + BATS_ONLY=1 (#887)` | Dispatch: coverage service, COVERAGE_PATH plumbed, never a shard |
+| `main --ci: COVERAGE=1 with COVERAGE_PATH runs the one spec and reports no coverage figure (#887)` | In-container branch sits ahead of _run_coverage; no report line |
+| `main --coverage-path: non-existent path dies before docker is called (#887)` | Host-side missing-path guard |
+| `main --coverage-path: test/bats/system/ dies with the ci-system hint (#887)` | Host-side system-spec guard (needs the ci-system service) |
+| `main --coverage-path + --coverage-shard is rejected (#887)` | A figure over a partition and one instrumented spec are different asks |
+| `main --coverage-path + --bats-path is rejected (#887)` | Two runners, two services -- refused by name |
+| `main --bats-path + --coverage stays rejected: the fast loop is still kcov-free (#887)` | #523's refusal is intact; the combination is --coverage-path |
+| `main: unknown option dies with ci_unknown_option (#692)` | #692 unknown-flag guard |
+| `main: --hadolint without --lint dies (narrowing flag, not standalone) (#692)` | #692 narrowing-flag typo guard |
+| `main: --group without --lint, or beside a tool, dies before compose (base#1412)` | base#1412. `--group` narrows `--lint` the way `--hadolint` does; standalone it is a typo, and with a tool it asks for two narrowings of one run. Both refuse before compose, so neither costs an image or runs a lint the caller did not ask for. |
+| `main: --lint --group refuses a malformed spec before compose (base#1412)` | base#1412. A malformed group spec is refused on the host, before compose: it is a typo, and a typo should cost no image build. |
+| `main --ci: LINT_GROUP routes the lint-only run to one group (base#1412)` | base#1412. LINT_GROUP is how the in-image lint-static job selects its group; it has to reach `_run_lint_group`, whose refusal of an out-of-range spec is the observable proof that the group branch, not the whole-phase or single-tool branch, took the run. |
+| `_run_lint_tool: every host lint entry point is refused on a CI runner (base#1412)` | base#1412 review round 7. CI lints inside the test-tools image, as the local gate does. A reading of the workflow cannot see every way a step reaches a host arm (a value an earlier step put in $GITHUB_ENV, a step that runs only on some runs), so the one lint dispatch refuses a CI runner's host itself. Every host entry point goes through it: the --<tool>-only family, --hadolint-only, --lint-group and `--ci` run on the host. None of them may reach a driver. |
+| `_run_lint_tool: off a CI runner a host arm still reaches its driver (base#1412)` | base#1412 review round 7. The refusal is the runner's mark, not a refusal of host arms: off a runner an operator still times one driver with them. |
+| `main --ci: unknown LINT_TOOL dies with ci_unknown_lint_tool (#692)` | #692 LINT_TOOL validation |
+| `main --ci: LINT_TOOL=stale-setup-conf runs the stale setup.conf lint (#845)` | #845 stale setup.conf lint reaches the CI gate |
+| `main --ci: LINT_TOOL=readme-sync runs the localized README sync lint (#846)` | #846 localized README sync lint reaches the CI gate |
+| `main --ci: LINT_TOOL=doc-counts runs the doc/test count drift gate (#864)` | #864 doc/test count drift gate reaches the CI gate |
+| `main --doc-counts-only: runs the drift gate on the host, no compose (#864)` | #864 host-direct primitive so a CI job can run the gate without compose |
+| `main --issueref-only: runs the issue-ref comment lint on the host, no compose (#866)` | - |
+| `main --adr-structure-only: runs the ADR-structure lint on the host, no compose (#994)` | - |
+| `main --adr-numbering-only: runs the ADR-numbering lint on the host, no compose (#866)` | - |
+| `main --stale-setup-conf-only: runs the stale setup.conf path lint on the host, no compose (#866)` | - |
+| `main --home-literal-only: runs the hardcoded home path lint on the host, no compose (#799)` | - |
+| `main --changelog-entry-only: runs the changelog entry-length lint on the host, no compose (#917)` | - |
+| `main --action-ref-agreement-only: runs the action ref agreement lint on the host, no compose (#949)` | The CI join is host-direct, like its siblings |
+| `main --readme-sync-only: runs the localized README sync lint on the host, no compose (#866)` | - |
+| `main: _LINT_TOOLS is the one table every lint-phase caller dispatches through (#866)` | - |
+| `main --filter: dispatches with BATS_FILTER + BATS_ONLY=1 and no BATS_FILE` | #523 filter-only dispatch |
+| `_run_bats_path: BATS_FILE runs bats on that path; BATS_FILTER appends -f` | #523 single-path runner |
+| `_run_bats_path: filter-only runs bats across unit + integration` | #523 filter-only runner |
 
 ### test/bats/unit/coverage_shard_parity_spec.bats (14)
 
