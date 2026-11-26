@@ -135,3 +135,109 @@ _check_case() {
   [[ -d "${CORPUS}" ]] || _bad=1
   (( _bad == 0 ))
 }
+
+# ── the stage hash corpus (base#2094, S43a-2 of base#2054) ──────────────────
+#
+# why: _compute_dockerfile_hash hashes only the `FROM ... AS <stage>` lines.
+# Every corpus/s43/s43_hash_<case>.Dockerfile has one golden
+# golden/s43/s43_hash_<case>.hash holding the 64 hex digits plus a trailing
+# newline. The function reads <base_path>/Dockerfile, so the fixture is copied
+# to ${BATS_TEST_TMPDIR}/<case>/Dockerfile first.
+
+# _check_hash_case <case> -- recompute the hash from the shell and compare it
+# byte for byte with the .hash golden.
+_check_hash_case() {
+  local _name="s43_hash_${1}" _h=""
+  [[ -f "${CORPUS}/${_name}.Dockerfile" ]] || {
+    echo "fixture missing: ${_name}.Dockerfile" >&2
+    return 1
+  }
+  [[ -f "${GOLDEN}/${_name}.hash" ]] || {
+    echo "golden missing: ${_name}.hash" >&2
+    return 1
+  }
+  mkdir -p "${BATS_TEST_TMPDIR}/${1}"
+  cp -- "${CORPUS}/${_name}.Dockerfile" "${BATS_TEST_TMPDIR}/${1}/Dockerfile"
+  _compute_dockerfile_hash "${BATS_TEST_TMPDIR}/${1}" _h
+  printf '%s\n' "${_h}" > "${BATS_TEST_TMPDIR}/${_name}.out"
+  cmp -- "${BATS_TEST_TMPDIR}/${_name}.out" "${GOLDEN}/${_name}.hash"
+}
+
+# why: three stages is the baseline hash.
+@test "s43 hash golden: base3 matches its golden" {
+  run _check_hash_case base3
+  assert_success
+}
+
+# why: adding a stage changes the hash.
+@test "s43 hash golden: added matches its golden" {
+  run _check_hash_case added
+  assert_success
+}
+
+# why: a second added stage changes the hash again.
+@test "s43 hash golden: two matches its golden" {
+  run _check_hash_case two
+  assert_success
+}
+
+# why: RUN and ENV lines do not change the hash.
+@test "s43 hash golden: noise_a matches its golden" {
+  run _check_hash_case noise_a
+  assert_success
+}
+
+# why: other RUN/ENV values and a comment do not change the hash either.
+@test "s43 hash golden: noise_b matches its golden" {
+  run _check_hash_case noise_b
+  assert_success
+}
+
+# why: the issue's table gives the expected values as literals; pin them so a
+# wrong golden cannot pass by being regenerated the same way.
+@test "s43 hash golden: goldens equal the issue's literal digests" {
+  run cat "${GOLDEN}/s43_hash_base3.hash"
+  assert_output "b63522efeb8407b72dce3bc62cc91a5d5461f833025436584c4d5ffc037a7465"
+  run cat "${GOLDEN}/s43_hash_added.hash"
+  assert_output "91cd5df58fea8c602dc075ed6f39f9900ab051df7764b99c16c5b85840ee4c03"
+  run cat "${GOLDEN}/s43_hash_two.hash"
+  assert_output "783f9970e3f6819aa7426e87eb7177cc244a47c0e0638a2b1d609b2133adb0b4"
+}
+
+# why: noise lines must not move the hash, so both noise goldens equal base3's.
+@test "s43 hash golden: noise goldens are byte-identical to base3" {
+  cmp -- "${GOLDEN}/s43_hash_noise_a.hash" "${GOLDEN}/s43_hash_base3.hash"
+  cmp -- "${GOLDEN}/s43_hash_noise_b.hash" "${GOLDEN}/s43_hash_base3.hash"
+}
+
+# why: a missing Dockerfile is not an error, so the Go side needs the same
+# empty result and rc 0.
+@test "s43 hash golden: a missing Dockerfile gives empty hash and rc 0" {
+  local _h="unset"
+  run -0 _compute_dockerfile_hash "${BATS_TEST_TMPDIR}/no_such_dir" _h
+  _compute_dockerfile_hash "${BATS_TEST_TMPDIR}/no_such_dir" _h
+  [[ -z "${_h}" ]]
+}
+
+# why: a hash fixture with no golden, or a golden with no fixture, must fail.
+@test "s43 hash golden: every hash fixture has exactly one golden and no extra" {
+  local _f _stem _bad=0
+  for _f in "${CORPUS}"/s43_hash_*.Dockerfile; do
+    [[ -e "${_f}" ]] || continue
+    _stem="$(basename -- "${_f}" .Dockerfile)"
+    if [[ ! -f "${GOLDEN}/${_stem}.hash" ]]; then
+      echo "fixture with no golden: ${_stem}" >&2
+      _bad=1
+    fi
+  done
+  for _f in "${GOLDEN}"/s43_hash_*.hash; do
+    [[ -e "${_f}" ]] || continue
+    _stem="$(basename -- "${_f}" .hash)"
+    if [[ ! -f "${CORPUS}/${_stem}.Dockerfile" ]]; then
+      echo "golden with no fixture: ${_stem}" >&2
+      _bad=1
+    fi
+  done
+  [[ -d "${CORPUS}" ]] || _bad=1
+  (( _bad == 0 ))
+}
