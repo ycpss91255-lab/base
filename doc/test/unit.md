@@ -5194,7 +5194,7 @@ directory is a no-op).
 | `_run_lint_tools: the lint phase reaches the moving-tag driver and fails on an added test-tools:latest (base#1647)` | A driver nothing calls passes every test above and gates nothing: `just test lint`, the lint-static CI groups and the host --<tool>-only arm all go through test.sh's _LINT_TOOLS table and its dispatch case. The scratch tree carries a copy of test.sh and what it sources, so its REPO_ROOT is the scratch tree and the phase scans the fixture, not the live checkout. |
 | `test.sh --moving-tag-only: runs the moving-tag driver on the host and fails on an added test-tools:latest (base#1647)` | The host arm is the other entry point the help text and CI's dedicated-job check name; it must run the same driver. main is what `bash test.sh --moving-tag-only` runs once the source guard passes. |
 
-### test/bats/unit/multi_distro_build_worker_yaml_spec.bats (23)
+### test/bats/unit/multi_distro_build_worker_yaml_spec.bats (25)
 
 Structural assertions for `.github/workflows/multi-distro-build-worker.yaml`
 (#325 B-1 dispatcher, extended to N-D matrix-mode via #344 in v0.32.0). The
@@ -5210,12 +5210,12 @@ plus arbitrary additional fields). `pull_request` -> `pr_matrix` (subset);
 anything else (tag push, main push, `workflow_dispatch`) -> `tag_matrix`
 (release validation matrix).
 
-2. **`call-build`** — strategy.matrix job invoking the local
-`build-worker.yaml` per matrix cell. Derives per-shard `image_name` as
-`<image_name>-<matrix.name>`, forwards `matrix.build_args` verbatim as
-`build_args`, and shards buildx GHA cache by name via `cache_variant: ${{
-matrix.name }}` (reuses #272's per-variant scope contract). `fail-fast:
-false` so one shard's failure doesn't cancel siblings.
+2. **`call-build`** — strategy.matrix job invoking `build-worker.yaml` per
+matrix cell. Derives per-shard `image_name` as `<image_name>-<matrix.name>`,
+forwards `matrix.build_args` verbatim as `build_args`, and shards buildx GHA
+cache by name via `cache_variant: ${{ matrix.name }}` (reuses #272's
+per-variant scope contract). `fail-fast: false` so one shard's failure
+doesn't cancel siblings.
 
 3. **`ci-passed`** — rollup gate for branch protection. Matches the existing
 `ci-passed` rollup naming used by env/ros_distro / env/ros2_distro per
@@ -5250,7 +5250,8 @@ so there is nothing for a dispatcher to forward (closes #1122)
 
 - `resolve-matrix` branches on `github.event_name == 'pull_request'`
 
-- `call-build` `uses: ./.github/workflows/build-worker.yaml`
+- `call-build` calls `build-worker.yaml` by its full path at the release in
+`.version`; no reusable workflow calls its next level by a `./` path
 
 - `call-build` matrix `include:
 fromJSON(needs.resolve-matrix.outputs.matrix)`
@@ -5288,7 +5289,9 @@ builds nothing and pushes nothing)
 | `multi-distro-build-worker.yaml: an entry's own characters survive the hand-over (base#2160)` | base#2160. A fix that joins or rewrites the lines as text can damage a value: an escaped newline in build_args, spaces, and the characters the GITHUB_OUTPUT format itself uses. |
 | `multi-distro-build-worker.yaml: an input that is not one JSON array is refused by name (base#2160)` | base#2160. An unreadable matrix must fail in this job, naming the input the caller wrote, and not as an empty matrix in call-build. A second JSON document and a non-array are refused for the same reason: `include:` takes one array. |
 | `multi-distro-build-worker.yaml: the input the event does not select is not judged (base#2160)` | base#2160. The event selects one input; what the other holds must not fail a run that never uses it. |
-| `multi-distro-build-worker.yaml: call-build uses local build-worker via ./.github/workflows/build-worker.yaml (#325 B-1)` | - |
+| `multi-distro-build-worker.yaml: call-build calls build-worker by its full path at the .version release (base#2171)` | base#2171. A caller that names the dispatcher by an annotated tag hands a `./` call the tag object's sha as the next level's ref, and push and workflow_dispatch runs then fail at startup. A full path with a ref is resolved as written. `uses:` takes no expression, so the ref is a literal; a release bump that moves `.version` without it fails here. |
+| `no reusable workflow calls its next level by a same-repository path (base#2171)` | base#2171. The startup failure belongs to the `./` form, not to this dispatcher, so every workflow a downstream repo can call is held to the rule. `$/` is the other same-repository form and carries no ref either. |
+| `base workflows name a base workflow only at the .version release (base#2171)` | base#2171. A full-path call names its release as a literal, so one left at another release runs that release's worker under this one's dispatcher. |
 | `multi-distro-build-worker.yaml: call-build matrix is include: fromJSON(needs.resolve-matrix.outputs.matrix) (#344 N-D)` | - |
 | `multi-distro-build-worker.yaml: call-build derives per-shard image_name as <image_name>-<matrix.name> (hyphen, #344)` | - |
 | `multi-distro-build-worker.yaml: call-build passes matrix.build_args verbatim as build_args (#344)` | - |
@@ -6967,7 +6970,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/self_hosted_guard_lint_spec.bats (24)
+### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
 | Test | Description |
 |------|-------------|
@@ -6986,6 +6989,8 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `self-hosted guard: PASSES the arm + amd hosted families and a windows/macos runner` | - |
 | `self-hosted guard: PASSES a literal matrix that resolves entirely to hosted labels` | - |
 | `self-hosted guard: PASSES a LOCAL reusable-workflow call` | - |
+| `self-hosted guard: PASSES a call by this repo's own slug to a workflow the tree ships (base#2171)` | base#2171. A reusable workflow has to name its next level by full path, so a call by this repo's own slug to a workflow this tree ships is the same in-tree callee a `./` call names, and its jobs are checked where they are. |
+| `self-hosted guard: FAILS a call by this repo's own slug to a workflow the tree does not ship (base#2171)` | base#2171. The exemption is for a callee whose jobs this run checks. A file the tree does not carry, or a tree that defines no slug, proves nothing. |
 | `self-hosted guard: PASSES an eligible job that carries the guard alone` | - |
 | `self-hosted guard: PASSES an eligible job that ANDs the guard with its own gate` | - |
 | `self-hosted guard: FAILS an eligible job whose if: is a near-miss reword` | - |
