@@ -252,7 +252,7 @@ jobs:
   # machine byte (offset 18) of the binary with the platform. The bytes are
   # from the ELF specification: 0x3e EM_X86_64, 0xb7 EM_AARCH64.
   smoke-arch:
-    needs: build
+    needs: [compute-matrix, build]
     # Same-repository guard, same reason as the build job: `runs-on` is a
     # runtime-computed matrix label, so the job is self-hosted-eligible by
     # the static rule and must carry it.
