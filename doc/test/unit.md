@@ -5911,7 +5911,7 @@ here with no daemon.
 | `probe: a Dockerfile with no ALPINE_VERSION FAILS rather than returning nothing (#946)` | A reader returning nothing would reduce the comparison to empty-vs-empty |
 | `probe: two ALPINE_VERSION pins are refused, not silently the first (#946)` | Whichever one a reader picked, half the stages would be built on the other |
 | `probe: an image carrying every tool at the pinned version is accepted (#947)` | The hot path: a matching `:main` must not cost every PR a local rebuild |
-| `probe: an image shipping ANOTHER just is refused and both versions named (#948)` | The runner mismatch a presence-only probe cannot see: `just` is there, at the version published before the bump, and just_runner_version_spec is fail-closed on exactly that -- so accepting the image reddens a PR that touched nothing related |
+| `probe: an image shipping ANOTHER just is refused and both versions named (#948)` | The runner mismatch a presence-only probe cannot see: `just` is there, at the version published before the bump, and test_tools_pins_spec is fail-closed on exactly that -- so accepting the image reddens a PR that touched nothing related |
 | `probe: a MISSING tool is refused and named (#947)` | The kcov race the probe was originally written for |
 | `probe: the required packages are read from the Dockerfile (#1010)` | The roster was five names written into this script -- exactly what the final stage puts on PATH -- and said nothing about the packages that stage installs. `yq` was the omission that already bit us: it was added to the Dockerfile, the post-merge run took the pull path, and the probe declared the stale image acceptable because it was not looking for it. Read the final stage's own `apk add` instead, and a package added to the image is a package the probe asserts. |
 | `probe: only the FINAL stage's packages are required (#1010)` | The stage boundary, which is what makes reading the file safe. The kcov builder `apk add`s a compiler toolchain that is deliberately NOT in the final image; a reader that took every `apk add` in the file would demand `g++` of an image that is correct without it, and the first refusal it produced would be read as a bug in the probe. |
@@ -7211,14 +7211,14 @@ not found`. STALE: the tool is present at the version the pin used to name —
 `shellcheck` / `hadolint` are lint GATES, so an older rule set does not
 fail, it under-reports, and the green check has examined something other
 than what the checkout asked for, while a `just` older than `ARG
-JUST_VERSION` reddens `test/bats/integration/just_runner_version_spec.bats`
-on a PR that touched nothing related. So no job pulls that tag itself: all
-six call `script/ci/obtain_test_tools.sh`, which pulls, re-tags, and ALWAYS
-runs `script/ci/probe_test_tools.sh` on what it got. The probe requires
-every package and binary the Dockerfile's FINAL stage installs to be present
--- a roster DERIVED from that stage, never restated here -- AND every tool
-in `PINNED_TOOLS` to report the version this checkout pins (the two linters
-out of their release URLs in the Dockerfile, the runner through
+JUST_VERSION` reddens `test/bats/integration/test_tools_pins_spec.bats` on a
+PR that touched nothing related. So no job pulls that tag itself: all six
+call `script/ci/obtain_test_tools.sh`, which pulls, re-tags, and ALWAYS runs
+`script/ci/probe_test_tools.sh` on what it got. The probe requires every
+package and binary the Dockerfile's FINAL stage installs to be present -- a
+roster DERIVED from that stage, never restated here -- AND every tool in
+`PINNED_TOOLS` to report the version this checkout pins (the two linters out
+of their release URLs in the Dockerfile, the runner through
 `dist/script/base/just-version.sh` — never restated either). On any refusal
 the script answers `build_local=true` so the image is rebuilt from
 `dockerfile/Dockerfile.test-tools` — self-correcting whatever the cause,
@@ -9428,16 +9428,13 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `tool-image: the bridge with TOML_BRIDGE_IMAGE= derives and inspects` | TOML_BRIDGE_IMAGE set but empty counts as unset, as it does today: the bridge derives and inspects. Pinned here because the bridge now reaches the override through the helper. |
 | `tool-image: the toml_bridge wrapper and tool_image_derive toml_bridge agree` | the bridge's functions are wrappers over the helper, so the bridge and the helper name the same tag. |
 
-### test/bats/unit/tool_pin_agreement_spec.bats (10)
+### test/bats/unit/tool_pin_agreement_spec.bats (7)
 
 | Test | Description |
 |------|-------------|
-| `tool pins: the shipped shellcheck is the version the Dockerfile pins` | Exit 0 says a binary exists; this says it is the one the pin asked for |
-| `tool pins: the shipped hadolint is the version the Dockerfile pins` | The drift that let a 2022 rule set stay behind a green gate, now asserted every run |
 | `tool pins reader: a Dockerfile with no pin declaration FAILS rather than returning nothing` | A reader returning nothing would reduce both checks to empty-vs-empty agreement |
 | `tool pins reader: a version is matched whole, not as a prefix of a longer one` | 0.11.0 must not be satisfied by 0.11.01 or by 10.11.0 |
 | `tool pins reader: the dots in a version are literal, not any-character` | An unescaped regex dot would let 0x11x0 pass as 0.11.0 |
-| `tool pins: the alpine this image runs on is the series the Dockerfile pins` | The base every stage is built on, compared with the image the suite is actually running in |
 | `tool pins: the bash this image ships is the series the pin's table records` | The bash-per-series table the series was chosen on, asserted rather than left as a comment |
 | `tool pins reader: a series the table does not cover FAILS rather than returning nothing` | A pin the table has no row for is a choice nothing supports |
 | `tool pins reader: a table row is matched whole, not as a prefix of a longer series` | A row for 3.2 must not answer for 3.22, nor one for 13.22 |

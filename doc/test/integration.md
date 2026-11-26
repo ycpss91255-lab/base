@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **318 tests**.
+Integration specs under `test/bats/integration/`: **317 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -474,12 +474,6 @@ the unit `tui_spec`.
 | `a failed resync leaves the index clean, not just the working tree (base#1160)` | base#1160 -- a rolled-back resync left the smoke-tree rename staged |
 | `a successful resync still stages the smoke-tree rename (base#1160)` | base#1160 -- dropping the stager must not drop the rename from the consumer's commit, which is strictly worse than the defect |
 | `a failed resync leaves what the consumer had already staged alone (base#1160)` | base#1160 -- the rule _init_restore_index already held, pinned so the change above cannot quietly take it away |
-
-### test/bats/integration/just_runner_version_spec.bats (1)
-
-| Test | Description |
-|------|-------------|
-| `test-tools image: just --version equals the declared pin (#948)` | - |
 
 ### test/bats/integration/kcov_merge_union_spec.bats (3)
 
