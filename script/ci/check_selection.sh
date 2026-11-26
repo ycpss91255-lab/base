@@ -21,15 +21,23 @@
 # unselected. A path takes the first row that matches it:
 #   1. docs (Markdown under doc/, README.md, LICENSE, CONTEXT.md): nothing.
 #      Narrower than classify's code_changed, which takes all of doc/: any
-#      other file there (a script, an image, a justfile) is row 5. With
+#      other file there (a script, an image, a justfile) is row 6. With
 #      --base the file must also be a plain file on every side of the diff
-#      that has it, so a symlink, an executable or a submodule is row 5
+#      that has it, so a symlink, an executable or a submodule is row 6
 #      (base#2110).
 #   2. any justfile: every job.
 #   3. an exact config_gen_paths.sh entry: every job but config-gen.
 #   4. a unit or integration `*_spec.bats` leaf: coverage and the code
 #      checks; a system `*_spec.bats` leaf also selects system.
-#   5. anything else: every job. A new, renamed or moved file, a symlink,
+#   5. a workflow under the root .github/workflows/ (`*.yaml`, `*.yml`)
+#      whose diff changes only its top-level `name:` line: nothing, as
+#      docs (base#2216). That line is the Actions page's label alone: the
+#      required check is a job name and callers reach a workflow by its
+#      path. --base only, since the rule reads the diff's lines; the file
+#      must be a plain file on both sides, so an added, deleted, renamed
+#      or chmodded workflow is row 6, and so is any other changed line,
+#      a job's or a step's name: included.
+#   6. anything else: every job. A new, renamed or moved file, a symlink,
 #      a reader tree and the selection's own files all land here.
 #
 # Fail closed: input this file cannot read as a list of changed paths
@@ -48,6 +56,9 @@ readonly -a _CS_JOBS=(config-gen coverage coverage-gate acceptance system
   worker-selftest shellcheck hadolint bats-fragile test-tools-image-arm64)
 # The answers the rows set; every job above prints one of them.
 readonly -a _CS_KEYS=(config-gen coverage acceptance system code)
+# The --base ref, which row 5 diffs a workflow against; empty under
+# --paths, where no row reads a diff's lines.
+_cs_base=""
 
 _cs_usage() {
   printf 'usage: %s --event <event> (--base <ref> | --paths) | --jobs\n' "${0##*/}" >&2
@@ -100,12 +111,43 @@ _cs_classify() {
   case "$1" in
     test/bats/unit/*_spec.bats | test/bats/integration/*_spec.bats)
       _cs_select coverage code
+      return 0
       ;;
     test/bats/system/*_spec.bats)
       _cs_select coverage code system
+      return 0
       ;;
-    *) _cs_select "${_CS_KEYS[@]}" ;;
   esac
+  if [[ "$#" -eq 3 && "$2" == 100644 && "$3" == 100644 ]] \
+    && _cs_name_only "$1"; then
+    return 0
+  fi
+  _cs_select "${_CS_KEYS[@]}"
+}
+
+# _cs_name_only <path> -- succeeds when <path> is a root workflow file and
+#   its diff against _cs_base changes nothing but top-level `name:` lines
+#   (row 5). Any doubt fails: a git error, a diff with no changed line, a
+#   `\ No newline` marker or any other changed line.
+_cs_name_only() {
+  case "$1" in
+    .github/workflows/*/*) return 1 ;;
+    .github/workflows/*.yaml | .github/workflows/*.yml) ;;
+    *) return 1 ;;
+  esac
+  [[ -n "${_cs_base}" ]] || return 1
+  local _hunks _line _n=0
+  _hunks="$(git diff --no-ext-diff --no-textconv --no-color -U0 --no-renames \
+    "${_cs_base}...HEAD" -- "$1" 2>/dev/null </dev/null)" || return 1
+  _hunks="$(sed -n '/^@@/,$p' <<<"${_hunks}")"
+  while IFS= read -r _line; do
+    case "${_line}" in
+      @@*) continue ;;
+      +name:* | -name:*) _n=$((_n + 1)) ;;
+      *) return 1 ;;
+    esac
+  done <<<"${_hunks}"
+  [[ "${_n}" -gt 0 ]]
 }
 
 # _cs_load_deny -- reads config_gen_paths.sh beside this file into the
@@ -199,6 +241,7 @@ main() {
   local _why _read=_cs_read_paths
   if [[ "${_from_stdin}" -eq 0 ]]; then
     _read=_cs_read_raw
+    _cs_base="${_base}"
     local _diff
     _diff="$(mktemp)"
     if ! _why="$(_cs_diff "${_base}" "${_diff}")"; then
