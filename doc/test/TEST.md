@@ -560,16 +560,15 @@ The release steps:
    when `ci-rollup` and both of them succeeded.
 3. Tag that commit and push the tag.
 
-The `v*` tag ruleset requires `release-checks` as well as `ci-rollup`, so GitHub
-refuses a tag on a commit without it. That covers rc tags too. A pull
+Once the `v*` tag ruleset requires `release-checks` as well as `ci-rollup`,
+GitHub refuses a tag on a commit without it, rc tags included. A pull
 request, a merge group and a push to `main` never produce a check of that name,
 so the merge queue's green `ci-rollup` does not stand in for it.
 
 The hosted run takes the branch's latest commit, so check that it is the one
 to be tagged. It shares one concurrency group with the pushes to `main`, which
 keeps a single pending run: a later merge cancels it while it waits, and it
-cancels a push run that waits. A cancelled run leaves no `release-checks`;
-run it again.
+cancels a push run that waits. If that happens, run it again.
 
 ## Maintaining these docs
 
