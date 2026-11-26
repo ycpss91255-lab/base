@@ -1,4 +1,4 @@
-name: Docker Build & Smoke Test
+name: "Reusable/Docker_建置與_smoke_test"
 
 on:
   workflow_call:

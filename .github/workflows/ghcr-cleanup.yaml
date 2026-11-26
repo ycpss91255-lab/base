@@ -1,4 +1,4 @@
-name: GHCR test-tools cleanup
+name: "Schedule/清理_GHCR_test-tools"
 
 # Prunes untagged ORPHAN digests from the base-owned `test-tools`
 # package on ghcr.io.

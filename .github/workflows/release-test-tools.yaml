@@ -1,4 +1,4 @@
-name: Release test-tools image to GHCR
+name: "Push_Tag/發佈_test-tools_映像檔"
 
 # Multi-arch (linux/amd64 + linux/arm64) build of
 # dockerfile/Dockerfile.test-tools, pushed to

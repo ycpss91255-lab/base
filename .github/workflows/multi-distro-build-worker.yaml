@@ -1,4 +1,4 @@
-name: Multi-distro build dispatcher
+name: "Reusable/多_distro_建置分派"
 
 # Two-job dispatcher reusable workflow (#325 B-1, extended to N-D via
 # #344). Resolves a per-event matrix (full JSON `include`-shape array)

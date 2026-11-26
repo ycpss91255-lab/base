@@ -1,4 +1,4 @@
-name: Coverage (local parallel kcov)
+name: "Manual/本機平行_kcov_覆蓋率"
 
 # Opt-in validation of `test.sh --coverage-local` on the org's self-hosted
 # runner. base#726.
