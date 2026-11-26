@@ -186,7 +186,7 @@
 # GATES, so an older rule set does not fail, it under-reports, and the green
 # check has examined something other than what the checkout asked for, while
 # a `just` older than `ARG JUST_VERSION` reddens
-# `test/bats/integration/just_runner_version_spec.bats` on a PR that touched
+# `test/bats/integration/test_tools_pins_spec.bats` on a PR that touched
 # nothing related. So no job pulls that tag itself: all six call
 # `script/ci/obtain_test_tools.sh`, which pulls, re-tags, and ALWAYS runs
 # `script/ci/probe_test_tools.sh` on what it got. The probe requires every
@@ -1529,7 +1529,7 @@ _builder_setups_out_of_step_with_their_consumer() {
   #
   # Why presence is not enough. The probe exists so a stale / racing
   # :main self-corrects to a local rebuild, and it used to answer only "is
-  # the tool there?". test/bats/integration/just_runner_version_spec.bats
+  # the tool there?". test/bats/integration/test_tools_pins_spec.bats
   # is deliberately fail-closed on a MISMATCH between the image's `just`
   # and ARG JUST_VERSION -- so a :main published before a version bump has
   # every required tool AND the wrong runner, passes a presence-only

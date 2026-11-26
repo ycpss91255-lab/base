@@ -656,7 +656,7 @@ _seed_entry() {
   # Dropping it from the image is NOT what this skip covers -- the
   # pinned fetch of `just` is asserted unconditionally by template_spec,
   # so a removal fails there rather than going quiet here. Staleness is a
-  # different question and is NOT skipped: just_runner_version_spec
+  # different question and is NOT skipped: test_tools_pins_spec
   # compares the image's version against the declaration, fail-closed.
   command -v just >/dev/null 2>&1 \
     || skip "this test-tools image has no just (older pinned TEST_TOOLS_IMAGE); the pinned fetch itself is asserted in template_spec"
@@ -678,7 +678,7 @@ _seed_entry() {
   # Dropping it from the image is NOT what this skip covers -- the
   # pinned fetch of `just` is asserted unconditionally by template_spec,
   # so a removal fails there rather than going quiet here. Staleness is a
-  # different question and is NOT skipped: just_runner_version_spec
+  # different question and is NOT skipped: test_tools_pins_spec
   # compares the image's version against the declaration, fail-closed.
   command -v just >/dev/null 2>&1 \
     || skip "this test-tools image has no just (older pinned TEST_TOOLS_IMAGE); the pinned fetch itself is asserted in template_spec"
@@ -714,7 +714,7 @@ _seed_entry() {
   # Dropping it from the image is NOT what this skip covers -- the
   # pinned fetch of `just` is asserted unconditionally by template_spec,
   # so a removal fails there rather than going quiet here. Staleness is a
-  # different question and is NOT skipped: just_runner_version_spec
+  # different question and is NOT skipped: test_tools_pins_spec
   # compares the image's version against the declaration, fail-closed.
   command -v just >/dev/null 2>&1 \
     || skip "this test-tools image has no just (older pinned TEST_TOOLS_IMAGE); the pinned fetch itself is asserted in template_spec"
@@ -770,7 +770,7 @@ _seed_entry() {
   # Dropping it from the image is NOT what this skip covers -- the
   # pinned fetch of `just` is asserted unconditionally by template_spec,
   # so a removal fails there rather than going quiet here. Staleness is a
-  # different question and is NOT skipped: just_runner_version_spec
+  # different question and is NOT skipped: test_tools_pins_spec
   # compares the image's version against the declaration, fail-closed.
   command -v just >/dev/null 2>&1 \
     || skip "this test-tools image has no just (older pinned TEST_TOOLS_IMAGE); the pinned fetch itself is asserted in template_spec"

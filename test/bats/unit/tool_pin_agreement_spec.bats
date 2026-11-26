@@ -138,26 +138,6 @@ _table_bash() {
   printf '%s\n' "${_row##* }"
 }
 
-# why: Exit 0 says a binary exists; this says it is the one the pin asked
-# for
-@test "tool pins: the shipped shellcheck is the version the Dockerfile pins" {
-  local _pinned _actual
-  _pinned="$(_pinned_version "${DOCKERFILE}" shellcheck)"
-  _actual="$(shellcheck --version)"
-  _reports_version "${_actual}" "${_pinned}" || fail \
-    "the Dockerfile pins shellcheck v${_pinned} but the image reports: ${_actual}. Either the image predates the pin (rebuild: the content-hash tag changes with the Dockerfile, so a stale tag is a stale image) or the pin was edited without one. Until they agree, every lint result in this image is being attributed to a rule set it did not run."
-}
-
-# why: The drift that let a 2022 rule set stay behind a green gate, now
-# asserted every run
-@test "tool pins: the shipped hadolint is the version the Dockerfile pins" {
-  local _pinned _actual
-  _pinned="$(_pinned_version "${DOCKERFILE}" hadolint)"
-  _actual="$(hadolint --version)"
-  _reports_version "${_actual}" "${_pinned}" || fail \
-    "the Dockerfile pins hadolint v${_pinned} but the image reports: ${_actual}. Either the image predates the pin (rebuild) or the pin was edited without one. This is the exact drift that let a 2022 rule set stay behind a green gate."
-}
-
 # why: A reader returning nothing would reduce both checks to empty-vs-empty
 # agreement
 @test "tool pins reader: a Dockerfile with no pin declaration FAILS rather than returning nothing" {
@@ -185,18 +165,6 @@ _table_bash() {
 # why: An unescaped regex dot would let 0x11x0 pass as 0.11.0
 @test "tool pins reader: the dots in a version are literal, not any-character" {
   ! _reports_version 'version: 0x11x0' '0.11.0'
-}
-
-# why: The base every stage is built on, compared with the image the suite
-# is actually running in
-@test "tool pins: the alpine this image runs on is the series the Dockerfile pins" {
-  local _series _release
-  _series="$(_pinned_series "${DOCKERFILE}")"
-  _release="$(cat /etc/alpine-release)"
-  case "${_release}" in
-    "${_series}" | "${_series}".*) ;;
-    *) fail "the Dockerfile pins alpine ${_series} but this image reports ${_release}. Every stage is built FROM alpine:\${ALPINE_VERSION}, so the image the suite is running in does not correspond to the checkout it is testing -- rebuild it (the content-hash tag moves with the Dockerfile, so a stale tag is a stale image)." ;;
-  esac
 }
 
 # why: The bash-per-series table the series was chosen on, asserted rather
