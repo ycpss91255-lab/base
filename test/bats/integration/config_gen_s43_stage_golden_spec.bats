@@ -138,7 +138,7 @@ _check_case() {
 
 # ── the stage hash corpus (base#2094, S43a-2 of base#2054) ──────────────────
 #
-# why: _compute_dockerfile_hash hashes only the `FROM ... AS <stage>` lines.
+# _compute_dockerfile_hash hashes only the `FROM ... AS <stage>` lines.
 # Every corpus/s43/s43_hash_<case>.Dockerfile has one golden
 # golden/s43/s43_hash_<case>.hash holding the 64 hex digits plus a trailing
 # newline. The function reads <base_path>/Dockerfile, so the fixture is copied
