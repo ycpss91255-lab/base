@@ -127,9 +127,10 @@ _load_of() {
 # base layer must not survive. The expected bytes are in
 # golden/s25/layers.base_over.golden; the absent third path adds nothing.
 @test "_conf_load_layers over the base and over layers matches layers.base_over.golden" {
-  run _conf_load_layers H "${CORPUS}/s25_layer_base.ini" \
-    "${CORPUS}/s25_layer_over.ini" "${CORPUS}/s25_layer_absent.ini"
-  assert_equal "${status}" "0"
+  local _rc=0
+  _conf_load_layers H "${CORPUS}/s25_layer_base.ini" \
+    "${CORPUS}/s25_layer_over.ini" "${CORPUS}/s25_layer_absent.ini" || _rc=$?
+  assert_equal "${_rc}" "0"
   cmp -s <(_load_of H) "${GOLDEN}/layers.base_over.golden" || {
     echo "differs from layers.base_over.golden" >&2
     return 1
