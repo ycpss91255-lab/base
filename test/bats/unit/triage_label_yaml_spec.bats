@@ -286,7 +286,7 @@ STUB
   PATH="${_dir}/bin:${PATH}" \
   STUB_GH_LOG="${BATS_TEST_TMPDIR}/gh.log" \
   STUB_LABELS="${_dir}/labels.json" \
-  GH_TOKEN=stub REPO=ycpss91255-docker/base ISSUE=4242 \
+  GH_TOKEN=stub REPO=ycpss91255-lab/base ISSUE=4242 \
     bash "${_dir}/step.sh" 2>&1
 }
 
@@ -306,7 +306,7 @@ STUB
     assert_success
     run grep -c '^issue edit' "${BATS_TEST_TMPDIR}/gh.log"
     assert_output '1'
-    run grep -cxF 'issue edit 4242 --repo ycpss91255-docker/base --add-label needs-triage' \
+    run grep -cxF 'issue edit 4242 --repo ycpss91255-lab/base --add-label needs-triage' \
       "${BATS_TEST_TMPDIR}/gh.log"
     assert_output '1'
   done
@@ -340,7 +340,7 @@ STUB
     assert_success
     run grep -c '^issue edit' "${BATS_TEST_TMPDIR}/gh.log"
     assert_output '1'
-    run grep -cxF 'issue edit 4242 --repo ycpss91255-docker/base --remove-label needs-triage' \
+    run grep -cxF 'issue edit 4242 --repo ycpss91255-lab/base --remove-label needs-triage' \
       "${BATS_TEST_TMPDIR}/gh.log"
     assert_output '1'
   done <<< "${_roles}"

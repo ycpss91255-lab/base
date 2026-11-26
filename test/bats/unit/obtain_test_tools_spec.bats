@@ -4,7 +4,7 @@
 # CI job gets the tooling image it runs inside.
 #
 # why: Six jobs of self-test.yaml consume
-# `ghcr.io/ycpss91255-docker/test-tools:main`. Five pulled it, probed it
+# `ghcr.io/ycpss91255-lab/test-tools:main`. Five pulled it, probed it
 # and rebuilt from source when the probe refused; the sixth -- the
 # `acceptance` job, which scaffolds a downstream repo and runs
 # `just docker build test` against a lint stage that is

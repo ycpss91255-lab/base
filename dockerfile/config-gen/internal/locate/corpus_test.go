@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // CorpusTOML is every .toml file under the corpus directory, at any depth,

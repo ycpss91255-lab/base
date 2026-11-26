@@ -7,7 +7,7 @@
 # the host Docker daemon and passes a version-scoped
 # `test-tools:<base-version>` (mirroring the CI tag minus the registry
 # prefix, so two base versions never collide on one host). CI passes
-# `ghcr.io/ycpss91255-docker/test-tools:vX.Y.Z` so buildx can pull the
+# `ghcr.io/ycpss91255-lab/test-tools:vX.Y.Z` so buildx can pull the
 # arch-correct pre-built image without the cross-step image-store
 # isolation that broke the old test-tools:local CI pattern.
 #
@@ -202,7 +202,7 @@
 ARG BASE_IMAGE="ubuntu:24.04"
 # No bare-tag default (was `test-tools:local`): build.sh (local) passes a
 # version-scoped `test-tools:<base-version>` and CI passes
-# `ghcr.io/ycpss91255-docker/test-tools:<version>`, both explicitly. An
+# `ghcr.io/ycpss91255-lab/test-tools:<version>`, both explicitly. An
 # unset value resolves an empty base image and fails the build loudly
 # rather than silently reusing a stale, wrong-version local image.
 ARG TEST_TOOLS_IMAGE
@@ -610,7 +610,7 @@ RUN bats /smoke_test/
 ############################## builder + runtime split (optional) ##############################
 # Three concrete stages for repos that need a separate runtime image
 # (compiled binaries / generated artifacts to ship without dev deps).
-# Lessons lifted from ycpss91255-docker/ros1_bridge#60 PR -- empirically
+# Lessons lifted from ycpss91255-lab/ros1_bridge#60 PR -- empirically
 # saved ~1.1 GB/arch on that repo's runtime image.
 #
 # Three rules, all of which the previous commented-out hint was silent on:

@@ -506,7 +506,7 @@ main() {
   #
   # The LOCAL tag is version-scoped by the pinned base subtree version
   # (.base/.version), mirroring the version-scoped GHCR tag CI uses
-  # (ghcr.io/ycpss91255-docker/test-tools:<version>) minus the registry
+  # (ghcr.io/ycpss91255-lab/test-tools:<version>) minus the registry
   # prefix. Two base versions (or two downstream repos pinning different
   # versions) on one host therefore get two distinct tags instead of
   # silently clobbering a single, version-agnostic `test-tools:local`.
