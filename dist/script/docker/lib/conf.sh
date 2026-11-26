@@ -573,15 +573,15 @@ _conf_load_layers() {
     # changed or newly appeared layer is a miss. A chain holding anything
     # but regular files skips the memo and reaches the bridge, which refuses
     # it by name. A failed merge is never written (base#2234).
-    local _cll_memo="" _cll_g
+    local _cll_memo="" _cll_f _cll_key
     if [[ -n "${_CONF_LAYERS_MEMO_DIR:-}" && -d "${_CONF_LAYERS_MEMO_DIR}" ]]; then
       local _cll_regular=1
-      for _cll_g in "${_cll_existing[@]}"; do
-        [[ -f "${_cll_g}" ]] || _cll_regular=0
+      for _cll_f in "${_cll_existing[@]}"; do
+        [[ -f "${_cll_f}" ]] || _cll_regular=0
       done
       if (( _cll_regular )); then
-        _cll_g="$(sha256sum -- "${_cll_existing[@]}" | sha256sum)" || _cll_g=""
-        [[ -n "${_cll_g}" ]] && _cll_memo="${_CONF_LAYERS_MEMO_DIR}/${_cll_g%% *}"
+        _cll_key="$(sha256sum -- "${_cll_existing[@]}" | sha256sum)" || _cll_key=""
+        [[ -n "${_cll_key}" ]] && _cll_memo="${_CONF_LAYERS_MEMO_DIR}/${_cll_key%% *}"
       fi
     fi
     if [[ -n "${_cll_memo}" && -f "${_cll_memo}" ]]; then
