@@ -370,6 +370,7 @@ config-gen-gates
 config-gen-redpath
 commit-attribution
 ci-rollup
+release-gate
 release"
 }
 
