@@ -67,40 +67,22 @@ _env_result() {
     '
 }
 
-# _check_env_prefix <stem-prefix> -- like _check_prefix for the .env corpus.
-_check_env_prefix() {
-  local _prefix="${1}" _f _stem _bad=0
-  for _f in "${CORPUS}/${_prefix}"*.env; do
-    [[ -e "${_f}" ]] || continue
-    _stem="$(basename -- "${_f}" .env)"
-    if [[ ! -f "${GOLDEN}/${_stem}.golden" ]]; then
-      printf 'corpus with no golden: %s\n' "${_stem}"
-      _bad=1
-      continue
-    fi
-    _env_result "${_stem}" > "${BATS_TEST_TMPDIR}/got"
-    if ! cmp -s -- "${BATS_TEST_TMPDIR}/got" "${GOLDEN}/${_stem}.golden"; then
-      printf 'golden differs: %s\n' "${_stem}"
-      _bad=1
-    fi
-  done
-  return "${_bad}"
-}
-
-# _check_prefix <stem-prefix> -- every corpus file with the prefix has a
-# golden and the shell result matches it byte for byte. Prints one line per
-# violation; returns 1 on any.
+# _check_prefix <stem-prefix> [ext] -- every corpus file with the prefix has a
+# golden and the shell result matches it byte for byte. ext is txt (default,
+# command output, _shell_result) or env (display variables, _env_result).
+# Prints one line per violation; returns 1 on any.
 _check_prefix() {
-  local _prefix="${1}" _f _stem _bad=0
-  for _f in "${CORPUS}/${_prefix}"*.txt; do
+  local _prefix="${1}" _ext="${2:-txt}" _f _stem _bad=0 _fn=_shell_result
+  [[ "${_ext}" == env ]] && _fn=_env_result
+  for _f in "${CORPUS}/${_prefix}"*."${_ext}"; do
     [[ -e "${_f}" ]] || continue
-    _stem="$(basename -- "${_f}" .txt)"
+    _stem="$(basename -- "${_f}" ".${_ext}")"
     if [[ ! -f "${GOLDEN}/${_stem}.golden" ]]; then
       printf 'corpus with no golden: %s\n' "${_stem}"
       _bad=1
       continue
     fi
-    _shell_result "${_stem}" > "${BATS_TEST_TMPDIR}/got"
+    "${_fn}" "${_stem}" > "${BATS_TEST_TMPDIR}/got"
     if ! cmp -s -- "${BATS_TEST_TMPDIR}/got" "${GOLDEN}/${_stem}.golden"; then
       printf 'golden differs: %s\n' "${_stem}"
       _bad=1
@@ -175,7 +157,7 @@ _check_prefix() {
 # why: detect_gui and _is_ssh_x11 read DISPLAY, WAYLAND_DISPLAY and
 # SSH_CONNECTION; the shell result must match every golden byte for byte.
 @test "s93: detect_gui and _is_ssh_x11 results match every golden" {
-  run _check_env_prefix s93_env_
+  run _check_prefix s93_env_ env
   [ "${status}" -eq 0 ] || { printf '%s\n' "${output}"; return 1; }
 }
 
