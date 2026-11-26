@@ -4167,19 +4167,22 @@ _lint_probe_fixture() {
 #
 # TEST.md is the one file in doc/test/ with no generated block (the doc-count
 # generator's TEST.md pass was removed), so nothing re-derived either half.
-# These two guards do, from the same table this spec already reads for the
-# CI-join completeness check: the row SET is _LINT_TOOLS, and every job name
-# the table cites is a job self-test.yaml actually declares. The "Enforces"
-# column stays authored -- it is prose a person writes, not a figure.
+# These three guards do, from the same table this spec already reads for the
+# CI-join completeness check: the row SET is _LINT_TOOLS, every job name the
+# table cites is a job self-test.yaml actually declares, and the flags and
+# the condition a row states are that job's own. The "Enforces" column stays
+# authored -- it is prose a person writes, not a figure.
 
 TEST_MD='/source/doc/test/TEST.md'
 
-# Print `<lint><TAB><ci-job>` for each row of the static-lint table. The job
-# is the first code span of the CI-job cell, taken whole: a row naming a job
-# that does not exist is exactly the defect, so the cell is not trimmed down
-# to something that happens to resolve. `\|` inside a cell is an escaped
-# pipe, not a column break (the errexit-bang cell carries several), so it is
-# protected before the split.
+# Print `<lint>|<ci-job>|<flags>|<gate>` for each row of the static-lint
+# table. The job is the first code span of the CI-job cell, taken whole: a
+# row naming a job that does not exist is exactly the defect, so the cell is
+# not trimmed down to something that happens to resolve. `\|` inside a cell
+# is an escaped pipe, not a column break (the errexit-bang cell carries
+# several), so it is protected before the split.
+# Flags: the CI-job cell's second code span, empty when absent. Joined by
+# `|` because `read` drops an empty field between tabs.
 _test_md_lint_rows() {
   awk '
     /^\| Lint \| Enforces \| CI job \| Gated\? \|/ { inside = 1; next }
@@ -4192,13 +4195,21 @@ _test_md_lint_rows() {
       split(line, cell, "|")
       lint = cell[2]
       job  = cell[4]
+      gate = cell[5]
       gsub(/`/, "", lint)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", lint)
+      gsub(/`/, "", gate)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", gate)
       jobname = ""
+      flags = ""
       if (match(job, /`[^`]*`/)) {
         jobname = substr(job, RSTART + 1, RLENGTH - 2)
+        job = substr(job, RSTART + RLENGTH)
+        if (match(job, /`[^`]*`/)) {
+          flags = substr(job, RSTART + 1, RLENGTH - 2)
+        }
       }
-      if (lint != "") { print lint "\t" jobname }
+      if (lint != "") { print lint "|" jobname "|" flags "|" gate }
     }
   ' "${TEST_MD}"
 }
@@ -4236,7 +4247,7 @@ _lint_tools_table() {
   local -a _listed=()
   local _row
   for _row in "${_rows[@]}"; do
-    _listed+=( "${_row%%$'\t'*}" )
+    _listed+=( "${_row%%|*}" )
   done
 
   local _t _missing='' _extra=''
@@ -4270,8 +4281,7 @@ _lint_tools_table() {
 
   local _row _lint _job _bad=''
   for _row in "${_rows[@]}"; do
-    _lint="${_row%%$'\t'*}"
-    _job="${_row#*$'\t'}"
+    IFS='|' read -r _lint _job _ <<<"${_row}"
     [[ -n "${_job}" ]] \
       || fail "TEST.md's row for '${_lint}' names no CI job at all"
     printf '%s\n' "${_jobs[@]}" | grep -qx -- "${_job}" \
@@ -4279,6 +4289,37 @@ _lint_tools_table() {
   done
   [[ -z "${_bad}" ]] \
     || fail "TEST.md cites CI job names that do not exist in ${WF}:${_bad} -- a reader looking for that check in the checks list will not find it"
+}
+
+# why: a row's flags and condition must be what the CI job it cites really has
+@test "TEST.md: each static-lint row states the flags and the condition of the CI job it cites (base#2175)" {
+  local -a _rows=()
+  mapfile -t _rows < <(_test_md_lint_rows)
+  [ "${#_rows[@]}" -ge 13 ] \
+    || fail "TEST.md yielded ${#_rows[@]} table rows; the table did not parse"
+
+  local _row _lint _job _flags _gate _call _if _bad=''
+  for _row in "${_rows[@]}"; do
+    IFS='|' read -r _lint _job _flags _gate <<<"${_row}"
+    _call="$(yq ".jobs[\"${_job}\"].steps[].run // \"\"" "${WF}" \
+      | sed -n 's|^\./script/test/test\.sh \(--lint .*\)$|\1|p')"
+    [[ -n "${_call}" ]] \
+      || fail "TEST.md's row for '${_lint}' cites job '${_job}', which runs no test.sh --lint step"
+    # A group leg is named by position, so its rows have no flag to state.
+    if [[ "${_call}" == '--lint --group '* ]]; then
+      _call=''
+    fi
+    [[ "${_flags}" == "${_call}" ]] \
+      || _bad+=$'\n'"${_lint}: flags '${_flags}', job runs '${_call}'"
+
+    _if="$(yq ".jobs[\"${_job}\"].if // \"ungated\"" "${WF}")"
+    _if="${_if#needs.classify.outputs.}"
+    _if="${_if% == \'true\'}"
+    [[ "${_gate}" == "${_if}" ]] \
+      || _bad+=$'\n'"${_lint}: condition '${_gate}', job has '${_if}'"
+  done
+  [[ -z "${_bad}" ]] \
+    || fail "TEST.md's static-lint table disagrees with ${WF}:${_bad}"
 }
 
 # ── The bats-fragile job's account of what it preserves ──────────────────────
