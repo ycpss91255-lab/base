@@ -58,29 +58,12 @@ _partition_violations() {
   return 0
 }
 
-# _run_case <name> <target-mode|-> <override-retired:yes|no> <input|->
-# -- run _prune_retired_entries in ${S}/w and write the actual golden to
-# ${S}/actual/<name>.golden. <input> is a corpus file copied to the target
-# (given <target-mode> when not `-`); `-` calls the function on a missing
-# path. <override-retired> yes replaces _retired_gitignore_entries with
-# `old1` and `old2`; no keeps the production function.
-_run_case() {
-  local _name="${1}" _mode="${2}" _override="${3}" _input="${4}"
-  local _tgt="${S}/w/.gitignore" _rc=0 _m
-  rm -rf -- "${S}/w"
-  mkdir -p "${S}/w" "${S}/actual"
-  if [[ "${_input}" != - ]]; then
-    cp -- "${TESTDATA}/corpus/s82/${_input}" "${_tgt}"
-    [[ "${_mode}" == - ]] || chmod "${_mode}" "${_tgt}"
-  fi
-  (
-    # shellcheck source=dist/script/docker/lib/gitignore.sh
-    source /source/dist/script/docker/lib/gitignore.sh
-    if [[ "${_override}" == yes ]]; then
-      _retired_gitignore_entries() { printf 'old1\nold2\n'; }
-    fi
-    _prune_retired_entries "${_tgt}"
-  ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
+# _write_actual <name> <rc> -- snapshot rc, target mode, target file,
+# stdout and stderr of the last run into ${S}/actual/<name>.golden, with the
+# work dir path replaced by TMP. Shared by _run_case and _run_sync_case.
+_write_actual() {
+  local _name="${1}" _rc="${2}"
+  local _tgt="${S}/w/.gitignore" _m
   if [[ -e "${_tgt}" ]]; then
     _m="$(stat -c %a -- "${_tgt}")"
   else
@@ -96,6 +79,32 @@ _run_case() {
   } > "${S}/actual/${_name}.golden"
 }
 
+# _run_case <name> <target-mode|-> <override-retired:yes|no> <input|->
+# -- run _prune_retired_entries in ${S}/w and write the actual golden to
+# ${S}/actual/<name>.golden. <input> is a corpus file copied to the target
+# (given <target-mode> when not `-`); `-` calls the function on a missing
+# path. <override-retired> yes replaces _retired_gitignore_entries with
+# `old1` and `old2`; no keeps the production function.
+_run_case() {
+  local _name="${1}" _mode="${2}" _override="${3}" _input="${4}"
+  local _tgt="${S}/w/.gitignore" _rc=0
+  rm -rf -- "${S}/w"
+  mkdir -p "${S}/w" "${S}/actual"
+  if [[ "${_input}" != - ]]; then
+    cp -- "${TESTDATA}/corpus/s82/${_input}" "${_tgt}"
+    [[ "${_mode}" == - ]] || chmod "${_mode}" "${_tgt}"
+  fi
+  (
+    # shellcheck source=dist/script/docker/lib/gitignore.sh
+    source /source/dist/script/docker/lib/gitignore.sh
+    if [[ "${_override}" == yes ]]; then
+      _retired_gitignore_entries() { printf 'old1\nold2\n'; }
+    fi
+    _prune_retired_entries "${_tgt}"
+  ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
+  _write_actual "${_name}" "${_rc}"
+}
+
 # _run_sync_case <name> <input|-> -- run _sync_managed_entries with
 # _canonical_gitignore_entries in ${S}/w and write the actual golden to
 # ${S}/actual/<name>.golden, same format as _run_case. <input> is a corpus
@@ -103,7 +112,7 @@ _run_case() {
 # (base#2213).
 _run_sync_case() {
   local _name="${1}" _input="${2}"
-  local _tgt="${S}/w/.gitignore" _rc=0 _m
+  local _tgt="${S}/w/.gitignore" _rc=0
   rm -rf -- "${S}/w"
   mkdir -p "${S}/w" "${S}/actual"
   if [[ "${_input}" != - ]]; then
@@ -114,19 +123,7 @@ _run_sync_case() {
     source /source/dist/script/docker/lib/gitignore.sh
     _sync_managed_entries "${_tgt}" _canonical_gitignore_entries
   ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
-  if [[ -e "${_tgt}" ]]; then
-    _m="$(stat -c %a -- "${_tgt}")"
-  else
-    _m=absent
-  fi
-  {
-    printf 'rc=%d\nmode=%s\n--- file\n' "${_rc}" "${_m}"
-    if [[ -e "${_tgt}" ]]; then cat -- "${_tgt}"; fi
-    printf -- '--- stdout\n'
-    sed "s|${S}/w|TMP|g" "${S}/stdout"
-    printf -- '--- stderr\n'
-    sed "s|${S}/w|TMP|g" "${S}/stderr"
-  } > "${S}/actual/${_name}.golden"
+  _write_actual "${_name}" "${_rc}"
 }
 
 # _assert_golden <name> -- the stored golden exists and equals the actual
