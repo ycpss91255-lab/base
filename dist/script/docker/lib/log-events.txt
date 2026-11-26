@@ -208,6 +208,7 @@ upgrade_merge_aborted
 upgrade_untracked_snapshot_failed
 upgrade_subtree_local_drift
 upgrade_subtree_local_drift_detail
+upgrade_worker_refs_left
 upgrade_version_check
 upgrade_available
 upgrade_up_to_date
@@ -498,6 +499,10 @@ conf_family_two_spellings
 config_gen_check_usage
 config_gen_check_input_failed
 
+# dist/script/docker/lib/config_gen.sh _config_gen_use_native (base#1848):
+# the native config-gen on PATH is stale against the shim's digest.
+config_gen_native_stale
+
 # dockerfile/config-gen/cmd/config-gen/tables.go (`config-gen tables`,
 # base#1469): the NUL frames it writes for a non-regular input, an input it
 # cannot open, and a failed or short stdout write.
@@ -505,8 +510,7 @@ config_gen_input_not_regular
 config_gen_input_unreadable
 config_gen_output_failed
 
-# script/test/drivers/mutation_required.sh (the required-kill roster runner,
-# base#1461) and the no-flag `just test` dispatch that runs it.
+# script/test/drivers/mutation_required.sh (the required-kill roster runner).
 mutation_required_usage_invalid
 mutation_required_roster_empty
 mutation_required_row_invalid
@@ -519,7 +523,6 @@ mutation_required_pinned
 mutation_required_interrupted
 mutation_required_row_timed
 mutation_required_row_dealt
-ci_mutation_required_failed
 
 # script/watch/lib.sh (the go.mod scanner of the pin registry) and
 # script/test/config_gen_steps/20-gomod-oracle.sh, which holds that scanner

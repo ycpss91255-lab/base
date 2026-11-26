@@ -468,13 +468,34 @@ printf 'cg=%s\n' \"\${_CONFIG_GEN_RESOLVED}\""
 
 # ── config_gen_tables (base#1470) ────────────────────────────────────────────
 
+# _cg_poison_native
+#   Unless a test put its own config-gen on PATH (under the test's temp
+#   dir), put one first that carries this checkout's own digest and
+#   answers every other call with nothing and status 0. It is the state a
+#   test-tools image built with the digest stamped (base#2043) leaves PATH
+#   in; a test that mocks docker to check the container path must not be
+#   moved by it (base#2099).
+_cg_poison_native() {
+  local _bin="${BATS_TEST_TMPDIR}/poison-bin" _d _have
+  _have="$(command -v config-gen 2> /dev/null || true)"
+  [[ "${_have}" == "${BATS_TEST_TMPDIR}/"* ]] && return 0
+  _d="$(_cg_own_digest)"
+  mkdir -p "${_bin}"
+  printf '#!/usr/bin/env bash\nif [[ "${1:-}" == version ]]; then printf "toolchain 1.27.2\\ndigest %%s\\n" "%s"; fi\nexit 0\n' "${_d}" > "${_bin}/config-gen"
+  chmod +x "${_bin}/config-gen"
+  PATH="${_bin}:${PATH}"
+}
+
 # _run_cg_tables <wd> <name>
 #   `run` config_gen_tables <name> out from <wd> in a fresh shell with JSON
 #   logs and stderr kept apart; out is preset to `stale`, so a value that
 #   survives a refusal shows. _cg_tables_seen prints out's final value in
-#   brackets.
+#   brackets. CONFIG_GEN_FORCE_DOCKER defaults to 1 so a docker-mock test
+#   stays on the container whatever config-gen is on PATH (base#2099); a
+#   native-path test sets it to 0.
 _run_cg_tables() {
-  CGT_NAME="$2" LOG_FORMAT=json run --separate-stderr timeout 10 bash -c "cd '$1' || exit 9
+  _cg_poison_native
+  CGT_NAME="$2" CONFIG_GEN_FORCE_DOCKER="${CONFIG_GEN_FORCE_DOCKER:-1}" LOG_FORMAT=json run --separate-stderr timeout 10 bash -c "cd '$1' || exit 9
 source '${CG}'
 out=stale
 config_gen_tables \"\${CGT_NAME}\" out
@@ -1115,4 +1136,258 @@ config_gen_tables layer.toml ${_name}"
     run find "${_tmpd}" -mindepth 1
     assert_output ""
   done
+}
+
+# _cg_native_stub <version-body>
+#   A native `config-gen` placed first on PATH. Every run appends its argv
+#   to ${CG_NATIVE_RUNS}; `version` then runs <version-body>.
+_cg_native_stub() {
+  local _bin="${BATS_TEST_TMPDIR}/native-bin"
+  mkdir -p "${_bin}"
+  export CG_NATIVE_RUNS="${BATS_TEST_TMPDIR}/native.runs"
+  : > "${CG_NATIVE_RUNS}"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "${CG_NATIVE_RUNS}"\n[[ "${1:-}" == version ]] || exit 0\n%s\n' "$1" > "${_bin}/config-gen"
+  chmod +x "${_bin}/config-gen"
+  NATIVE_PATH="${_bin}:${PATH}"
+}
+
+# _cg_own_digest -- the 12 hex after the colon in the tag the shim derives.
+_cg_own_digest() {
+  local _tag
+  _tag="$(_derive)"
+  printf '%s' "${_tag#*:}"
+}
+
+# _cg_native_count <stderr-text> -- config_gen_native_stale records in it.
+_cg_native_count() {
+  local _n
+  _n="$(grep -c '"body":"config_gen_native_stale"' <<< "$1" || true)"
+  printf '%s' "${_n:-0}"
+}
+
+# _cg_path_without_native -- PATH with no `config-gen` on it, whatever the
+#   host or the ci image ships: each PATH dir that holds one is replaced by a
+#   directory of symlinks to everything else in it.
+_cg_path_without_native() {
+  local _dir _out="" _i=0 _shadow _f
+  local -a _dirs
+  IFS=: read -r -a _dirs <<< "${PATH}"
+  for _dir in "${_dirs[@]}"; do
+    if [[ -e "${_dir}/config-gen" ]]; then
+      _i=$((_i + 1))
+      _shadow="${BATS_TEST_TMPDIR}/nonative-${_i}"
+      mkdir -p "${_shadow}"
+      for _f in "${_dir}"/*; do
+        [[ "${_f##*/}" == config-gen ]] && continue
+        ln -s "${_f}" "${_shadow}/${_f##*/}"
+      done
+      _dir="${_shadow}"
+    fi
+    _out="${_out:+${_out}:}${_dir}"
+  done
+  printf '%s' "${_out}"
+}
+
+# why: the native binary is used only when it was built from the same
+#      sources as the shim (base#1848); with none on PATH the shim stays on
+#      the image and says nothing.
+@test "config-gen: native predicate is false with no config-gen on PATH, silently (base#2035)" {
+  _seed_cg_subtree
+  local _p
+  _p="$(_cg_path_without_native)"
+  PATH="${_p}" run bash -c "command -v config-gen"
+  assert_failure
+  LOG_FORMAT=json run --separate-stderr bash -c "export PATH='${_p}'; source '${CG}'; _config_gen_use_native"
+  assert_failure 1
+  assert_output ""
+  assert_equal "$(_cg_native_count "${stderr}")" 0
+}
+
+# why: CONFIG_GEN_FORCE_DOCKER=1 is the caller's veto; the binary is not
+#      even asked for its version.
+@test "config-gen: native predicate honours CONFIG_GEN_FORCE_DOCKER=1 without running the binary (base#2035)" {
+  _seed_cg_subtree
+  local _d
+  _d="$(_cg_own_digest)"
+  _cg_native_stub "printf 'toolchain 1.27.2\ndigest ${_d}\n'"
+  LOG_FORMAT=json CONFIG_GEN_FORCE_DOCKER=1 run --separate-stderr bash -c "export PATH='${NATIVE_PATH}'; source '${CG}'; _config_gen_use_native"
+  assert_failure 1
+  assert_output ""
+  assert_equal "$(_cg_native_count "${stderr}")" 0
+  run cat "${CG_NATIVE_RUNS}"
+  assert_output ""
+}
+
+# why: a binary whose version line carries the shim's own digest was built
+#      from this checkout's module; it may be used.
+@test "config-gen: native predicate accepts a binary carrying the shim's own digest (base#2035)" {
+  _seed_cg_subtree
+  local _d
+  _d="$(_cg_own_digest)"
+  [[ "${_d}" =~ ^[0-9a-f]{12}$ ]] || fail "own digest is not 12 hex: ${_d}"
+  _cg_native_stub "printf 'toolchain 1.27.2\ndigest ${_d}\n'"
+  LOG_FORMAT=json run --separate-stderr bash -c "export PATH='${NATIVE_PATH}'; source '${CG}'; _config_gen_use_native"
+  assert_success
+  assert_output ""
+  assert_equal "$(_cg_native_count "${stderr}")" 0
+}
+
+# why: a different digest is a stale binary: fall back to the image and say
+#      so once per shell, not once per call.
+@test "config-gen: native predicate refuses a stale digest with one record per shell (base#2035)" {
+  _seed_cg_subtree
+  _cg_native_stub "printf 'toolchain 1.27.2\ndigest ffffffffffff\n'"
+  LOG_FORMAT=json run --separate-stderr bash -c "export PATH='${NATIVE_PATH}'; source '${CG}'
+_config_gen_use_native; first=\$?
+_config_gen_use_native; second=\$?
+printf '%s %s' \"\${first}\" \"\${second}\" >&2"
+  assert_success
+  assert_output ""
+  assert_equal "$(_cg_native_count "${stderr}")" 1
+  [[ "${stderr}" == *"1 1" ]] || fail "statuses were not 1 1: ${stderr}"
+}
+
+# why: a binary that cannot say its digest is as unusable as a stale one.
+@test "config-gen: native predicate refuses a failing or silent version with a stale record (base#2035)" {
+  _seed_cg_subtree
+  local _body
+  for _body in "exit 3" ":"; do
+    _cg_native_stub "${_body}"
+    LOG_FORMAT=json run --separate-stderr bash -c "export PATH='${NATIVE_PATH}'; source '${CG}'; _config_gen_use_native"
+    assert_failure 1
+    assert_output ""
+    assert_equal "$(_cg_native_count "${stderr}")" 1
+  done
+}
+
+# why: every log event id is registered (base#1848 names this one).
+@test "config-gen: config_gen_native_stale is registered in log-events.txt under base#1848 (base#2035)" {
+  run grep -n 'config_gen_native_stale' "${ROOT}/dist/script/docker/lib/log-events.txt"
+  assert_success
+  run grep -B3 '^config_gen_native_stale$' "${ROOT}/dist/script/docker/lib/log-events.txt"
+  assert_output --partial "base#1848"
+}
+
+# ── config_gen_tables on the native binary (base#2036) ───────────────────────
+
+# _cg_native_tables_stub <tables-body>
+#   A native `config-gen` first on PATH whose `version` prints the shim's
+#   own digest (so _config_gen_use_native answers 0) and whose `tables`
+#   runs <tables-body>. Every run's argv is appended to ${CG_NATIVE_RUNS}.
+_cg_native_tables_stub() {
+  local _d _bin="${BATS_TEST_TMPDIR}/native-bin"
+  _d="$(_cg_own_digest)"
+  mkdir -p "${_bin}"
+  export CG_NATIVE_RUNS="${BATS_TEST_TMPDIR}/native.runs"
+  : > "${CG_NATIVE_RUNS}"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "${CG_NATIVE_RUNS}"\nif [[ "${1:-}" == version ]]; then printf "toolchain 1.27.2\\ndigest %s\\n"; exit 0; fi\n%s\n' "${_d}" "$1" > "${_bin}/config-gen"
+  chmod +x "${_bin}/config-gen"
+  NATIVE_PATH="${_bin}:${PATH}"
+}
+
+# why: with a native binary built from the shim's own sources, tables runs
+#      it and never the container: no docker call at all, not even the
+#      image resolve. The list is the one the container gives for the same
+#      file (`[a]` and `[b.c]` give a, b, b.c).
+@test "config-gen: tables runs the native binary with no docker call (base#2036)" {
+  _seed_cg_subtree
+  _cg_mock_docker 'exit 1'
+  local _wd="${BATS_TEST_TMPDIR}/wd"
+  mkdir -p "${_wd}"
+  printf '[a]\n[b.c]\n' > "${_wd}/layer.toml"
+  _cg_native_tables_stub '[[ "$*" == "tables --name layer.toml layer.toml" ]] || exit 9
+printf "a\nb\nb.c\n"'
+
+  PATH="${NATIVE_PATH}" CONFIG_GEN_FORCE_DOCKER=0 _run_cg_tables "${_wd}" layer.toml
+  assert_success
+  assert_output ""
+  assert_equal "$(_cg_tables_seen)" "$(printf '[a\nb\nb.c\n]')"
+  assert_cg_calls
+}
+
+# why: a native failure speaks the same way the container's does: its frame
+#      is re-emitted as its own event and its status is the answer.
+@test "config-gen: tables re-emits the native binary's frame with its status (base#2036)" {
+  _seed_cg_subtree
+  _cg_mock_docker 'exit 1'
+  local _wd="${BATS_TEST_TMPDIR}/wd"
+  mkdir -p "${_wd}"
+  printf '[a]\n' > "${_wd}/layer.toml"
+  _cg_native_tables_stub 'printf "D\0error\0config_gen_output_failed\0layer.toml\0\0\0\0write /dev/stdout: broken pipe\0" >&2
+exit 1'
+
+  PATH="${NATIVE_PATH}" CONFIG_GEN_FORCE_DOCKER=0 _run_cg_tables "${_wd}" layer.toml
+  assert_refusal 1 config_gen_output_failed "file=layer.toml"
+  assert_equal "$(_cg_tables_seen)" "[]"
+  assert_cg_calls
+}
+
+# why: a native failure with no frame is refused as config_gen_run_failed
+#      with the binary's status, as the container path does.
+@test "config-gen: tables refuses a native failure with no frame as config_gen_run_failed (base#2036)" {
+  _seed_cg_subtree
+  _cg_mock_docker 'exit 1'
+  local _wd="${BATS_TEST_TMPDIR}/wd"
+  mkdir -p "${_wd}"
+  printf '[a]\n' > "${_wd}/layer.toml"
+  _cg_native_tables_stub 'exit 1'
+
+  PATH="${NATIVE_PATH}" CONFIG_GEN_FORCE_DOCKER=0 _run_cg_tables "${_wd}" layer.toml
+  assert_refusal 1 config_gen_run_failed "file=layer.toml" "status=1"
+  assert_equal "$(log_event_ids "${stderr}" | grep -cx config_gen_run_failed)" 1
+  assert_equal "$(_cg_tables_seen)" "[]"
+  assert_cg_calls
+}
+
+# why: CONFIG_GEN_FORCE_DOCKER=1 keeps the container path exactly as before
+#      even with a matching binary present, and that binary is not run for
+#      tables.
+@test "config-gen: tables stays on the container with CONFIG_GEN_FORCE_DOCKER=1 (base#2036)" {
+  _seed_cg_subtree
+  _mock_docker_tables_exec
+  local _wd="${BATS_TEST_TMPDIR}/wd"
+  mkdir -p "${_wd}"
+  printf '[a]\n[b.c]\n' > "${_wd}/layer.toml"
+  _cg_native_tables_stub 'printf "native\n"'
+
+  PATH="${NATIVE_PATH}" CONFIG_GEN_FORCE_DOCKER=1 _run_cg_tables "${_wd}" layer.toml
+  assert_success
+  assert_equal "$(_cg_tables_seen)" "$(printf '[a\nb\nb.c\n]')"
+  assert_cg_run_argv run --rm -i --user "$(id -u):$(id -g)" \
+    "$(_expected_tag)" tables --name layer.toml -
+  run grep -c '^tables' "${CG_NATIVE_RUNS}"
+  assert_output 0
+}
+
+# why: a binary built from other sources is refused once and the container
+#      answers.
+@test "config-gen: tables falls back to the container on a stale native digest with one record (base#2036)" {
+  _seed_cg_subtree
+  _mock_docker_tables_exec
+  local _wd="${BATS_TEST_TMPDIR}/wd"
+  mkdir -p "${_wd}"
+  printf '[a]\n[b.c]\n' > "${_wd}/layer.toml"
+  _cg_native_stub "printf 'toolchain 1.27.2\ndigest ffffffffffff\n'"
+
+  PATH="${NATIVE_PATH}" CONFIG_GEN_FORCE_DOCKER=0 _run_cg_tables "${_wd}" layer.toml
+  assert_success
+  assert_equal "$(_cg_tables_seen)" "$(printf '[a\nb\nb.c\n]')"
+  assert_equal "$(_cg_native_count "${stderr}")" 1
+  run grep -c '^tables' "${CG_NATIVE_RUNS}"
+  assert_output 0
+  assert_cg_calls image run
+}
+
+# why: the stat check comes before the native/container choice.
+@test "config-gen: tables refuses a missing file with no_such_file on the native path (base#2036)" {
+  _seed_cg_subtree
+  _cg_mock_docker 'exit 1'
+  local _wd="${BATS_TEST_TMPDIR}/wd"
+  mkdir -p "${_wd}"
+  _cg_native_tables_stub 'printf "a\n"'
+
+  PATH="${NATIVE_PATH}" CONFIG_GEN_FORCE_DOCKER=0 _run_cg_tables "${_wd}" missing.toml
+  assert_refusal 1 no_such_file "file=missing.toml"
+  assert_equal "$(_cg_tables_seen)" "[]"
+  assert_cg_calls
 }

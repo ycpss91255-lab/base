@@ -944,9 +944,9 @@ _confirm_step_for() {
     STUB_RAW_FAIL="${_rawfail}" \
     STUB_TAG_UNRESOLVED="${_unresolved}" \
     STUB_TAG_ANSWER="${_answer}" \
-    IMAGE='ghcr.io/ycpss91255-docker/test-tools' \
-    IMAGE_TAG='ghcr.io/ycpss91255-docker/test-tools:main' \
-    VERIFIED_REF="ghcr.io/ycpss91255-docker/test-tools@sha256:${_verified}" \
+    IMAGE='ghcr.io/ycpss91255-lab/test-tools' \
+    IMAGE_TAG='ghcr.io/ycpss91255-lab/test-tools:main' \
+    VERIFIED_REF="ghcr.io/ycpss91255-lab/test-tools@sha256:${_verified}" \
       bash "${_dir}/step.sh" 2>&1
   ) || _status=$?
   return "${_status}"
@@ -990,7 +990,7 @@ _resolve_tags_for() {
   (
     cd -- "$(_repo_root)" || exit 2
     GITHUB_REF="${_ref}" \
-    IMAGE='ghcr.io/ycpss91255-docker/test-tools' \
+    IMAGE='ghcr.io/ycpss91255-lab/test-tools' \
     GITHUB_OUTPUT="${_dir}/out" \
       bash "${_dir}/step.sh" > /dev/null
   ) || _status=$?
@@ -1118,8 +1118,8 @@ _spec_prose() {
 @test "release-test-tools.yaml: a release tag publishes :<ver> and moves :latest" {
   run _resolve_tags_for refs/tags/v0.42.0
   assert_success
-  assert_output --partial 'tags=ghcr.io/ycpss91255-docker/test-tools:v0.42.0,ghcr.io/ycpss91255-docker/test-tools:latest'
-  assert_output --partial 'smoke=ghcr.io/ycpss91255-docker/test-tools:v0.42.0'
+  assert_output --partial 'tags=ghcr.io/ycpss91255-lab/test-tools:v0.42.0,ghcr.io/ycpss91255-lab/test-tools:latest'
+  assert_output --partial 'smoke=ghcr.io/ycpss91255-lab/test-tools:v0.42.0'
 }
 
 # why: The load-bearing case: `v0.42.0-rc1` through `-rc4` each matched the
@@ -1132,8 +1132,8 @@ _spec_prose() {
   # built its lint stage from it.
   run _resolve_tags_for refs/tags/v0.42.0-rc4
   assert_success
-  assert_output --partial 'tags=ghcr.io/ycpss91255-docker/test-tools:v0.42.0-rc4'
-  assert_output --partial 'smoke=ghcr.io/ycpss91255-docker/test-tools:v0.42.0-rc4'
+  assert_output --partial 'tags=ghcr.io/ycpss91255-lab/test-tools:v0.42.0-rc4'
+  assert_output --partial 'smoke=ghcr.io/ycpss91255-lab/test-tools:v0.42.0-rc4'
   refute_output --partial ':latest'
 }
 
@@ -1142,8 +1142,8 @@ _spec_prose() {
 @test "release-test-tools.yaml: a main push publishes the :main rolling tag only" {
   run _resolve_tags_for refs/heads/main
   assert_success
-  assert_output --partial 'tags=ghcr.io/ycpss91255-docker/test-tools:main'
-  assert_output --partial 'smoke=ghcr.io/ycpss91255-docker/test-tools:main'
+  assert_output --partial 'tags=ghcr.io/ycpss91255-lab/test-tools:main'
+  assert_output --partial 'smoke=ghcr.io/ycpss91255-lab/test-tools:main'
   refute_output --partial ':latest'
 }
 
@@ -1391,7 +1391,7 @@ _spec_prose() {
     printf 'answer: [%s]\n' "${_answer}"
     run _confirm_step_for unresolved "${_answer}"
     assert_failure
-    assert_output --partial '::error::ghcr.io/ycpss91255-docker/test-tools:main did not resolve to a digest'
+    assert_output --partial '::error::ghcr.io/ycpss91255-lab/test-tools:main did not resolve to a digest'
     refute_output --partial 'names the verified'
   done
 }
@@ -1885,4 +1885,156 @@ _filter_selects() {
     ! _filter_selects "${_p}" || fail \
         "this workflow's push filter selects ${_p}, which cannot change what the tooling image contains: every merge would republish :main, and a run that publishes nothing can evict a queued one from the concurrency group"
   done
+}
+
+# why: The test-tools image carries a config-gen digest as a build arg
+# (`ARG CONFIG_GEN_DIGEST=` in Dockerfile.test-tools), taken from
+# script/ci/config_gen_digest.sh. The release build step has to compute it
+# before the build and hand it over, or every published image carries the
+# empty default (base#2043).
+@test "release-test-tools.yaml: a config_gen_digest step records the script's output (base#2043)" {
+  local _body
+  _body="$(grep -n -A8 -F 'id: config_gen_digest' "${WF}")" || fail \
+      "no step with id config_gen_digest: the build has no digest to pass"
+  [[ "${_body}" == *"script/ci/config_gen_digest.sh"* ]] || fail \
+      "the config_gen_digest step does not run script/ci/config_gen_digest.sh"
+  [[ "${_body}" == *"GITHUB_OUTPUT"* ]] || fail \
+      "the config_gen_digest step does not write its result to GITHUB_OUTPUT"
+}
+
+# why: computing the digest is not enough; the build step has to carry it as
+#      the CONFIG_GEN_DIGEST build arg the Dockerfile declares (base#2043).
+@test "release-test-tools.yaml: the build step passes CONFIG_GEN_DIGEST as a build arg (base#2043)" {
+  run grep -c -F -x '          build-args: CONFIG_GEN_DIGEST=${{ steps.config_gen_digest.outputs.config_gen_digest }}' "${WF}"
+  [[ "${output}" == "1" ]] || fail \
+      "the id: build step does not carry the exact CONFIG_GEN_DIGEST build-args line"
+}
+
+# why: a step's output is only readable by steps after it, so the digest
+#      step has to come before the build step that consumes it (base#2043).
+@test "release-test-tools.yaml: the digest step runs before the build step (base#2043)" {
+  local _d _b
+  _d="$(grep -n -F 'id: config_gen_digest' "${WF}" | head -1 | cut -d: -f1)"
+  _b="$(grep -n -E '^        id: build$' "${WF}" | head -1 | cut -d: -f1)"
+  [[ -n "${_d}" ]] || fail "no config_gen_digest step"
+  [[ -n "${_b}" ]] || fail "no id: build step"
+  (( _d < _b )) || fail \
+      "config_gen_digest (line ${_d}) is not before the build step (line ${_b})"
+}
+
+# why: a command substitution inside an echo argument discards the script's
+#      exit status, so a failing config_gen_digest.sh would still write an
+#      empty output and the build would publish with the empty default. The
+#      script has to be assigned on its own line so a non-zero exit fails the
+#      step (base#2043).
+@test "release-test-tools.yaml: the digest script's failure fails the step (base#2043)" {
+  local _body
+  _body="$(grep -n -A8 -F 'id: config_gen_digest' "${WF}")" || fail \
+      "no step with id config_gen_digest"
+  if grep -E 'echo.*\$\(script/ci/config_gen_digest\.sh\)' <<<"${_body}"; then
+    fail "the script runs inside an echo command substitution, which swallows its exit status"
+  fi
+  grep -E '^[0-9]+-[[:space:]]+_?[A-Za-z_]+="\$\(script/ci/config_gen_digest\.sh\)"$' <<<"${_body}" || fail \
+      "the script is not assigned to a variable on its own line"
+}
+
+# ── smoke-arch: run config-gen on each architecture before any tag (base#1849) ──
+#
+# The merge job's smoke step runs on ubuntu-latest and picks the digest for
+# the host architecture, so the arm64 image is never run and the config-gen
+# binary is never checked on either. A per-architecture job closes that: it
+# runs on the matrix runner, pulls the digest built for its own platform,
+# runs `config-gen version`, and compares the ELF machine byte (offset 18)
+# with the platform. The expected bytes come from the ELF specification:
+# e_machine 0x3e is EM_X86_64, 0xb7 is EM_AARCH64.
+
+# _smoke_arch_job -- the code lines of the smoke-arch job.
+_smoke_arch_job() {
+  yaml_job_lines "${WF}" smoke-arch
+}
+
+# _merge_needs -- the `needs:` value of the merge job, whether written inline
+# (`needs: build`, `needs: [a, b]`) or as a block list.
+_merge_needs() {
+  yaml_job_lines "${WF}" merge | awk '
+    /^    needs:/ { flag=1; sub(/^    needs:[[:space:]]*/, ""); print; next }
+    flag && /^      - / { print; next }
+    flag { flag=0 }'
+}
+
+# why: the job has to exist, on the same matrix as build, behind build, or
+#      the arm64 image is still never run (base#1849).
+@test "release-test-tools.yaml: a smoke-arch job runs on the build matrix after build (base#1849)" {
+  run _smoke_arch_job
+  assert_success
+  [[ -n "${output}" ]] || fail "no smoke-arch job in the workflow"
+  # needs.compute-matrix is only readable when compute-matrix is a direct
+  # dependency, so the matrix expression requires both entries.
+  assert_output --regexp '(^|
+)    needs: \[[^]]*compute-matrix[^]]*\](
+|$)'
+  assert_output --regexp '(^|
+)    needs: \[[^]]*\bbuild\b[^]]*\](
+|$)'
+  assert_output --partial 'matrix: ${{ fromJSON(needs.compute-matrix.outputs.matrix) }}'
+  assert_output --partial 'runs-on: ${{ matrix.runner }}'
+}
+
+# why: smoke-arch is self-hosted-eligible by the static rule, so it carries
+#      the same fork guard as build (base#1849).
+@test "release-test-tools.yaml: the smoke-arch job carries the same-repo guard (base#1849)" {
+  run _smoke_arch_job
+  assert_success
+  [[ -n "${output}" ]] || fail "no smoke-arch job in the workflow"
+  assert_output --partial "github.event_name != 'pull_request' &&"
+  assert_output --partial "github.event_name != 'merge_group' ||"
+  assert_output --partial 'github.event.pull_request.head.repo.full_name == github.repository'
+}
+
+# why: the merge job attaches the tags, so it has to wait for both
+#      architectures to pass (base#1849).
+@test "release-test-tools.yaml: merge needs both build and smoke-arch (base#1849)" {
+  run _merge_needs
+  assert_success
+  assert_output --regexp '(^|[^A-Za-z-])build([^A-Za-z-]|$)'
+  assert_output --regexp '(^|[^A-Za-z-])smoke-arch([^A-Za-z-]|$)'
+}
+
+# why: the job has to test the digest built for ITS platform, and refuse
+#      when none matches rather than pull nothing (base#1849).
+@test "release-test-tools.yaml: smoke-arch selects the digest whose content equals matrix.platform (base#1849)" {
+  run _smoke_arch_job
+  assert_success
+  [[ -n "${output}" ]] || fail "no smoke-arch job in the workflow"
+  assert_output --partial 'pattern: digests-*'
+  assert_output --partial 'matrix.platform'
+  assert_output --partial '::error::'
+  assert_output --partial 'exit 1'
+  assert_output --regexp '@sha256:'
+}
+
+# why: `config-gen version` is the run check; no `toolchain ` line in its
+#      output has to fail the job (base#1849).
+@test "release-test-tools.yaml: smoke-arch runs config-gen version and requires a toolchain line (base#1849)" {
+  run _smoke_arch_job
+  assert_success
+  [[ -n "${output}" ]] || fail "no smoke-arch job in the workflow"
+  assert_output --regexp 'docker run --rm .*config-gen version'
+  assert_output --partial 'toolchain '
+}
+
+# why: the ELF machine byte at offset 18 of the binary inside the image is
+#      the architecture the binary was built for: 3e amd64, b7 arm64
+#      (ELF e_machine EM_X86_64 / EM_AARCH64) (base#1849).
+@test "release-test-tools.yaml: smoke-arch compares the ELF machine byte of config-gen with the platform (base#1849)" {
+  run _smoke_arch_job
+  assert_success
+  [[ -n "${output}" ]] || fail "no smoke-arch job in the workflow"
+  assert_output --partial '/usr/local/bin/config-gen'
+  assert_output --regexp 'skip=18|offset.*18|-j *18'
+  assert_output --regexp '3e'
+  assert_output --regexp 'b7'
+  assert_output --partial 'linux/amd64'
+  assert_output --partial 'linux/arm64'
+  assert_output --partial 'binary architecture confirmed'
 }

@@ -4430,7 +4430,7 @@ EOF
   local _log="${TEMP_DIR}/docker.argv"
   : > "${_log}"
   mock_cmd docker "printf '%s\n' \"\$*\" >> '${_log}'; exit 0"
-  export CONFIG_GEN_IMAGE=config-gen:test1937
+  export CONFIG_GEN_IMAGE=config-gen:test1937 CONFIG_GEN_FORCE_DOCKER=1
   PATH="${MOCK_DIR}:${PATH}" LOG_FORMAT=json \
     run --separate-stderr _setup_conf_check_known "${TEMP_DIR}"
   assert_success

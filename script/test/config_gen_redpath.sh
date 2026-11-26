@@ -257,11 +257,11 @@ readonly -a _RP_SERIAL=(mut-timeout)
 # mutant there times out, so its 0.0 holds only if a LIVED mutant is
 # judged not killed.
 readonly -a _RP_MUTATION_FAILED=(
-  'mut-unstaged|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzmut|below|0.0'
-  'mut-staged|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzmut|below|0.0'
-  'mut-timeout|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzloop|below|75.0'
-  'mut-untracked-lived|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzlive|below|0.0'
-  'corpus|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzweak|below|0.0'
+  'mut-unstaged|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzmut|below|0.0'
+  'mut-staged|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzmut|below|0.0'
+  'mut-timeout|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzloop|below|75.0'
+  'mut-untracked-lived|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzlive|below|0.0'
+  'corpus|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzweak|below|0.0'
 )
 # <case>|<event>|<file>: the one record of <event>, naming <file>, the
 # mutation gate's mapping must refuse <case> with (base#1467).
@@ -275,7 +275,7 @@ readonly -a _RP_MUTATION_EVENTS=(
 # zzhelp compares zz.golden's bytes and zzseed seed.golden's, so neither
 # is weak.
 readonly -a _RP_WEAK=(
-  'sens-per-golden|github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/zzglob|golden/s1/zz.golden'
+  'sens-per-golden|github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/zzglob|golden/s1/zz.golden'
 )
 # <case>:<the event id the build must refuse it with> (base#1465).
 readonly -a _RP_REFUSALS=(no-context:config_gen_manifest_missing)

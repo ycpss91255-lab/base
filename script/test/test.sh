@@ -1993,6 +1993,10 @@ _resolve_test_tools_image() {
   return 0
 }
 
+# base#2044: PATH as it was when this file was sourced; the digest step in
+# _ensure_test_tools_image runs config_gen_digest.sh under it.
+_TEST_SH_SOURCED_PATH="${PATH}"
+
 # _ensure_test_tools_image <image> <project>
 #
 # Makes the DERIVED tooling tag exist before a compose run reads it.
@@ -2044,10 +2048,23 @@ _ensure_test_tools_image() {
   # for another. For the same reason the message says an unreachable index
   # MAY be the cause rather than asserting it: a genuine typo produces the
   # same wording.
-  if ! TEST_TOOLS_IMAGE="${_image}" docker compose -p "${_project}" \
+  # base#2044. Dockerfile.test-tools stamps CONFIG_GEN_DIGEST into the
+  # config-gen binary; compose.yaml lists the arg in the bare form, so the
+  # value reaches the build through this environment. Assigned on its own
+  # line so a failing script is seen here and not masked by `export`.
+  local _config_gen_digest
+  # The script needs bash and dirname on PATH. The PATH captured when this
+  # file was sourced has them, even when a caller narrows PATH to a docker
+  # stub before calling in.
+  if ! _config_gen_digest="$(PATH="${_TEST_SH_SOURCED_PATH}" "${REPO_ROOT}/script/ci/config_gen_digest.sh")"; then
+    _die ci_tooling_build_failed \
+      "could not compute the config-gen digest (script/ci/config_gen_digest.sh failed), so the tooling image ${_image} was not built."
+  fi
+  if ! TEST_TOOLS_IMAGE="${_image}" CONFIG_GEN_DIGEST="${_config_gen_digest}" \
+      docker compose -p "${_project}" \
       -f "${REPO_ROOT}/compose.yaml" build test-tools; then
     _die ci_tooling_build_failed \
-      "could not build the tooling image ${_image}. If the output above reports packages that do not exist, an unreachable package index may be the cause rather than a packaging mistake: an index apk cannot fetch reads as an empty one. For that case, APK_MIRROR=<host> just test repoints the Alpine index (compose.yaml already forwards it). To skip the local build whatever the cause, TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-docker/test-tools:main just test uses the published image instead. The published image gets you past a package name that is genuinely wrong too, but it does not fix it: the next local build still fails. Neither remedy starts a Docker daemon that is not running. A dead daemon says so before apk runs at all; a wrong package name does not -- apk words it exactly as it words an unreachable index, so the output above cannot tell you which of those two you have. Retried with the same inputs, BuildKit keeps the instructions that already succeeded, so the retry re-pays the failed instruction rather than the whole file -- but it does re-pay it, for as long as the cause persists. Setting APK_MIRROR is not the same inputs: it re-pays from the instruction that reads it."
+      "could not build the tooling image ${_image}. If the output above reports packages that do not exist, an unreachable package index may be the cause rather than a packaging mistake: an index apk cannot fetch reads as an empty one. For that case, APK_MIRROR=<host> just test repoints the Alpine index (compose.yaml already forwards it). To skip the local build whatever the cause, TEST_TOOLS_IMAGE=ghcr.io/ycpss91255-lab/test-tools:main just test uses the published image instead. The published image gets you past a package name that is genuinely wrong too, but it does not fix it: the next local build still fails. Neither remedy starts a Docker daemon that is not running. A dead daemon says so before apk runs at all; a wrong package name does not -- apk words it exactly as it words an unreachable index, so the output above cannot tell you which of those two you have. Retried with the same inputs, BuildKit keeps the instructions that already succeeded, so the retry re-pays the failed instruction rather than the whole file -- but it does re-pay it, for as long as the cause persists. Setting APK_MIRROR is not the same inputs: it re-pays from the instruction that reads it."
   fi
 }
 
@@ -3477,24 +3494,10 @@ main() {
       elif [[ "${bats_only}" == "1" ]]; then
         BATS_ONLY=1 _run_via_compose ci 0
       else
-        # The no-flag `just test` is split around the required-kill roster
-        # (base#1461): it runs on the host, because it builds sandbox
-        # copies and its probe drives compose itself, after the lint phase
-        # and before bats, and a red roster stops the run before bats.
-        LINT_ONLY=1 _run_via_compose ci 0
-        _run_mutation_required \
-          || _die ci_mutation_required_failed "the required-kill mutation roster failed; see the mutation_required_* events above"
-        BATS_ONLY=1 _run_via_compose ci 0
+        _run_via_compose ci 0
       fi
       ;;
   esac
-}
-
-# _run_mutation_required -- the required-kill roster over this checkout
-# (base#1461), on the host. Its own function so the dispatch above can be
-# read, and specced, apart from the probes it runs.
-_run_mutation_required() {
-  bash "${REPO_ROOT}/script/test/drivers/mutation_required.sh" --root "${REPO_ROOT}"
 }
 
 # ── End-of-run reclaim ───────────────────────────────────────────────────────

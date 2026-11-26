@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // A `["stage:<name>"]` table is modelled: the decode gives one Stage

@@ -104,7 +104,7 @@ whoever unpacked the bundle on the field host: reads work either way, writes
 fail on the machine that matters. Read-only turns that into an immediate,
 obvious failure in development instead, and confines the user-id question to
 the paths actually declared `rw` (see
-[#870](https://github.com/ycpss91255-docker/base/issues/870)).
+[#870](https://github.com/ycpss91255-lab/base/issues/870)).
 
 Workload env vars ride as baked `ENV` defaults (a GUI stage additionally reads
 `${DISPLAY}` / `${XAUTHORITY}` etc. from the field host's own shell); the dev

@@ -256,7 +256,7 @@ jobs:
       - name: Checkout base worker source (version-matched via job_workflow_sha)
         uses: actions/checkout@v7
         with:
-          repository: ycpss91255-docker/base
+          repository: ycpss91255-lab/base
           ref: ${{ github.job_workflow_sha }}
           path: .preflight-base
       - name: Validate caller contract (preflight)
@@ -364,7 +364,7 @@ jobs:
   # Parse the comma-separated `platforms` input into a matrix
   # definition. Each supported platform gets the right runner label
   # (native arm64 runners are available for public repos under the
-  # ycpss91255-docker org) and a canonical HARDWARE build-arg value.
+  # ycpss91255-lab org) and a canonical HARDWARE build-arg value.
   # ────────────────────────────────────────────────────────────────
   compute-matrix:
     needs: path-filter
@@ -387,7 +387,7 @@ jobs:
       - name: Checkout base worker source (version-matched via job_workflow_sha)
         uses: actions/checkout@v7
         with:
-          repository: ycpss91255-docker/base
+          repository: ycpss91255-lab/base
           ref: ${{ github.job_workflow_sha }}
           path: .worker-base
       - id: set
@@ -456,7 +456,7 @@ jobs:
       - name: Checkout base worker source (version-matched via job_workflow_sha)
         uses: actions/checkout@v7
         with:
-          repository: ycpss91255-docker/base
+          repository: ycpss91255-lab/base
           ref: ${{ github.job_workflow_sha }}
           path: .worker-base
 
@@ -517,7 +517,7 @@ jobs:
           fi
           if [ -n "${LOCAL_VER}" ]; then
             LATEST_VER=$(git ls-remote --tags --sort=-v:refname \
-              https://github.com/ycpss91255-docker/base.git \
+              https://github.com/ycpss91255-lab/base.git \
               | grep -oP 'refs/tags/v\d+\.\d+\.\d+$' | head -1 | sed 's|refs/tags/||')
             if [ -n "${LATEST_VER}" ] && [ "${LOCAL_VER}" != "${LATEST_VER}" ]; then
               echo "::warning::template ${LOCAL_VER} → ${LATEST_VER} available"
@@ -544,7 +544,7 @@ jobs:
         # late-stage COPY change in devel cascaded the manifest pointer
         # in the shared scope and invalidated runtime / runtime-test
         # caches on the next PR (refs the audit in
-        # https://github.com/ycpss91255-docker/base/issues/378). Splitting
+        # https://github.com/ycpss91255-lab/base/issues/378). Splitting
         # by target isolates each chain's manifest history.
         #
         # Shape migration cost: every existing scope key is orphaned by
@@ -1084,7 +1084,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   # Stable-name aggregator so downstream branch-protection rules
   # keep working. Keeping this job's name as `docker-build`
-  # preserves the status-check context that public-ycpss91255-docker
+  # preserves the status-check context that public-ycpss91255-lab
   # container repos currently require on their `main` branch
   # (`call-docker-build / docker-build`). Matrix shards publish as
   # `call-docker-build / build (linux/amd64)` etc. — those are the

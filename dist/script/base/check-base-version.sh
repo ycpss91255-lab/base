@@ -31,7 +31,7 @@
 #   run                        full check-and-file flow (default)
 #
 # Env overrides:
-#   BASE_REPO          upstream repo to poll (default ycpss91255-docker/base,
+#   BASE_REPO          upstream repo to poll (default ycpss91255-lab/base,
 #                      the shared constant in upstream.sh). It also names
 #                      the release link this script writes into the issue it
 #                      files, so a wrong value publishes a wrong link.

@@ -2,7 +2,7 @@
 
 The skills speak in terms of five canonical triage roles. This file maps
 those roles to the label strings used in this repo's tracker
-(`ycpss91255-docker/base` GitHub Issues), and documents the one further state
+(`ycpss91255-lab/base` GitHub Issues), and documents the one further state
 role this repo adds on top of them, for **six state labels** in total.
 
 This repo uses the **canonical names verbatim**: every label string equals its
@@ -69,13 +69,13 @@ Three other axes exist, and none of them substitutes for a state label.
 
 ## Live state: the table matches GitHub and the stock-default cleanup is done
 
-**Every label in the table above exists on `ycpss91255-docker/base`** with
+**Every label in the table above exists on `ycpss91255-lab/base`** with
 the colour and description shown. The tracker was migrated on 2026-09-09.
 Verified against the live set with:
 
 ```
-$ gh label list -R ycpss91255-docker/base
-$ gh issue list -R ycpss91255-docker/base --label needs-triage --state all
+$ gh label list -R ycpss91255-lab/base
+$ gh issue list -R ycpss91255-lab/base --label needs-triage --state all
 ```
 
 The live set is **thirteen labels**: the six state roles in the table, the
@@ -95,17 +95,17 @@ What was applied:
 
 - **`triage` was renamed in place to `needs-triage`** with `gh label edit triage --name needs-triage`, not deleted and recreated, so every issue that carried `triage` still carries the intake role under its canonical name. The live count is **32 issues** across open and closed. No label named `triage` remains.
 - **`needs-info`, `ready-for-human` and `needs-decision` were created** with the exact colours and descriptions in the table.
-- **`needs-decision` is byte-identical to the two reference repos**: name, colour `006b75` and description match `ycpss91255-docker/agent_harness` and `ycpss91255-research/vendor_kit` exactly, so an agent naming the role in any of the three repos lands on the same label.
+- **`needs-decision` is byte-identical to the two reference repos**: name, colour `006b75` and description match `ycpss91255-lab/agent_harness` and `ycpss91255-lab/vendor_kit` exactly, so an agent naming the role in any of the three repos lands on the same label.
 - **`ready-for-agent` and `wontfix` already matched** and were not touched.
 
-That is the label half of `ycpss91255-docker/base#1182` (the five canonical
-roles) and of `ycpss91255-docker/base#1183` (`needs-decision`). Whether
+That is the label half of `ycpss91255-lab/base#1182` (the five canonical
+roles) and of `ycpss91255-lab/base#1183` (`needs-decision`). Whether
 either issue is closed on the strength of it is the maintainer's call; the
 labels are live regardless.
 
 ### Done, from #1182: the stock defaults
 
-The other half of `ycpss91255-docker/base#1182` has landed. All five of
+The other half of `ycpss91255-lab/base#1182` has landed. All five of
 GitHub's stock default labels are gone from the tracker, and none of them is
 part of this vocabulary:
 

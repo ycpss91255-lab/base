@@ -71,6 +71,34 @@ config_gen_resolve() {
   tool_image_resolve config_gen
 }
 
+# _config_gen_use_native
+#   Answer 0 when a `config-gen` on PATH was built from the same sources as
+#   this shim: its `version` prints a `digest` line equal to the 12 hex the
+#   shim derives for its own image tag. Answers 1 otherwise, so the caller
+#   stays on the image. CONFIG_GEN_FORCE_DOCKER=1 and an absent binary
+#   answer 1 silently; a binary whose digest differs, is missing or whose
+#   `version` fails answers 1 and logs config_gen_native_stale once per
+#   shell (base#2035, base#1848).
+_CONFIG_GEN_NATIVE_STALE_SAID="${_CONFIG_GEN_NATIVE_STALE_SAID-}"
+_config_gen_use_native() {
+  [[ "${CONFIG_GEN_FORCE_DOCKER-}" == 1 ]] && return 1
+  command -v config-gen > /dev/null 2>&1 || return 1
+  local _tag _own _line _got=""
+  _tag="$(tool_image_derive config_gen)" || return 1
+  _own="${_tag#*:}"
+  while IFS= read -r _line; do
+    [[ "${_line}" == "digest "* ]] && _got="${_line#digest }"
+  done < <(config-gen version 2> /dev/null)
+  [[ "${_got}" == "${_own}" ]] && return 0
+  if [[ -z "${_CONFIG_GEN_NATIVE_STALE_SAID}" ]]; then
+    _CONFIG_GEN_NATIVE_STALE_SAID=1
+    _log_warn config_gen config_gen_native_stale \
+      "display=the config-gen on PATH was not built from this checkout (digest ${_got:-none}, expected ${_own}); using the image instead." \
+      "got=${_got}" "want=${_own}"
+  fi
+  return 1
+}
+
 # _config_gen_decode_frames <errfile> <name>
 #   Re-emit each 8-field NUL frame the binary wrote to <errfile>
 #   (tag, severity, event, file, line, col, key, text) as one config_gen
@@ -162,7 +190,14 @@ config_gen_tables() {
   fi
   local -n _cgt_out="$2"
   _cgt_out=""
-  config_gen_resolve || return 1
+  # A native binary built from this checkout runs the file in place: no
+  # image is resolved and no mount is built (base#2036, base#1848).
+  local _cgt_native=0
+  if _config_gen_use_native; then
+    _cgt_native=1
+  else
+    config_gen_resolve || return 1
+  fi
   # A stat first: a missing file must not reach `docker run` (base#1470).
   if [[ ! -e "$1" && ! -L "$1" ]]; then
     _log_err config_gen no_such_file \
@@ -186,11 +221,16 @@ config_gen_tables() {
   _cgt_tmp="$(mktemp -d)"
   # The file goes in on stdin, as toml_bridge_parse feeds the bridge: a
   # caller under docker.sock names a path only it can see, which the host
-  # daemon cannot bind-mount (base#1937).
-  # shellcheck disable=SC2094 # "$1" is only the --name label here
-  docker run --rm -i --user "$(id -u):$(id -g)" \
-    "${_CONFIG_GEN_RESOLVED}" tables --name "$1" - \
-    < "$1" > "${_cgt_tmp}/out" 2> "${_cgt_tmp}/err" || _cgt_rc=$?
+  # daemon cannot bind-mount (base#1937). A native binary reads it in place.
+  if ((_cgt_native == 1)); then
+    config-gen tables --name "$1" "$1" \
+      > "${_cgt_tmp}/out" 2> "${_cgt_tmp}/err" || _cgt_rc=$?
+  else
+    # shellcheck disable=SC2094 # "$1" is only the --name label here
+    docker run --rm -i --user "$(id -u):$(id -g)" \
+      "${_CONFIG_GEN_RESOLVED}" tables --name "$1" - \
+      < "$1" > "${_cgt_tmp}/out" 2> "${_cgt_tmp}/err" || _cgt_rc=$?
+  fi
   # A non-zero status with no diagnostic frame is refused on what is
   # observed: the status, and no frame. Any such run lands here, whether
   # docker or the binary wrote its stderr (base#1470).
