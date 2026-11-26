@@ -108,6 +108,7 @@ establishes one of those is `elevates-principle`.
 | 00000039 -- the config generator is one typed Go program | keep (amends 00000037; amended by 00000041) | invariant 2 (never fail silently) -- an unknown key, a wrong type or a lost entry is refused at load with file and key named instead of being dropped at a flattening seam | One static `config-gen` binary (BurntSushi/toml v1.6.0 plus a TOML 1.0 acceptance gate and a line locator) loads, validates, merges, queries, edits and renders the configuration, replacing the toml-bridge `--kv` seam and about 20,000 lines of shell reassembly. Batched `run` takes `setup apply` from 16 container runs to 1; answers are JSON, with a NUL-framed view for the shell. Writes stay format-preserving by span edit plus a semantic and a byte check. Built at first use by content digest and shipped in test-tools; no published image yet (#1176). Chosen over Python plus a schema and over Rust on the #1435 speed and size evaluation and the 62-bug stability evaluation, where the language effect was 0 to 2 bugs. toml-bridge stays for Python consumers. |
 | 00000040 -- the wrapper CLI shape: positional plus `-t` on `build.sh`, project-wide `stop.sh`, subcommand-first `setup.sh` | keep | invariant 3 (composable by construction) via one consistent argument shape across the user-facing wrappers | The three decisions behind the README wrapper cheat sheet (#291), moved out of the README by #1545: `build.sh` keeps its positional TARGET with `-t` / `--target` as an alias, `stop.sh` stays project-wide (`docker compose down`) with no `-t`, and `setup.sh` stays subcommand-first like `git` / `docker`. |
 | 00000041 -- all parsing and generation in Go; the TUI excluded | keep (amends 00000039) | invariant 2 (never fail silently) -- every structured text base reads goes through one typed program that refuses what it cannot read | Answers #1561. INI tokenizing and the INI-to-TOML converter, Dockerfile parsing and migration, version and semver, gitignore and drift, and host-fact parsing join the configuration in `config-gen`. Shell keeps only the docker wrappers (a port saves at most about 0.36 s of a 9.8 s apply, #1435), the host probes and the `init.sh` / `upgrade.sh` bootstrap. The TUI is unsupported while #1731 is open (S15 #1451 parked). Go over Rust stands: on the 2026-11-18 edit spike the line locator passed 24/24 and refused every unsafe probe, `toml_edit` was wrong on 3 (CRLF) and accepted a silent type change. Delivery unchanged; each moved area gets its own fixture corpus before its switch slice. |
+| 00000042 -- release-only checks | keep | invariant 7 (swappable CI mechanism) | Answers #1592. `mutation-roster` and `config-gen-redpath` gate a release and not a change: a tag push and `workflow_dispatch` run them, a pull request, a merge group and a push to a branch skip them. `classify` writes their keys from the event, `ci-rollup` excuses the skips and names them, and the tag's `release` job still needs them. Local `just test` and the pre-PR mirror follow. |
 
 ## Audit conclusion
 
@@ -117,11 +118,11 @@ counts and the numbers both. It is stored here because a reader of the index
 wants the shape of the decision log in one place, not because anybody keeps it
 true by hand.
 
-- **keep:** 27 (00000001, 00000002, 00000003, 00000005, 00000006, 00000007,
+- **keep:** 28 (00000001, 00000002, 00000003, 00000005, 00000006, 00000007,
   00000008, 00000012, 00000013, 00000014, 00000015, 00000016, 00000017,
   00000021, 00000022, 00000024, 00000026, 00000027, 00000030, 00000031,
   00000033, 00000035, 00000037, 00000038, 00000039, 00000040,
-  00000041)
+  00000041, 00000042)
 - **supersede:** 1 (00000004)
 - **elevates-invariant:** 10 (00000010, 00000011, 00000018, 00000019,
   00000020, 00000023, 00000025, 00000028, 00000032, 00000036)
