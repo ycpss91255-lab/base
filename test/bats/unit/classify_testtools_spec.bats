@@ -1086,6 +1086,19 @@ _release_outputs() {
   done
 }
 
+# why: both release-only jobs must be selected, not one, for the run to be a
+# release run.
+@test "chain: a run that selects only one release-only job does not carry the release-checks name (base#2205)" {
+  local _out _j
+  _out="$(_release_outputs tag)"
+  for _j in ${RELEASE_JOBS}; do
+    run _gate_name "${_out}"$'
+'"select_${_j//-/_}=false"
+    assert_success
+    refute_output release-checks
+  done
+}
+
 # why: a skipped job is shown under its id or its unexpanded name, so
 # neither may be the required name; and only `always()` keeps a failed
 # need from skipping it on a release run.
