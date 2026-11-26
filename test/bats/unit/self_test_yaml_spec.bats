@@ -4955,9 +4955,8 @@ _rollup_honours_every_need() {
 
 # ── the required-kill roster runs in every CI environment (base#1461) ────────
 #
-# Local `just test`, the hosted mutation-roster matrix (base#1571; the
-# hosted lint-static legs ran it before that) and the self-hosted
-# coverage-local workflow all run `just test mutation-required`. Which
+# The hosted mutation-roster matrix and the self-hosted coverage-local
+# workflow run `just test mutation-required`. Which
 # steps run it is decided the way the lint parity is (base#1412): by
 # RUNNING every `run:` step of the job in a checkout copy whose roster
 # driver is a recorder, not by reading the step text. A quoted, variable

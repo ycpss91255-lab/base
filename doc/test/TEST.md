@@ -526,16 +526,39 @@ finished, and a failing run publishes no pass. The first INT / TERM is
 forwarded to every row's probe, which restores and stops; the run exits
 130 / 143 with no verdict.
 
-**Where it runs.** The no-flag `just test` runs it on the host after the
-lint phase and before bats, and a red roster stops the run before bats.
-Every leg of the hosted `mutation-roster` job runs `just test
+**Where it runs.** It is a release-only check (ADR-00000042, base#2177). The
+hosted `mutation-roster` job runs on a tag push, whose `release` job needs
+it, and on `workflow_dispatch`; a pull request, a merge group and a push to
+`main` skip it. Every leg of that job runs `just test
 mutation-required --shard <its shard>` (rows are dealt by their seconds in
 `seconds.txt`, heaviest first, each to the shard holding the fewest seconds
-so far, so the twenty legs together probe every row; every leg still
+so far, so the legs together probe every row; every leg still
 validates every row), and the self-hosted `config-gen` job in
 `coverage-local.yaml` runs the whole roster; each as a step of its own, with
-no `if:` and no `continue-on-error`. The pre-PR mirror covers it through
-`just test`. `--lint`, `--ci` and the coverage modes do not run it.
+no `if:` and no `continue-on-error`. No `test.sh` mode runs it, the no-flag
+`just test` included, and the pre-PR mirror lists it as excluded.
+
+**Before a release**, run it on the commit to be tagged, in one of two ways:
+
+```bash
+just test mutation-required                 # local: the roster alone
+gh workflow run self-test.yaml --ref main   # hosted: the whole CI, the roster included
+```
+
+The hosted run takes the branch's latest commit, so check that it is the one
+to be tagged. It shares one concurrency group with the pushes to `main`, which
+keeps a single pending run: a later merge cancels it while it waits, and it
+cancels a push run that waits.
+
+Nothing enforces this step. A roster that is red on the tag itself withholds
+the GitHub Release and nothing else:
+
+- The tag is pushed all the same: the `v*` ruleset asks for a green
+  `ci-rollup` on the commit, and the merge group's is green without the
+  roster.
+- `upgrade.sh` and `init.sh` pick the newest `vX.Y.Z` tag, not the newest
+  GitHub Release, so a downstream upgrade takes it.
+- `release-test-tools.yaml` has published its images.
 
 ## Maintaining these docs
 
