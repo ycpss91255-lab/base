@@ -9155,13 +9155,14 @@ directions, so the derivation cannot drift away from the tree it is about.
 | `main copies tmux.conf to config directory` | Config copy |
 | `script runs entry_point when executed directly` | Direct-run guard |
 
-### test/bats/unit/toml_bridge_spec.bats (88)
+### test/bats/unit/toml_bridge_spec.bats (89)
 
 | Test | Description |
 |------|-------------|
 | `toml-bridge: Dockerfile exists` | ADR-37 mandates a standalone toml-bridge image for containerised parsing |
 | `toml-bridge: Python version pinned with tool-pin marker` | reproducible builds require a pinned Python base with tool-pin marker |
-| `toml-bridge: tomli version pinned with tool-pin marker` | reproducible builds require a pinned tomli dependency with tool-pin marker |
+| `toml-bridge: the image installs no tomli beside the stdlib tomllib (base#2184)` | the bridge imports the stdlib tomllib first; a tomli is never loaded |
+| `toml-bridge: the image runs the bridge once at build time (base#2184)` | otherwise every `docker run --rm` recompiles the bridge's imports |
 | `toml-bridge: Python bridge script exists in build context` | the Dockerfile COPY needs the script present in the build context |
 | `toml-bridge: bash shim exists and is sourceable` | the shim is the host-side entry point sourced by all TOML consumers |
 | `toml-bridge: shim converts TOML to JSON via docker run` | golden-path contract -- TOML in, JSON out, via docker run |
