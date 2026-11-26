@@ -482,7 +482,7 @@ docker rmi <old-id-of ... if displaced>` visible + zero real rmi), and
 | `build.sh --dry-run prints planned prune step + does not rmi` | - |
 | `build.sh --help mentions --no-prune (#387)` | - |
 
-### test/bats/unit/build_sh_spec.bats (63)
+### test/bats/unit/build_sh_spec.bats (67)
 
 Unit tests for `build.sh` argument handling and control flow. Uses a sandbox
 tree mirroring the expected layout (build.sh + `template/` subtree with real
@@ -587,6 +587,10 @@ runs).
 | `build.sh --verbose long form is accepted (#311)` | - |
 | `build.sh -vv --dry-run enables bash trace (set -x output on stderr) (#311)` | - |
 | `build.sh aborts on a failing pre-build hook and skips docker build (#690)` | - |
+| `build.sh --dry-run passes --build-arg CONFIG_GEN_DIGEST=<12 hex> to the test-tools build (base#2045)` | the local test-tools image can only report the digest the config-gen shim compares if the wrapper hands it over at build time; without it every native config-gen reads as stale (base#2045). |
+| `build.sh CONFIG_GEN_DIGEST follows .base/dockerfile/config-gen edits only (base#2045)` | pins that the digest tracks the config-gen sources, so an edit there changes the image identity (base#2045). |
+| `build.sh CONFIG_GEN_DIGEST ignores Dockerfile.test-tools edits (base#2045)` | pins that the digest is not taken over the test-tools Dockerfile, which the config-gen binary does not depend on (base#2045). |
+| `build.sh with TEST_TOOLS_IMAGE set prints no test-tools build and no digest (base#2045)` | a caller-pinned test-tools image is never built here, so no digest argument is passed for it either (base#2045). |
 
 ### test/bats/unit/build_sh_verify_spec.bats (18)
 
@@ -6351,7 +6355,7 @@ rule with nothing comparing them is the #1012 shape with one fewer copy.
 | `release-ref: every prerelease classifier under script/ci is one this spec can ask (#1012)` | "One home per classified thing" is only true while the homes agree wherever their inputs overlap. #1012's own reasoning is that three hand-kept copies of a rule are a defect BECAUSE nothing in the tree compared any pair of them; two hand-kept copies with nothing comparing them is the same shape with one fewer copy. The owner list is derived by the same predicate the site scan uses, so a third classifier lands here the day it lands in script/ci/ -- and it fails until someone states how to ask it, because an interface is the one thing a scan cannot derive. |
 | `release-ref: no two prerelease classifiers disagree where both answer (#1012)` | The two owners accept different grammars on purpose -- a released VERSION must carry the `v` a downstream repo pins, a git REF may be a full `refs/tags/...` -- so each refuses inputs the other reads. What must never happen is the pair ANSWERING a shared input differently: one of them would be marking a Release final or moving the org's `test-tools:latest` for a tag the other calls a release candidate. Only inputs both owners accept are compared; a refusal is not a disagreement. |
 
-### test/bats/unit/release_test_tools_yaml_spec.bats (58)
+### test/bats/unit/release_test_tools_yaml_spec.bats (64)
 
 Structural assertions for `.github/workflows/release-test-tools.yaml`. Locks
 the publish surface that downstream Dockerfile.example's `FROM
@@ -6460,6 +6464,12 @@ each moved `:latest`.
 | `release-test-tools.yaml: the build step passes CONFIG_GEN_DIGEST as a build arg (base#2043)` | computing the digest is not enough; the build step has to carry it as the CONFIG_GEN_DIGEST build arg the Dockerfile declares (base#2043). |
 | `release-test-tools.yaml: the digest step runs before the build step (base#2043)` | a step's output is only readable by steps after it, so the digest step has to come before the build step that consumes it (base#2043). |
 | `release-test-tools.yaml: the digest script's failure fails the step (base#2043)` | a command substitution inside an echo argument discards the script's exit status, so a failing config_gen_digest.sh would still write an empty output and the build would publish with the empty default. The script has to be assigned on its own line so a non-zero exit fails the step (base#2043). |
+| `release-test-tools.yaml: a smoke-arch job runs on the build matrix after build (base#1849)` | the job has to exist, on the same matrix as build, behind build, or the arm64 image is still never run (base#1849). |
+| `release-test-tools.yaml: the smoke-arch job carries the same-repo guard (base#1849)` | smoke-arch is self-hosted-eligible by the static rule, so it carries the same fork guard as build (base#1849). |
+| `release-test-tools.yaml: merge needs both build and smoke-arch (base#1849)` | the merge job attaches the tags, so it has to wait for both architectures to pass (base#1849). |
+| `release-test-tools.yaml: smoke-arch selects the digest whose content equals matrix.platform (base#1849)` | the job has to test the digest built for ITS platform, and refuse when none matches rather than pull nothing (base#1849). |
+| `release-test-tools.yaml: smoke-arch runs config-gen version and requires a toolchain line (base#1849)` | `config-gen version` is the run check; no `toolchain ` line in its output has to fail the job (base#1849). |
+| `release-test-tools.yaml: smoke-arch compares the ELF machine byte of config-gen with the platform (base#1849)` | the ELF machine byte at offset 18 of the binary inside the image is the architecture the binary was built for: 3e amd64, b7 arm64 (ELF e_machine EM_X86_64 / EM_AARCH64) (base#1849). |
 
 ### test/bats/unit/release_version_spec.bats (12)
 
@@ -9008,7 +9018,7 @@ is where a whole-tree scan belongs (base#1075).
 | `_run_test_name_backtick: DIES when the tree holds no spec file at all` | An empty population is the shape that goes green by construction: the specs moved, the lint reads nothing and reports a clean tree |
 | `_run_test_name_backtick: DIES when the spec files carry no '@test' line` | The blind-detector case, and the one that matters most: 4848 '@test' lines exist today, so zero means the anchor stopped matching -- a renamed keyword, a changed convention -- and a blind detector reports every name clean |
 
-### test/bats/unit/test_tools_config_gen_digest_spec.bats (6)
+### test/bats/unit/test_tools_config_gen_digest_spec.bats (7)
 
 Dockerfile.test-tools stamps `-X main.contentDigest=${CONFIG_GEN_DIGEST}`
 and the shell shim compares that stamp with `tool_image_derive config_gen`.
@@ -9017,12 +9027,13 @@ _ensure_test_tools_image must run script/ci/config_gen_digest.sh and hand
 its output to `docker compose build test-tools` as CONFIG_GEN_DIGEST, and
 compose.yaml must list the arg in the bare form so compose passes it on.
 
-The tree is a scratch copy so a config-gen source can be edited. The
-expected digest is the literal observed from the shell library itself
-(`tool_image_derive config_gen` -> config-gen:2173903f6c17 on the seeded
-tree), not recomputed here. The seeded tree is the live
-dockerfile/config-gen, so any edit to those sources moves this literal. Unit
-level (ADR-00000018).
+The tree is a scratch copy so a config-gen source can be edited. Its
+dockerfile/ holds a small FIXED synthetic config-gen, not a copy of the live
+dockerfile/config-gen, so adding a file there (a corpus testdata file, say)
+cannot move the expected digest (base#2201, same as base#2104). The expected
+digest is the literal observed from the shell library itself
+(`tool_image_derive config_gen` on the seeded tree), not recomputed here.
+Unit level (ADR-00000018).
 
 | Test | Description |
 |------|-------------|
@@ -9032,6 +9043,7 @@ level (ADR-00000018).
 | `_ensure_test_tools_image: an edit outside dockerfile/config-gen keeps the recorded digest` | acceptance 4. An edit outside dockerfile/config-gen leaves it alone. |
 | `_ensure_test_tools_image: a failing config_gen_digest.sh refuses and does not build` | acceptance 3. A script failure refuses through ci_tooling_build_failed and never reaches `docker compose build`. |
 | `_ensure_test_tools_image: a caller-pinned TEST_TOOLS_IMAGE builds nothing` | acceptance 2. A caller-pinned image returns early and never runs the script, so no build happens. |
+| `_ensure_test_tools_image: an extra testdata file in the live checkout does not move the digest` | base#2201. The spec must not read the live dockerfile/config-gen: a checkout whose config-gen holds an extra testdata file records the same pinned digest. |
 
 ### test/bats/unit/test_tools_pins_spec.bats (18)
 
