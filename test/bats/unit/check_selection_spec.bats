@@ -27,7 +27,7 @@ setup() {
 }
 
 # The map's names, in its output order: one per select_* key the diff
-# decides. config-gen stands for config-gen-gates and config-gen-redpath.
+# decides. config-gen stands for config-gen-gates.
 GATED_JOBS="config-gen coverage coverage-gate acceptance system worker-selftest shellcheck hadolint bats-fragile test-tools-image-arm64"
 # Every gated job but config-gen: what a config-gen deny-list path runs.
 NOT_CONFIG_GEN="coverage coverage-gate acceptance system worker-selftest shellcheck hadolint bats-fragile test-tools-image-arm64"

@@ -209,6 +209,7 @@ jobs:
       # The names are script/ci/check_selection.sh --jobs, and the diff
       # step's release_jobs.
       select_config_gen: ${{ steps.diff.outputs.select_config_gen }}
+      select_config_gen_redpath: ${{ steps.diff.outputs.select_config_gen_redpath }}
       select_coverage: ${{ steps.diff.outputs.select_coverage }}
       select_coverage_gate: ${{ steps.diff.outputs.select_coverage_gate }}
       select_acceptance: ${{ steps.diff.outputs.select_acceptance }}
@@ -282,7 +283,7 @@ jobs:
           fi
           # The release-only jobs (ADR-00000042): the event and the ref alone
           # decide, and one the case does not name runs them.
-          release_jobs=(mutation_roster)
+          release_jobs=(mutation_roster config_gen_redpath)
           release_run=true
           case "${EVENT_NAME}:${EVENT_REF:-}" in
             pull_request:* | merge_group:* | push:refs/heads/*) release_run=false ;;
@@ -2101,12 +2102,8 @@ jobs:
     if: needs.classify.outputs.select_config_gen == 'true'
     # The config generator's Go gates (ADR-00000039): fmt, vet, lint, race
     # and coverage in dockerfile/Dockerfile.config-gen's test stage and the
-    # binary's usage contract, as ONE command, `just test go-gates`. With
-    # the config-gen-redpath matrix below it is `just test go`, the command
-    # the self-hosted coverage-local.yaml job and the pre-PR mirror run, so
-    # a green here and a green there are one claim. The two were one job
-    # until base#1547: the redpath's serial cases took that job to about 91
-    # minutes.
+    # binary's usage contract, as ONE command, `just test go-gates`, which
+    # the pre-PR mirror runs too.
     #
     # Each config-gen job is compared WHOLE by self_test_yaml_spec.bats: its
     # keys, its `if`, its steps (the checkout, the three just-pin steps
@@ -2118,11 +2115,8 @@ jobs:
     # `continue-on-error`, a job or workflow `env:` such as BASH_ENV, a
     # `defaults:` block, a setup step that exports BASH_ENV through
     # $GITHUB_ENV -- fails that spec rather than leaving this job green
-    # with the gates unrun. Both config-gen jobs read the same inputs, so
-    # both gate on the one classify key select_config_gen (base#1584): the
-    # map drops it for docs, spec leaves and exact config-gen deny-list
-    # paths, and ci-rollup passes either job's skip only when that key is
-    # `false`.
+    # with the gates unrun. The map drops select_config_gen for docs, spec
+    # leaves and exact config-gen deny-list paths.
     runs-on: ubuntu-latest
     # The gates' test and final stages: two docker builds and the mutation
     # gate over the changed packages. A ceiling, not a budget; not raised
@@ -2166,7 +2160,10 @@ jobs:
   config-gen-redpath:
     name: Config-gen redpath shard ${{ matrix.shard }}/5${{ matrix.label }} (base#1547)
     needs: [classify]
-    if: needs.classify.outputs.select_config_gen == 'true'
+    if: needs.classify.outputs.select_config_gen_redpath == 'true'
+    # Release-only (ADR-00000042): a tag push and workflow_dispatch run it,
+    # and the tag's `release` job needs it.
+    #
     # The redpath, which plants one defect per gate in a scratch copy and
     # requires each to go red on its own gate, split into the shards
     # script/test/config_gen_redpath_shards.tsv names (base#1547): each job
@@ -2269,13 +2266,10 @@ jobs:
     # Conditionally-gated jobs (shellcheck / hadolint / bats-fragile /
     # coverage / coverage-gate / acceptance / system / worker-selftest /
     # mutation-roster / test-tools-image-arm64) each run under `if: needs.classify.outputs.select_<job> == 'true'`;
-    # config-gen-gates and config-gen-redpath both run under
-    # `select_config_gen` (base#1547 split one job into two). Each key is
-    # one classify writes from the base side's map
-    # (script/ci/selection_at_base.sh), or from the event for a release-only
-    # job. The `if:` and this rollup read the
-    # same key, so a skip passes only where classify decided it (#317
-    # P1/P3, #376, #377, #615, #677, base#1584).
+    # config-gen-gates runs under `select_config_gen` and config-gen-redpath
+    # under `select_config_gen_redpath`. classify writes each key, from the
+    # base side's map (script/ci/selection_at_base.sh) or, for a release-only
+    # job, from the event.
     #
     # `coverage` is IN `needs:` (#615, ADR-00000008): a sharded kcov PR
     # gate -- a kcov test failure fails the matrix and this rollup. The
@@ -2328,9 +2322,9 @@ jobs:
           # is excused only when the classify key the job's `if:` reads is
           # exactly "false"; a failed classify leaves every key empty, so
           # then no skip is. The job-to-key map is explicit, never a
-          # rewrite of the job name: config-gen-gates and
-          # config-gen-redpath both read select_config_gen (base#1547),
-          # and a job the map does not name has no key, so its skip fails.
+          # rewrite of the job name: config-gen-gates reads
+          # select_config_gen, and a job the map does not name has no key,
+          # so its skip fails.
           verdicts="$(jq -r '
             {
               "shellcheck": "select_shellcheck",
@@ -2342,7 +2336,7 @@ jobs:
               "system": "select_system",
               "worker-selftest": "select_worker_selftest",
               "config-gen-gates": "select_config_gen",
-              "config-gen-redpath": "select_config_gen",
+              "config-gen-redpath": "select_config_gen_redpath",
               "mutation-roster": "select_mutation_roster",
               "test-tools-image-arm64": "select_test_tools_image_arm64"
             } as $keys

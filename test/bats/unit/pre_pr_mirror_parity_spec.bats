@@ -327,8 +327,10 @@ ${_table}"
   local _table _jobs _job _reason _recipe
   _table="$(_mirror_table)" || return 1
   _jobs="$(_release_only_jobs)" || return 1
-  grep -Fxq mutation-roster <<<"${_jobs}" \
-    || fail "classify still selects mutation-roster for a pull request; release-only jobs read: ${_jobs:-none}"
+  for _job in mutation-roster config-gen-redpath; do
+    grep -Fxq "${_job}" <<<"${_jobs}" \
+      || fail "classify still selects ${_job} for a pull request; release-only jobs read: ${_jobs:-none}"
+  done
   while IFS= read -r _job; do
     _reason="$(awk -F'\t' -v j="${_job}" '$1 == "excluded" && $2 == j {print $3}' <<<"${_table}")"
     [[ -n "${_reason}" ]] || fail "the mirror does not exclude ${_job}, which CI runs for no pull request"
@@ -336,7 +338,7 @@ ${_table}"
       || fail "${_job}: the exclusion names no just test recipe: ${_reason}"
     _recipe="${BASH_REMATCH[1]}"
     [[ -n "$(_recipe_body "${_recipe}")" ]] || fail "${_job}: ${JUSTFILE_TEST} declares no ${_recipe} recipe"
-    yaml_job_lines "${WF}" "${_job}" | grep -Fq -- "just test ${_recipe}" \
+    yaml_job_lines "${WF}" "${_job}" | grep -Eq -- "just test ${_recipe}( |\$)" \
       || fail "${_job}: its CI job does not run just test ${_recipe}"
   done <<<"${_jobs}"
 }
@@ -930,7 +932,7 @@ _make_report() {
 ${_recipe}"
 }
 
-# ── config-gen: just test go is attested and planned (base#1462) ─────────────
+# ── config-gen: just test go-gates is attested and planned ───────────────────
 
 # why: A gate read by substring took `<gate> && false` -- a job that
 # never runs -- for a gated job, so the plan check demanded a local
@@ -947,44 +949,38 @@ ${_recipe}"
   assert_output always
 }
 
-# why: config-gen joins ci-rollup's needs, so the mirror must run the same
-# one command CI runs for it, and that command must resolve to a recipe.
-# base#1547 split the hosted job into config-gen-gates and the
-# config-gen-redpath shard matrix, which run `just test go`'s two recipes;
-# the mirror runs `just test go` itself, their union, for both. Both
-# jobs gate on the one select_config_gen key (base#1584), so _ci_gate
-# reads the same map job, config-gen, from each.
-@test "pre-PR mirror: config-gen is attested by exactly just test go (base#1462)" {
-  local _table _job
+# why: the mirror runs the recipe the CI job runs; `just test go` would also
+# run the redpath, which CI runs for no pull request.
+@test "pre-PR mirror: config-gen-gates is attested by exactly just test go-gates (base#1462, base#2176)" {
+  local _table
   _table="$(_mirror_table)" || return 1
-  for _job in config-gen-gates config-gen-redpath; do
-    run _attested_cmd "${_table}" "${_job}"
-    assert_output 'just test go'
-    run _ci_gate "${_job}"
-    assert_output select:config-gen
-  done
-  run _local_mode 'just test go'
+  run _attested_cmd "${_table}" config-gen-gates
+  assert_output 'just test go-gates'
+  run _ci_gate config-gen-gates
+  assert_output select:config-gen
+  run _local_mode 'just test go-gates'
   assert_output plain
 }
 
-# why: The config generator's sources are code paths; a diff touching only
-# them must plan the Go gates, and a docs-only diff must not.
-@test "pre-PR mirror: a config-gen diff plans just test go and a docs-only diff does not (base#1462)" {
+# why: a diff in the generator's sources can break the gates and a docs-only
+# one cannot; no diff plans the redpath, through either recipe that runs it.
+@test "pre-PR mirror: a config-gen diff plans just test go-gates and a docs-only diff does not (base#1462, base#2176)" {
   _require_mirror
   run bash "${MIRROR}" --plan <<<"dockerfile/config-gen/cmd/config-gen/main.go"
   assert_success
-  assert_line 'just test go'
+  assert_line 'just test go-gates'
+  refute_line --regexp '^just test go( |$|-redpath)'
   run bash "${MIRROR}" --plan <<<"doc/test/TEST.md"
   assert_success
-  refute_line 'just test go'
+  refute_line --regexp '^just test go'
 }
 
 # why: The mutation baseline (base#1464) is a script the 00-manifest step
-# runs inside `just test go`, and its spec is integration tier. A diff that
+# runs inside the gates, and its spec is integration tier. A diff that
 # touches only one of the three must plan both, so the mirror runs the step
 # and the spec that pins it. The mirror sets no CONFIG_GEN_MUTATION_CONTEXT,
 # so it runs the pr default the spec proves.
-@test "pre-PR mirror: a mutation-baseline diff plans just test go and just test (base#1464)" {
+@test "pre-PR mirror: a mutation-baseline diff plans just test go-gates and just test (base#1464, base#2176)" {
   _require_mirror
   local _p
   for _p in script/test/config_gen_mutation_targets.sh \
@@ -992,7 +988,7 @@ ${_recipe}"
             test/bats/integration/config_gen_mutation_targets_spec.bats; do
     run bash "${MIRROR}" --plan <<<"${_p}"
     assert_success
-    assert_line 'just test go'
+    assert_line 'just test go-gates'
     assert_line 'just test'
   done
 }
@@ -1001,7 +997,8 @@ ${_recipe}"
 # the config generator, with a `bash` first on PATH that records every
 # planned command and hands each `just ...` one to the real bash, and a
 # recording `just` first on PATH that logs its argv, one `|`-joined line per
-# call, to ${SCRATCH}/just and exits <just-rc> for `test go` (0 otherwise).
+# call, to ${SCRATCH}/just and exits <just-rc> for `test go-gates` (0
+# otherwise).
 _stub_just_run() {
   local _base _real
   _real="$(command -v bash)"
@@ -1023,7 +1020,7 @@ STUB
   cat > "${SCRATCH}/bin/just" <<STUB
 #!${_real}
 (IFS='|'; printf '%s\n' "\$*") >> "${SCRATCH}/just"
-[[ "\$*" == 'test go' ]] && exit ${1}
+[[ "\$*" == 'test go-gates' ]] && exit ${1}
 exit 0
 STUB
   chmod +x "${SCRATCH}/bin/bash" "${SCRATCH}/bin/just"
@@ -1032,23 +1029,22 @@ STUB
       "${SCRATCH}/repo/script/ci/pre_pr_mirror.sh" --base "${_base}"
 }
 
-# why: The plan naming `just test go` is a string; what CI attests is the
-# recipe `just` runs for argv `test go`, and that its red reaches the
-# mirror's own exit status (base#1462).
-@test "pre-PR mirror: a config-gen diff calls just with argv test go, and its red fails the mirror (base#1462)" {
+# why: a planned string attests nothing unless `just` is handed that recipe,
+# and no other config-gen one, and its red reaches the mirror's exit status.
+@test "pre-PR mirror: a config-gen diff calls just with argv test go-gates, and its red fails the mirror (base#1462, base#2176)" {
   _require_mirror
   _stub_just_run 0
   assert_success
   [[ -f "${SCRATCH}/just" ]] || fail "the mirror never called just"
-  run grep -cFx 'test|go' "${SCRATCH}/just"
-  assert_output 1
+  run grep -E '^test\|go' "${SCRATCH}/just"
+  assert_output 'test|go-gates'
 
   rm -rf "${SCRATCH:?}/repo" "${SCRATCH:?}/bin" "${SCRATCH}/ran" "${SCRATCH}/just"
   _stub_just_run 1
   assert_failure
-  assert_output --partial 'RED at: just test go'
-  run grep -cFx 'test|go' "${SCRATCH}/just"
-  assert_output 1
+  assert_output --partial 'RED at: just test go-gates'
+  run grep -E '^test\|go' "${SCRATCH}/just"
+  assert_output 'test|go-gates'
 }
 
 # ── the commit-attribution leg (base#1989) ───────────────────────────────────
