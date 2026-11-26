@@ -80,7 +80,7 @@ establishes one of those is `elevates-principle`.
 | 00000010 -- layered `just` entry + base/downstream split | elevates-invariant (6) | invariant 6 (subtree / thin caller) | Established the `dist/` split + layered entry. Its docker-top-level decision was superseded-in-part by ADR-00000011 sec.1 -- recommend a forward-pointer (follow-up). |
 | 00000011 -- zero-special-case `just` command model | elevates-invariant (6) | invariant 6 (subtree / thin caller) | The current command model + generic test runner; amends ADR-00000010 and ADR-00000006. |
 | 00000012 -- tool-first test layout | keep (supersedes 00000004) | invariant 7 (test bar) -- mechanism | Its category *vocabulary* was later amended by ADR-00000018; forward-pointer already present. |
-| 00000013 -- strip transient issue refs from comments | keep | invariant 2 (never fail silently) -- the issue-ref lint | PRD invariant 2 names the issue-ref lint as one of its enforcing guards. |
+| 00000013 -- strip transient issue refs from comments | keep | invariant 2 (never fail silently) -- the issue-ref lint | PRD invariant 2 names the issue-ref lint as one of its enforcing guards. 2026-11-26 修訂（base#2182），見檔內。 |
 | 00000014 -- decompose setup.sh into subsystem libs | keep | mechanism (source architecture / testability), no invariant | Deep-module decomposition; underpins invariant 7's testability but is an architecture decision. |
 | 00000015 -- test files mirror source | keep | invariant 7 (test bar) -- mechanism | Lowers the per-file coverage shard floor; complements ADR-00000008/00000012. |
 | 00000016 -- coverage tooling evaluation | keep | invariant 7 (swappable coverage mechanism) | Status is **Rejected**: the spike disproved the "kcov = heavy ptrace" premise; kcov stays. Accurate record. |
