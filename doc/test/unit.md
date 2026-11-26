@@ -6944,7 +6944,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/self_hosted_guard_lint_spec.bats (24)
+### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
 | Test | Description |
 |------|-------------|
@@ -6963,6 +6963,8 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `self-hosted guard: PASSES the arm + amd hosted families and a windows/macos runner` | - |
 | `self-hosted guard: PASSES a literal matrix that resolves entirely to hosted labels` | - |
 | `self-hosted guard: PASSES a LOCAL reusable-workflow call` | - |
+| `self-hosted guard: PASSES a call by this repo's own slug to a workflow the tree ships (base#2171)` | base#2171. A reusable workflow has to name its next level by full path, so a call by this repo's own slug to a workflow this tree ships is the same in-tree callee a `./` call names, and its jobs are checked where they are. |
+| `self-hosted guard: FAILS a call by this repo's own slug to a workflow the tree does not ship (base#2171)` | base#2171. The exemption is for a callee whose jobs this run checks. A file the tree does not carry, or a tree that defines no slug, proves nothing. |
 | `self-hosted guard: PASSES an eligible job that carries the guard alone` | - |
 | `self-hosted guard: PASSES an eligible job that ANDs the guard with its own gate` | - |
 | `self-hosted guard: FAILS an eligible job whose if: is a near-miss reword` | - |

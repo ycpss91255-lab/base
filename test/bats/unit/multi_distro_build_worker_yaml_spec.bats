@@ -377,14 +377,16 @@ readonly _SINGLE='[{"name":"humble","build_args":"ROS2_DISTRO=humble"}]'
 # dispatcher, so every workflow a downstream repo can call is held to the rule.
 # `$/` is the other same-repository form and carries no ref either.
 @test "no reusable workflow calls its next level by a same-repository path (base#2171)" {
-  local _file _found _hits=""
+  local _file _found _hits="" _reusable=0
   for _file in /source/.github/workflows/*.yaml /source/.github/workflows/*.yml; do
     [[ -f "${_file}" ]] || continue
     grep -qE '^[[:space:]]+workflow_call:' "${_file}" || continue
+    _reusable=$(( _reusable + 1 ))
     _found="$(strip_comments < "${_file}" \
       | grep -E "^[[:space:]]*uses:[[:space:]]*[\"']?[.\$]/\.github/workflows/" || true)"
     [[ -z "${_found}" ]] || _hits+="${_file##*/}: ${_found}"$'\n'
   done
+  (( _reusable > 0 )) || fail "no workflow declares workflow_call, so nothing was checked"
   [ -z "${_hits}" ] || fail "reusable workflow with a same-repository uses: ${_hits}"
 }
 
@@ -399,7 +401,7 @@ readonly _SINGLE='[{"name":"humble","build_args":"ROS2_DISTRO=humble"}]'
     [[ -f "${_file}" ]] || continue
     _found="$(strip_comments < "${_file}" \
       | grep -E "^[[:space:]]*uses:[[:space:]]*[\"']?${BASE_UPSTREAM_SLUG}/" \
-      | grep -vE "@${_version//./\.}[\"']?[[:space:]]*\$" || true)"
+      | grep -vE "@${_version//./\\.}[\"']?([[:space:]]+#.*)?[[:space:]]*\$" || true)"
     [[ -z "${_found}" ]] || _hits+="${_file##*/}: ${_found}"$'\n'
   done
   [ -z "${_hits}" ] || fail "base workflow ref not at ${_version}: ${_hits}"
