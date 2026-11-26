@@ -2094,7 +2094,7 @@ on hand-edited / malformed setup.conf:
 | `_conf_split_nskey: sourcing conf.sh alone carries the registry with it (base#1185)` | base#1185 -- conf.sh gains its first dependency on schema.sh, and it must declare that itself rather than trust the caller |
 | `_conf_split_nskey: refuses rather than guessing when the registry is gone (base#1185)` | base#1185 -- an unloaded registry must not read as "nothing is sub-sectioned", an answer worse than the literal it replaced |
 
-### test/bats/unit/conf_ini_golden_spec.bats (3)
+### test/bats/unit/conf_ini_golden_spec.bats (4)
 
 `_ini_tokenize` is the single shell INI tokenizer. The Go reader that
 replaces it (the later `ini tokens` slice) must match it byte for byte, so
@@ -2109,6 +2109,7 @@ holds the shell to that record. A golden is tab-separated lines:
 | `the s25 corpus holds its eight inputs` | a corpus input added or dropped without a golden changes what the Go reader is held to; the count makes that a visible edit. |
 | `every s25 input has a golden, and no golden is orphaned` | an input without a golden is compared against nothing, and a golden without an input is a record of nothing. |
 | `_ini_tokenize over every s25 input matches its golden byte for byte` | this is the record itself: the shell answer the Go reader must reproduce byte for byte. |
+| `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. |
 
 ### test/bats/unit/conf_logging_spec.bats (12)
 
