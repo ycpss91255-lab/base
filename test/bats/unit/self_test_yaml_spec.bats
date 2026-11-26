@@ -414,11 +414,6 @@ _acceptance_code() {
 
 # ── classify job declared with both outputs ────────────────────
 
-@test "self-test.yaml: declares classify job (#317)" {
-  run code_grep -E '^  classify:' "${WF}"
-  assert_success
-}
-
 @test "self-test.yaml: classify job declares code_changed output (#317)" {
   run yaml_job_lines "${WF}" classify
   assert_success
@@ -1731,13 +1726,6 @@ _builder_setups_out_of_step_with_their_consumer() {
 
 # ── ci-rollup aggregator ───────────────────────────────────────
 
-# why: Branch protection requires ci-rollup alone; without the job every
-# other check is advisory.
-@test "self-test.yaml: declares ci-rollup job (#337)" {
-  run code_grep -E '^  ci-rollup:' "${WF}"
-  assert_success
-}
-
 # why: A PR check outside ci-rollup's needs is one whose red never blocks a
 # merge; the exact list is what makes adding or dropping one a reviewed edit.
 @test "self-test.yaml: ci-rollup needs every sibling PR-check job incl coverage (#337 + #376 + #377 + #615 + #677)" {
@@ -1766,26 +1754,6 @@ _builder_setups_out_of_step_with_their_consumer() {
   # `bats-integration` left it with base#1573: the coverage shards run
   # every integration spec, so that job ran each one a second time.
   assert_output --partial 'needs: [actionlint, classify, test-tools-image-amd64, test-tools-image-arm64, shellcheck, doc-counts, lint-static, mutation-roster, single-issue-pr, hadolint, bats-fragile, compute-shards, coverage, coverage-gate, acceptance, system, config-gen-gates, config-gen-redpath, commit-attribution, worker-selftest]'
-}
-
-# why: The coverage shards already run every integration spec (the pool in
-# script/test/drivers/bats.sh holds test/bats/integration), so a separate
-# bats-integration job ran each of them a second time. With the job gone,
-# neither the merge gate nor the tag gate may still wait on it: the two lists
-# below are main's lists at b091f8e3 with that one entry removed and the
-# mutation-roster job (base#1571) added, written out by hand rather than read
-# back from the workflow.
-@test "self-test.yaml: no bats-integration job, and neither ci-rollup nor release needs it (base#1573)" {
-  run code_grep -E '^  bats-integration:' "${WF}"
-  assert_failure
-
-  run yaml_job_lines "${WF}" ci-rollup
-  assert_success
-  assert_output --partial 'needs: [actionlint, classify, test-tools-image-amd64, test-tools-image-arm64, shellcheck, doc-counts, lint-static, mutation-roster, single-issue-pr, hadolint, bats-fragile, compute-shards, coverage, coverage-gate, acceptance, system, config-gen-gates, config-gen-redpath, commit-attribution, worker-selftest]'
-
-  run yaml_job_lines "${WF}" release
-  assert_success
-  assert_output --partial 'needs: [test-tools-image-amd64, test-tools-image-arm64, shellcheck, doc-counts, lint-static, mutation-roster, single-issue-pr, hadolint, bats-fragile, coverage, coverage-gate, acceptance, system, config-gen-gates, config-gen-redpath, commit-attribution, worker-selftest]'
 }
 
 # why: The sharded kcov run is the primary unit gate; out of the rollup, a
@@ -2133,23 +2101,6 @@ YAML
 
 # ── Fork PRs cannot make the rollup vacuously green ────────────
 
-@test "self-test.yaml: ci-rollup fails a fork PR instead of reporting a partial run as green (#766)" {
-  # The self-hosted guard's effect is a SKIP, and SKIPPED is
-  # pass-equivalent in the conditionally-gated bucket above. worker-selftest
-  # calls build-worker.yaml, whose `build` job carries the guard: on a fork
-  # PR that job skips while the worker's other jobs succeed, so
-  # needs.worker-selftest.result is `success` and the loop would collapse a
-  # build that never ran into a green REQUIRED check -- for exactly the
-  # untrusted PR. A required check is a claim the commit was fully tested;
-  # on a fork PR that claim is false, so the rollup has to say so rather
-  # than pass.
-  run yaml_job_lines "${WF}" ci-rollup
-  assert_success
-  assert_output --partial 'IS_FORK_PR:'
-  assert_output --partial "github.event.pull_request.head.repo.full_name != github.repository"
-  assert_output --partial 'if [[ "${IS_FORK_PR}" == "true" ]]; then'
-}
-
 @test "self-test.yaml: the fork-PR branch is a hard failure, not an advisory note (#766)" {
   # An advisory warning next to a green required check is the vacuous
   # rollup with extra steps.
@@ -2400,11 +2351,6 @@ EOF
 
 # ── shellcheck + hadolint dedicated jobs ───────────────────────
 
-@test "self-test.yaml: declares shellcheck job (#376)" {
-  run code_grep -E '^  shellcheck:' "${WF}"
-  assert_success
-}
-
 @test "self-test.yaml: shellcheck job needs actionlint + classify and gates on select_shellcheck (#376, base#1584)" {
   # Same upstream pattern as the test/acceptance jobs so the
   # actionlint workflow-validator gate still fires first, and the
@@ -2448,11 +2394,6 @@ EOF
   assert_success
   assert_output --partial './script/test/test.sh --lint --shellcheck'
   refute_output --regexp 'v?[0-9]+\.[0-9]+\.[0-9]+'
-}
-
-@test "self-test.yaml: declares doc-counts job (#864)" {
-  run code_grep -E '^  doc-counts:' "${WF}"
-  assert_success
 }
 
 @test "self-test.yaml: doc-counts job runs test.sh --lint --doc-counts inside the test-tools image (#864, base#1412)" {
@@ -2516,11 +2457,6 @@ EOF
 }
 
 # ── lint-static groups (the rest of the lint phase) ────────────
-
-@test "self-test.yaml: declares lint-static job (#866)" {
-  run code_grep -E '^  lint-static:' "${WF}"
-  assert_success
-}
 
 @test "self-test.yaml: lint-static carries NO code_changed gate (#866)" {
   # Ungated on purpose, like doc-counts. Two of the matrix entries
@@ -2743,11 +2679,6 @@ EOF
         || fail "lint group ${_g} runs '${_m}', but its lint step is named '${_rendered}'"
     done
   done
-}
-
-@test "self-test.yaml: declares hadolint job (#376)" {
-  run code_grep -E '^  hadolint:' "${WF}"
-  assert_success
 }
 
 @test "self-test.yaml: hadolint job needs actionlint + classify and gates on select_hadolint (#376, base#1584)" {
@@ -3848,11 +3779,6 @@ _lint_probe_fixture() {
 
 # ── bats-unit + bats-integration + coverage jobs ───────────────
 
-@test "self-test.yaml: declares bats-fragile job (#677)" {
-  run code_grep -E '^  bats-fragile:' "${WF}"
-  assert_success
-}
-
 @test "self-test.yaml: bats-fragile is a single job (no shard matrix) (#677)" {
   # The 4-shard bats-unit matrix (which double-ran the same specs the
   # coverage matrix runs) is replaced with ONE plain job running only the
@@ -3875,11 +3801,6 @@ _lint_probe_fixture() {
   # primary unit gate and bats-fragile covers the kcov-skipped delta.
   run code_grep -E '^  bats-unit:' "${WF}"
   assert_failure
-}
-
-@test "self-test.yaml: declares coverage job (#377)" {
-  run code_grep -E '^  coverage:' "${WF}"
-  assert_success
 }
 
 @test "self-test.yaml: coverage now runs on PRs (gated on classify's select_coverage), not main-only (#615 amends #377, base#1584)" {

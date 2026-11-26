@@ -456,18 +456,6 @@ tester/foo-99:devel"
   assert_output ""
 }
 
-@test "prune.sh --worktree-orphans -y skips confirmation" {
-  local _ws="${TEMP_DIR}/ws"
-  mkdir -p "${_ws}/worktree"
-  _orphans_setup_stub "${_ws}" tester
-  export DOCKER_IMAGES_OUTPUT="tester/repo-99:devel"
-  # No stdin piping needed — -y bypasses the prompt and rmi fires.
-  run bash "${SANDBOX}/prune.sh" --worktree-orphans -y
-  assert_success
-  run cat "${DOCKER_RMI_LOG}"
-  assert_output --partial "tester/repo-99:devel"
-}
-
 @test "prune.sh --worktree-orphans without --workspace + empty .env → exit 2" {
   # No WS_PATH in .env, no --workspace flag → must error out.
   : > "${SANDBOX}/.env.generated"

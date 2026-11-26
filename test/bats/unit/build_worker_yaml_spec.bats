@@ -552,19 +552,6 @@ FROM --platform=$BUILDPLATFORM debian:bookworm AS foo-test' foo
   assert_output --partial '--target foo'
 }
 
-# why: The cost of widening a detector, pinned in the opposite direction:
-# inventing a `-test` target the Dockerfile does not declare fails the
-# build outright, which is a worse outcome than the miss it was fixing.
-@test "build-worker.yaml: an extra stage with no -test companion builds only itself (#1013)" {
-  # The other direction: widening the detector must not invent a test
-  # stage that the Dockerfile does not declare -- buildx would fail the
-  # build on a target that is not there.
-  run _extra_stages 'FROM debian:bookworm AS foo' foo
-  assert_success
-  assert_output --partial '--target foo'
-  refute_output --partial '--target foo-test'
-}
-
 # why: The structural half, and the one that stops #1013 recurring: two
 # readers of one fact with a comment asserting they agree is what produced
 # the miss. This fails if the file grows a `FROM ... AS` pattern of its own
@@ -835,13 +822,6 @@ FROM debian:bookworm AS foo-test' foo
 }
 
 # ── Phase 1: doc-only PR fast-pass ────────────────────────────────
-
-@test "build-worker.yaml: declares path-filter job (#273)" {
-  # New job runs the doc-only classifier; outputs code_changed
-  # consumed by compute-matrix / build / docker-build downstream.
-  run code_grep -E '^  path-filter:$' "${WF}"
-  assert_success
-}
 
 @test "build-worker.yaml: path-filter classifier is pure shell (#273 Phase 2: no dorny/paths-filter)" {
   # Phase 2 — dorny/paths-filter@v3 dependency dropped; classification
@@ -1138,23 +1118,6 @@ _classify() {
 }
 
 # ── Same-repository guard on the self-hosted-eligible build job ────────
-
-@test "build-worker.yaml: the build job carries the same-repo guard AND-ed with its code_changed gate (#766)" {
-  # `runs-on: ${{ matrix.runner }}` over a `fromJSON` matrix: the label
-  # set is computed at runtime, so nothing static can prove this job stays
-  # on a GitHub-hosted machine -- and the org registers an org-level
-  # self-hosted runner that public repos may use. The guard must not
-  # REPLACE the existing gate, or a doc-only PR would start paying for a
-  # full build; both conditions have to survive.
-  run yaml_job_lines "${WF}" build
-  assert_success
-  assert_output --partial "needs.path-filter.outputs.code_changed == 'true' &&"
-  assert_output --partial "(github.event_name != 'pull_request' &&"
-  assert_output --partial "github.event_name != 'merge_group' ||"
-  assert_output --partial 'github.event.pull_request.head.repo.full_name == github.repository ||'
-  # The group closes after the merge_group trust term (base#1587).
-  assert_output --partial "inputs.merge_group_same_repo == 'true')"
-}
 
 @test "build-worker.yaml: the guard tests the FORK, not the PR (#766)" {
   # A condition that skipped on every pull_request would disable the

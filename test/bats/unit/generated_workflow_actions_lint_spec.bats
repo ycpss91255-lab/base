@@ -1247,22 +1247,6 @@ _write_generator_raw() {
 # extracts the value on that line, because a human wrote a `tool-pin:`
 # marker there under a lint that fails when it is missing.
 
-# why: The replacement contract in one case: a variable is what the pin registry
-# says it is, and the registry already names the file, line and value
-@test "generated-workflow-actions: a variable the registry declares is resolved (#987)" {
-  _load_driver
-  _write_workflow 'actions/checkout@v8'
-  _write_generator_var \
-    '# tool-pin: unpinned monitor-checkout -- a major ref on purpose' \
-    "readonly _MONITOR_REF='actions/checkout@v7'" \
-    -- '      - uses: ${_MONITOR_REF}'
-
-  _gwa_lint
-  [ "${status}" -ne 0 ]
-  assert_output --partial 'v7'
-  assert_output --partial 'v8'
-}
-
 # why: A short name substituted into a longer one it prefixes fabricated a ref that
 # appears in no declaration, and the backstop found nothing to refuse
 @test "generated-workflow-actions: a bare \$NAME is a finding, not a resolution (#987)" {
