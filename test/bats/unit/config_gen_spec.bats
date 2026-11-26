@@ -1029,6 +1029,7 @@ config_gen_tables layer.toml ${_name}"
   done
 }
 
+# bats test_tags=kcov-fragile
 # why: a file the caller's uid cannot read is refused on the host as
 #      config_gen_input_unreadable naming the caller's text, before any
 #      container starts. A mode-000 file does not stop root, so the test
