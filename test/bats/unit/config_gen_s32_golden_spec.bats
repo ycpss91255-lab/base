@@ -74,7 +74,7 @@ _check_s32() {
 }
 
 # why: A gap in the numbered keys leaves an empty block for the missing
-# number; the golden pins the bytes (red until the golden exists).
+# number; the golden pins the bytes.
 @test "s32 a gap in numbered keys leaves an empty block (base#2082)" {
   _check_s32 s32_gap "ini_to_toml_migrated"
 }
