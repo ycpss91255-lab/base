@@ -352,9 +352,8 @@ mutation-probe *args:
 # mutation that disables it. All rows are validated before any baseline,
 # each is probed by mutation-probe.sh in a private sandbox copy under its
 # own compose project, and the recipe exits 0 only when every row is
-# PINNED. MUTATION_REQUIRED_JOBS (default 4) rows run at once. The no-flag
-# `just test` runs it between the lint phase and bats; the hosted
-# lint-static legs and the self-hosted config-gen job run this recipe.
+# PINNED. MUTATION_REQUIRED_JOBS (default 4) rows run at once. Release-only
+# (ADR-00000042): no other recipe runs it.
 #
 #   just test mutation-required            # probe every row
 #   just test mutation-required --check    # validate the roster only

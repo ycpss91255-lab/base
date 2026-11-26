@@ -13,8 +13,8 @@ on:
     tags:
       - 'v*'
   pull_request:
-  # The merge queue runs the full suite on the queued group before it
-  # reaches main (base#1587).
+  # The merge queue runs all but the release-only jobs on the queued group
+  # before it reaches main.
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
@@ -185,7 +185,7 @@ jobs:
     #                          under test (#1011). The script's header
     #                          carries the reasoning for each line.
     # Non-PR events (push / tag / workflow_dispatch) default to 'true' on
-    # both outputs so post-merge / release builds run the full suite.
+    # both outputs, so no diff narrows a post-merge or release build.
     # See issue #317 for the classifier's design; #1011 for why the system
     # pathspecs live in a script rather than in a list.
     needs: actionlint
@@ -206,7 +206,8 @@ jobs:
       # select_<job>: whether the diff can affect each classify-gated job
       # (base#1584). Each gated job's `if:` reads its own key, and the
       # rollup passes that job's skip only when the same key is `false`.
-      # The names are script/ci/check_selection.sh --jobs.
+      # The names are script/ci/check_selection.sh --jobs, and the diff
+      # step's release_jobs.
       select_config_gen: ${{ steps.diff.outputs.select_config_gen }}
       select_coverage: ${{ steps.diff.outputs.select_coverage }}
       select_coverage_gate: ${{ steps.diff.outputs.select_coverage_gate }}
@@ -240,6 +241,7 @@ jobs:
       - id: diff
         env:
           EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
           BASE_REF: ${{ github.base_ref }}
           IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -278,8 +280,18 @@ jobs:
             echo "::warning::could not derive the tooling image's inputs;" \
                  "rebuilding the test-tools image from source"
           fi
+          # The release-only jobs (ADR-00000042): the event and the ref alone
+          # decide, and one the case does not name runs them.
+          release_jobs=(mutation_roster)
+          release_run=true
+          case "${EVENT_NAME}:${EVENT_REF:-}" in
+            pull_request:* | merge_group:* | push:refs/heads/*) release_run=false ;;
+          esac
+          for job in "${release_jobs[@]}"; do
+            echo "select_${job}=${release_run}" >> "${GITHUB_OUTPUT}"
+          done
           if [[ "${EVENT_NAME}" != "pull_request" ]]; then
-            # push to main / tag push / workflow_dispatch -- full suite.
+            # push to main / tag push / workflow_dispatch -- no diff narrows it.
             #
             # testtools_changed used to be the literal false here, on every
             # non-PR event including the ONE that can answer it: a push
@@ -312,11 +324,10 @@ jobs:
               echo "code_changed=true"
               echo "system_relevant=true"
               echo "testtools_changed=${testtools}"
-              # Every gated job is selected off a pull request, so main
-              # runs the full suite (owner decision, base#1584).
+              # Every job a diff can affect is selected off a pull request.
               for job in config_gen coverage coverage_gate acceptance system \
                          worker_selftest shellcheck hadolint bats_fragile \
-                         mutation_roster test_tools_image_arm64; do
+                         test_tools_image_arm64; do
                 echo "select_${job}=true"
               done
             } >> "${GITHUB_OUTPUT}"
@@ -359,7 +370,7 @@ jobs:
           fi
           for job in config-gen coverage coverage-gate acceptance system \
                      worker-selftest shellcheck hadolint bats-fragile \
-                     mutation-roster test-tools-image-arm64; do
+                     test-tools-image-arm64; do
             val="$(sed -n "s/^${job}=//p" <<< "${sel_out}")"
             [[ "${val}" == "false" ]] || val=true
             echo "select_${job//-/_}=${val}" >> "${GITHUB_OUTPUT}"
@@ -1112,8 +1123,7 @@ jobs:
           bash script/ci/single_issue_pr.sh
 
   mutation-roster:
-    # The required-kill mutation roster (base#1461), the hosted leg of the
-    # check the no-flag `just test` runs between lint and bats. It ran
+    # The required-kill mutation roster: `just test mutation-required`. It ran
     # inside the lint-static legs until base#1571, where it took most of
     # each leg's time and the checks page named it as a lint group; it is
     # a job of its own so its name says what it runs. Every leg runs it,
@@ -1132,10 +1142,8 @@ jobs:
     # case "every mutation-roster leg's list-scheduling bound over its
     # worker slots fits 240 s", a bound over seconds.txt, not a timed job.
     #
-    # A docs-only pull request skips it: no row mutates a document, and the
-    # cases the rows' witnesses name read none (base#2110). Every other run has it whole, because choosing roster
-    # rows from a diff belongs to base#1604, not to the job selection of
-    # base#1584.
+    # Release-only (ADR-00000042): a tag push and workflow_dispatch run it,
+    # and the tag's `release` job needs it.
     needs: [actionlint, classify, test-tools-image-amd64]
     if: needs.classify.outputs.select_mutation_roster == 'true'
     runs-on: ubuntu-latest
@@ -1961,9 +1969,8 @@ jobs:
     # P3 (#317) gated this on the narrower `system_relevant` output so
     # PRs that change pure lint / unit-test / doc paths don't burn the
     # docker.sock-mounted compose run (script/ci/system_paths.sh, #1011).
-    # Since base#1584 classify's map decides, like every gated job: docs
-    # and unit or integration `*_spec.bats` leaves drop it; a system spec,
-    # a justfile and any other path run it.
+    # classify's map decides: docs and unit or integration `*_spec.bats`
+    # leaves drop it; a system spec, a justfile and any other path run it.
     if: needs.classify.outputs.select_system == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -2265,7 +2272,8 @@ jobs:
     # config-gen-gates and config-gen-redpath both run under
     # `select_config_gen` (base#1547 split one job into two). Each key is
     # one classify writes from the base side's map
-    # (script/ci/selection_at_base.sh). The `if:` and this rollup read the
+    # (script/ci/selection_at_base.sh), or from the event for a release-only
+    # job. The `if:` and this rollup read the
     # same key, so a skip passes only where classify decided it (#317
     # P1/P3, #376, #377, #615, #677, base#1584).
     #
@@ -2385,7 +2393,7 @@ jobs:
             if [[ "${doc_only}" == "true" ]]; then
               echo "::notice::Passed as a doc-only change: the diff touched nothing but Markdown under doc/, README.md, LICENSE and CONTEXT.md, so every gated job above skipped by design. This green means the classification held, not that the suite ran."
             else
-              echo "::notice::Passed with jobs classify deselected for this diff, skipped by design:${deselected}"
+              echo "::notice::Passed with jobs classify deselected for this run, skipped by design:${deselected}"
             fi
           fi
           exit "${fail}"
