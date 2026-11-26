@@ -7,7 +7,8 @@
 #
 # why a spec of its own: every case here reads a committed row against its
 # subject's bytes in /source, so a row whose spec were this file would read
-# PINNED from these cases whatever its own test does.
+# PINNED from these cases whatever its own test does. The last case of
+# mutation_roster_spec.bats refuses such a row.
 
 bats_require_minimum_version 1.5.0
 

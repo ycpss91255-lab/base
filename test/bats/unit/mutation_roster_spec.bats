@@ -13,7 +13,8 @@
 # s1571.tsv's deal-by-index and slot-reset-hard rows there turned these
 # four cases red beside the one behaviour test each row names, so either
 # row read PINNED with that test gone (base#1571). Here no row can name
-# them: the last case refuses a committed row whose spec is this file.
+# them: the last case refuses a committed row whose spec is this file or
+# mutation_roster_rows_spec.bats.
 
 bats_require_minimum_version 1.5.0
 
@@ -149,15 +150,18 @@ _leg_bound() {
 }
 
 # why: A row's spec is what the probe runs against that row's mutant, and
-# every other case in this file reads the committed roster against its
-# subject's bytes, so a row naming this file would read PINNED from those
-# cases whatever its own test does. Read straight from the TSVs.
+# the other cases in this file and in mutation_roster_rows_spec.bats read
+# the committed roster against its subject's bytes, so a row naming either
+# file would read PINNED from those cases whatever its own test does. Read
+# straight from the TSVs.
 @test "roster: no committed row names this spec, which reads every row against its subject (base#1571)" {
   assert_spec_subject_dir /source/script/test/mutation_required "the committed roster"
-  local _self _bad
+  local _self _rows _bad
   _self="test/bats/unit/$(basename "${BATS_TEST_FILENAME}")"
-  _bad="$(cd /source/script/test/mutation_required && LC_ALL=C awk -F '\t' -v self="${_self}" '
-    $0 != "" && substr($0, 1, 1) != "#" && $3 == self { print FILENAME ": " $1 }
+  _rows="test/bats/unit/mutation_roster_rows_spec.bats"
+  [[ -f "/source/${_rows}" ]] || fail "no ${_rows}: the guard would cover a file that does not exist"
+  _bad="$(cd /source/script/test/mutation_required && LC_ALL=C awk -F '\t' -v self="${_self}" -v rows="${_rows}" '
+    $0 != "" && substr($0, 1, 1) != "#" && ($3 == self || $3 == rows) { print FILENAME ": " $1 " (" $3 ")" }
   ' ./*.tsv)"
-  [[ -z "${_bad}" ]] || fail "rows probed under ${_self}:"$'\n'"${_bad}"
+  [[ -z "${_bad}" ]] || fail "rows probed under ${_self} or ${_rows}:"$'\n'"${_bad}"
 }
