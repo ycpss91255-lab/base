@@ -1846,6 +1846,14 @@ _setup_apply() {
     config_gen_resolve || return 1
   fi
 
+  # One merge per layer chain for the whole command: _conf_load_layers keeps
+  # its merged rows in this directory, removed when the command returns
+  # (base#2234).
+  local _CONF_LAYERS_MEMO_DIR=""
+  _CONF_LAYERS_MEMO_DIR="$(mktemp -d 2>/dev/null)" || _CONF_LAYERS_MEMO_DIR=""
+  # shellcheck disable=SC2064  # the path is fixed now, on purpose
+  [[ -n "${_CONF_LAYERS_MEMO_DIR}" ]] && trap "rm -rf -- '${_CONF_LAYERS_MEMO_DIR}'; trap - RETURN" RETURN
+
   _announce_template_default_fallback "${_base_path}"
 
   # A table or key no reader knows is refused before anything is
