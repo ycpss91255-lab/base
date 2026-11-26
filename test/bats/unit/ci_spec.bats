@@ -3116,6 +3116,86 @@ _kcov_slice_mock() {
   assert_output --partial "--recursive"
 }
 
+# _system_run_tree [VAR=value ...]: _run_system over the fixture tree with
+# real bats, GITHUB_ACTIONS cleared, the builder half stubbed.
+_system_run_tree() {
+  run env -u GITHUB_ACTIONS "$@" bash -c '
+    cd "${BATS_TEST_TMPDIR}"
+    REPO_ROOT="${BATS_TEST_TMPDIR}/repo"
+    _die() { echo "DIE: $*"; exit 1; }
+    source /source/script/test/drivers/bats.sh
+    _system_setup() { :; }
+    _system_teardown() { :; }
+    _run_system
+  '
+}
+
+# _system_skip_tree
+#   One spec whose setup_file skips the whole file, beside one that runs.
+_system_skip_tree() {
+  local _tree="${BATS_TEST_TMPDIR}/repo/test/bats/system"
+  _skip_audit_fixture "${_tree}/missing" '|setup_file() {
+|  skip "system test: tooling image not in the daemon"
+|}
+|
+|@test "first without its image" {
+|  true
+|}
+|
+|@test "second without its image" {
+|  true
+|}'
+  _skip_audit_fixture "${_tree}/present" '|@test "neighbour that ran" {
+|  true
+|}'
+}
+
+# why: bats counts a skip as a pass, so a CI run has to refuse one by name
+@test "_run_system: on a CI runner a skipped test fails the run, by name (base#2173)" {
+  _system_skip_tree
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_failure
+  # TAP lines carry the names too, so only the DIE line is matched.
+  assert_output --regexp "DIE: ci_system_skip .*first without its image.*second without its image"
+  refute_output --regexp "DIE: .*neighbour that ran"
+}
+
+# why: a local run may lack a prerequisite, so its skips still pass
+@test "_run_system: off a CI runner a missing prerequisite still skips and passes (base#2173)" {
+  _system_skip_tree
+  _system_run_tree
+  assert_success
+  assert_output --partial "# skip system test: tooling image not in the daemon"
+  refute_output --partial "ci_system_skip"
+}
+
+# why: the skip check must not replace bats' own pass or fail
+@test "_run_system: on a CI runner a run with no skip keeps bats' own verdict (base#2173)" {
+  local _tree="${BATS_TEST_TMPDIR}/repo/test/bats/system"
+  _skip_audit_fixture "${_tree}" '|@test "neighbour that ran" {
+|  true
+|}'
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_success
+
+  _skip_audit_fixture "${_tree}" '|@test "failing on purpose" {
+|  false
+|}'
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_failure
+  assert_output --regexp "not ok [0-9]+ failing on purpose"
+  refute_output --partial "ci_system_skip"
+}
+
+# why: a report that holds no test cannot show that nothing was skipped
+@test "_run_system: on a CI runner a run that reports no test fails (base#2173)" {
+  mkdir -p "${BATS_TEST_TMPDIR}/repo/test/bats/system"
+  mock_cmd "bats" 'exit 0'
+  _system_run_tree GITHUB_ACTIONS=true
+  assert_failure
+  assert_output --partial "DIE: ci_system_skip "
+}
+
 # why: #615 shard env plumbing
 @test "main --coverage-shard: routes to the coverage service with COVERAGE_SHARD set (#615)" {
   local _log="${BATS_TEST_TMPDIR}/docker.log"
