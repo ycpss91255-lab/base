@@ -1037,6 +1037,9 @@ _seed_config_gen_fixture() {
   : > "${SANDBOX}/compose.yaml"
 }
 
+# why: the local test-tools image can only report the digest the
+# config-gen shim compares if the wrapper hands it over at build time;
+# without it every native config-gen reads as stale (base#2045).
 @test "build.sh --dry-run passes --build-arg CONFIG_GEN_DIGEST=<12 hex> to the test-tools build (base#2045)" {
   _seed_config_gen_fixture
   run bash "${SANDBOX}/build.sh" --dry-run
@@ -1047,6 +1050,8 @@ _seed_config_gen_fixture() {
   assert_output --partial "--network host"
 }
 
+# why: pins that the digest tracks the config-gen sources, so an edit
+# there changes the image identity (base#2045).
 @test "build.sh CONFIG_GEN_DIGEST follows .base/dockerfile/config-gen edits only (base#2045)" {
   _seed_config_gen_fixture
   printf '// edit\n' >> "${SANDBOX}/.base/dockerfile/config-gen/go.mod"
@@ -1056,6 +1061,8 @@ _seed_config_gen_fixture() {
   refute_output --partial "CONFIG_GEN_DIGEST=83673c04b67a"
 }
 
+# why: pins that the digest is not taken over the test-tools
+# Dockerfile, which the config-gen binary does not depend on (base#2045).
 @test "build.sh CONFIG_GEN_DIGEST ignores Dockerfile.test-tools edits (base#2045)" {
   _seed_config_gen_fixture
   printf '# edit\n' >> "${SANDBOX}/.base/dockerfile/Dockerfile.test-tools"
@@ -1064,6 +1071,8 @@ _seed_config_gen_fixture() {
   assert_output --partial "--build-arg CONFIG_GEN_DIGEST=83673c04b67a"
 }
 
+# why: a caller-pinned test-tools image is never built here, so no
+# digest argument is passed for it either (base#2045).
 @test "build.sh with TEST_TOOLS_IMAGE set prints no test-tools build and no digest (base#2045)" {
   _seed_config_gen_fixture
   TEST_TOOLS_IMAGE=test-tools:local run bash "${SANDBOX}/build.sh" --dry-run
