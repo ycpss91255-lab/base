@@ -299,6 +299,7 @@ ci_invalid_shard
 ci_empty_shard
 ci_no_docker_socket
 ci_no_docker_cli
+ci_system_skip
 ci_unknown_option
 ci_bats_path_not_found
 ci_bats_path_system

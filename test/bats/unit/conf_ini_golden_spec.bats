@@ -78,3 +78,33 @@ _tokens_of() {
     return 1
   }
 }
+
+# why: `_dump_conf_section` is the shell answer the later `ini dump-section`
+# slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below
+# are written out by hand from the corpus files, not derived by the code
+# under test; the goldens are the exact stdout bytes, one file per pair.
+@test "_dump_conf_section over every s25 input and section matches its golden byte for byte" {
+  local _pair _stem _sec _bad=""
+  local -a _pairs=(
+    "s25_comments:image" "s25_comments:build"
+    "s25_keys_before_header:image"
+    "s25_repeated_sections:a" "s25_repeated_sections:b"
+    "s25_repeated_keys:a"
+    "s25_dotted_keys:stage:dev"
+    "s25_equals_in_value:environment"
+    "s25_empty_values:deploy"
+    "s25_no_trailing_newline:image" "s25_no_trailing_newline:build"
+  )
+  for _pair in "${_pairs[@]}"; do
+    _stem="${_pair%%:*}"
+    _sec="${_pair#*:}"
+    if ! cmp -s <(_dump_conf_section "${CORPUS}/${_stem}.ini" "${_sec}") \
+      "${GOLDEN}/${_stem}.dump.${_sec}.golden"; then
+      _bad+=" ${_stem}:${_sec}"
+    fi
+  done
+  [[ -z "${_bad}" ]] || {
+    echo "differs from golden:${_bad}" >&2
+    return 1
+  }
+}
