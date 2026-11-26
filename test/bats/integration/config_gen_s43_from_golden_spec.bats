@@ -6,7 +6,8 @@
 # why: Before any Go parser exists, the shell `_dockerfile_stage_from_line`
 # (dist/script/docker/lib/stage.sh) is the oracle for which FROM lines are
 # accepted. Each dockerfile/config-gen/testdata/corpus/s43/s43_from_<case>.Dockerfile
-# is a single line. Its goldens in testdata/golden/s43/ are
+# holds exactly one FROM-relevant line plus optional lint-allow comment lines.
+# Its goldens in testdata/golden/s43/ are
 # s43_from_<case>.stages (stdout of `_parse_dockerfile_stages`, empty output is
 # a 0-byte file) and s43_from_<case>.hash (`_compute_dockerfile_hash` plus a
 # trailing newline). The Go side must later match these byte for byte. The
