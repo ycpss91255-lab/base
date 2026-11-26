@@ -613,8 +613,9 @@ _pr_restores_selection() {
 }
 
 # why: the step must not invent a `false` for a job the map decides: it has
-# one selection call, and passes on only the `false` it read there.
-@test "classify: the diff step's only select_* false is the selection's own or a release-only job's (base#1584, base#2177)" {
+# one selection call, and passes on only the `false` it read there; any
+# other `false` comes from the event, through a variable.
+@test "classify: the diff step's only select_* false is the selection's own or the event's (base#1584, base#2177, base#2190)" {
   local _step
   _step="$(yaml_step_run "${SELF_WF}" classify diff | grep -v '^[[:space:]]*#')"
   [[ -n "${_step}" ]] || fail "could not read classify's diff step"

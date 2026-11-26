@@ -185,7 +185,9 @@ jobs:
     #                          under test (#1011). The script's header
     #                          carries the reasoning for each line.
     # Non-PR events (push / tag / workflow_dispatch) default to 'true' on
-    # both outputs, so no diff narrows a post-merge or release build.
+    # both outputs, so no diff narrows a post-merge or release build. A
+    # push to main is narrowed by the event instead: it lands the tree the
+    # merge queue tested, so only the cache writers and their inputs run.
     # See issue #317 for the classifier's design; #1011 for why the system
     # pathspecs live in a script rather than in a list.
     needs: actionlint
@@ -333,10 +335,14 @@ jobs:
               echo "code_changed=true"
               echo "system_relevant=true"
               echo "testtools_changed=${testtools}"
-              # Every job a diff can affect is selected off a pull request.
-              for job in config_gen coverage coverage_gate acceptance system \
-                         worker_selftest shellcheck hadolint bats_fragile \
-                         test_tools_image_arm64; do
+              # Every job a diff can affect is selected off a pull request,
+              # but a push to main keeps only the cache writers: coverage-gate
+              # saves the shard weights and the arm64 builder its layers.
+              for job in config_gen acceptance system worker_selftest \
+                         shellcheck hadolint bats_fragile; do
+                echo "select_${job}=${full_run}"
+              done
+              for job in coverage coverage_gate test_tools_image_arm64; do
                 echo "select_${job}=true"
               done
             } >> "${GITHUB_OUTPUT}"
