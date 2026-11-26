@@ -2392,6 +2392,42 @@ jobs:
           fi
           exit "${fail}"
 
+  release-gate:
+    # The check the `v*` tag ruleset requires (ADR-00000042).
+    # - Named `release-checks` only on a run that selects both release-only
+    #   jobs. A PR, merge group or push to main never shows that name, not
+    #   even as a skip, which GitHub would count as a pass.
+    # - always(): a failed need must fail this job, not skip it.
+    name: ${{ needs.classify.outputs.select_mutation_roster == 'true' && needs.classify.outputs.select_config_gen_redpath == 'true' && 'release-checks' || 'release-gate (not a release run)' }}
+    needs: [classify, ci-rollup, mutation-roster, config-gen-redpath]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify the release run
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          # The same keys as the job name.
+          release="$(jq -r '.classify.outputs // {}
+            | (.select_mutation_roster == "true" and .select_config_gen_redpath == "true")' \
+            <<<"${NEEDS_JSON}")"
+          if [[ "${release}" != "true" ]]; then
+            echo "::notice::Not a release run: the release-only jobs were not selected, so this is not release-checks."
+            exit 0
+          fi
+          fail=0
+          for job in ci-rollup mutation-roster config-gen-redpath; do
+            result="$(jq -r --arg j "${job}" '.[$j].result // ""' <<<"${NEEDS_JSON}")"
+            printf '%-20s%s\n' "${job}:" "${result}"
+            if [[ "${result}" != "success" ]]; then
+              echo "::error::${job} did not succeed (${result:-no result}); this commit cannot be tagged"
+              fail=1
+            fi
+          done
+          exit "${fail}"
+
   release:
     # The tag path's own gate. It does NOT go through ci-rollup (ci-rollup
     # is not a `needs:` here), so every gate a tag must clear has to be
