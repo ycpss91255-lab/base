@@ -260,14 +260,11 @@ _context_copy_paths() {
   assert_line 'testtools_changed=true'
 }
 
-# The eleven select_* keys classify writes (nine from design r7 sec. 2, two
-# from base#2110). Each
-# self-test.yaml job whose `if:` reads classify reads one of them, and
-# select_config_gen gates both config-gen jobs (base#1547 split one job
-# in two), so twelve jobs read these eleven keys (cycle 4 below).
-SELECT_KEYS="select_config_gen select_coverage select_coverage_gate select_acceptance select_system select_worker_selftest select_shellcheck select_hadolint select_bats_fragile select_mutation_roster select_test_tools_image_arm64"
+# The select_* keys classify writes, one per gated job; config-gen-gates
+# reads select_config_gen.
+SELECT_KEYS="select_config_gen select_config_gen_redpath select_coverage select_coverage_gate select_acceptance select_system select_worker_selftest select_shellcheck select_hadolint select_bats_fragile select_mutation_roster select_test_tools_image_arm64"
 # The release-only ones of those: the event decides them, not the diff.
-RELEASE_KEYS="select_mutation_roster"
+RELEASE_KEYS="select_mutation_roster select_config_gen_redpath"
 
 # _assert_keys <output> <value> [<key>...] -- every select_* key named (all
 # of them when none is) is exactly <value> in <output>.
@@ -411,6 +408,7 @@ release"
   assert_line 'select_system=false'
   assert_line 'select_worker_selftest=false'
   assert_line 'select_mutation_roster=false'
+  assert_line 'select_config_gen_redpath=false'
   assert_line 'select_coverage=true'
   _assert_keys "${output}" true select_coverage_gate select_shellcheck \
       select_hadolint select_bats_fragile select_test_tools_image_arm64
@@ -505,7 +503,8 @@ _base_map_drops_acceptance() {
   _assert_keys "${output}" false select_config_gen select_coverage \
       select_coverage_gate select_system select_worker_selftest \
       select_shellcheck select_hadolint select_bats_fragile \
-      select_mutation_roster select_test_tools_image_arm64
+      select_mutation_roster select_config_gen_redpath \
+      select_test_tools_image_arm64
 }
 
 # _pr_map_selects_nothing_for_row5 -- the PR side's map: row 5 (`*`)
@@ -726,9 +725,8 @@ _gated_jobs() {
 # why: cycle 1, end to end on a PR that changes one unit spec. The expected
 # set comes from the issue and the design, not from the map: a unit spec
 # cannot affect config-gen, acceptance, system or worker-selftest, so
-# those skip (config-gen is two jobs since base#1547, config-gen-gates
-# and config-gen-redpath, on one key); it is code, so shellcheck, hadolint, bats-fragile,
-# coverage and coverage-gate run; and mutation-roster is release-only.
+# those skip; it is code, so shellcheck, hadolint, bats-fragile,
+# coverage and coverage-gate run; and the release-only jobs skip.
 # Read through classify's real step, its `outputs:` map, every
 # job's parsed `if:` and the real rollup step, so a gate that reads the
 # wrong output, an output classify does not export, or a classify that
@@ -749,10 +747,8 @@ _gated_jobs() {
   assert_success
 }
 
-# why: cycle 2. A docs-only PR skips every gated job (twelve: the eleven
-# keys, with select_config_gen gating both config-gen jobs),
-# mutation-roster and the arm64 image among them (base#2110), runs the
-# documentation checks, and the rollup passes and says so.
+# why: a docs-only PR can affect no gated job; the documentation checks still
+# run, and the rollup says which kind of pass it is.
 @test "chain: a docs-only PR skips every gated job, mutation-roster included, and the rollup passes as doc-only (base#1584, base#2110)" {
   local _out _results _j
   local -a _want=(mutation-roster=skipped test-tools-image-arm64=skipped
@@ -773,7 +769,7 @@ _gated_jobs() {
 }
 
 # The release-only jobs, by job name.
-RELEASE_JOBS="mutation-roster"
+RELEASE_JOBS="mutation-roster config-gen-redpath"
 
 # _chain_gated <results> <release-only-result> -- every gated job got
 # `success`, but the release-only ones, which got <release-only-result>.
@@ -804,9 +800,9 @@ _chain_gated() {
   done
 }
 
-# why: branch protection requires the rollup, so the skip must pass it; and
-# it must name the job, so that its green is not read as a full run's.
-@test "chain: a PR, a merge group and a push to main skip mutation-roster, and the rollup passes naming it (base#2177)" {
+# why: branch protection requires the rollup, so the skips must pass it; and
+# it must name the jobs, so that its green is not read as a full run's.
+@test "chain: a PR, a merge group and a push to main skip the release-only jobs, and the rollup passes naming them (base#2176, base#2177)" {
   local _run _out _results
   for _run in pull_request merge_group push; do
     case "${_run}" in
@@ -821,13 +817,33 @@ _chain_gated() {
     _chain_check "${_results}" release=skipped
     run _chain_rollup "${_out}" "${_results}"
     assert_success
-    assert_line '::notice::Passed with jobs classify deselected for this run, skipped by design: mutation-roster'
+    assert_line '::notice::Passed with jobs classify deselected for this run, skipped by design: mutation-roster config-gen-redpath'
   done
 }
 
-# why: the tag is where the roster blocks, and a dispatch on a branch is how
-# it is checked before the tag exists, with nothing published.
-@test "chain: a tag push and workflow_dispatch run mutation-roster, and only the tag releases (base#2177)" {
+# _chain_config_gen <classify-output> <gates-result> -- config-gen-gates got
+# <gates-result> and config-gen-redpath skipped, and the rollup passes.
+_chain_config_gen() {
+  local _results
+  _results="$(_chain_results "$1")"
+  _chain_check "${_results}" "config-gen-gates=$2" config-gen-redpath=skipped
+  run _chain_rollup "$1" "${_results}"
+  assert_success
+}
+
+# why: the two config-gen keys must not be crossed, or skipping the redpath
+# would skip the gates too, or the gates' selection would run the redpath.
+@test "chain: config-gen-gates keeps its own selection where the redpath skips (base#2176)" {
+  _chain_config_gen "$(_classify_pr dockerfile/config-gen/cmd/config-gen/main.go)" success
+  _chain_config_gen "$(_classify_pr script/test/config_gen_redpath.sh)" success
+  _chain_config_gen "$(_classify_pr dist/env.toml)" skipped
+  _chain_config_gen "$(CLASSIFY_REF="${MERGE_GROUP_REF}" _classify_event merge_group doc/x.md)" success
+  _chain_config_gen "$(_classify_push doc/x.md)" success
+}
+
+# why: the tag is where the release-only jobs block, and a dispatch on a branch
+# is how they are checked before the tag exists, with nothing published.
+@test "chain: a tag push and workflow_dispatch run the release-only jobs, and only the tag releases (base#2176, base#2177)" {
   local _out
   _out="$(CLASSIFY_REF=refs/tags/v1.2.3 _classify_push zz-new/thing.txt)"
   CHAIN_REF=refs/tags/v1.2.3 run _chain_results "${_out}"
@@ -848,33 +864,31 @@ _chain_gated() {
   refute_output --partial 'skipped by design'
 }
 
-# why: the rollup excuses a roster classify deselected, so `release` cannot
-# rest on the rollup: it must need the roster itself.
-@test "chain: a tag whose mutation-roster fails or never runs publishes no release (base#2177)" {
-  local _out
+# why: the rollup excuses a job classify deselected, so `release` cannot rest
+# on the rollup: it must need each release-only job itself.
+@test "chain: a tag on which a release-only job fails or never runs publishes no release (base#2176, base#2177)" {
+  local _out _j
   _out="$(CLASSIFY_REF=refs/tags/v1.2.3 _classify_push zz-new/thing.txt)"
-  CHAIN_REF=refs/tags/v1.2.3 CHAIN_FAIL=mutation-roster run _chain_results "${_out}"
-  assert_success
-  _chain_gated "${output}" failure
-  _chain_check "${output}" release=skipped
-  run _chain_rollup "${_out}" "${output}"
-  assert_failure 1
+  for _j in ${RELEASE_JOBS}; do
+    CHAIN_REF=refs/tags/v1.2.3 CHAIN_FAIL="${_j}" run _chain_results "${_out}"
+    assert_success
+    _chain_check "${output}" "${_j}=failure" release=skipped
+    run _chain_rollup "${_out}" "${output}"
+    assert_failure 1
 
-  _out+=$'\n'"select_mutation_roster=false"
-  CHAIN_REF=refs/tags/v1.2.3 run _chain_results "${_out}"
-  assert_success
-  _chain_gated "${output}" skipped
-  _chain_check "${output}" release=skipped
-  run _chain_rollup "${_out}" "${output}"
-  assert_success
+    CHAIN_REF=refs/tags/v1.2.3 run _chain_results "${_out}"$'\n'"select_${_j//-/_}=false"
+    assert_success
+    _chain_check "${output}" "${_j}=skipped" release=skipped
+    run _chain_rollup "${_out}"$'\n'"select_${_j//-/_}=false" "${output}"
+    assert_success
+  done
 }
 
 # why: cycle 4. One source for every gate: the map's names,
 # the map's --jobs and classify's loop list are the same set, and with the
-# release-only jobs the keys the gated jobs' `if:`s read. Each gated job reads exactly one
-# select_* key, the one its `if:` names; config-gen-gates and
-# config-gen-redpath both read select_config_gen (base#1547 split one job
-# into two, addendum point 2). The rollup must resolve each gated job to
+# release-only jobs the keys the gated jobs' `if:`s read. Each gated job
+# reads exactly one select_* key, the one its `if:` names; config-gen-gates
+# reads select_config_gen. The rollup must resolve each gated job to
 # that same key: its skip fails while the key is `true` and passes once
 # that key alone is `false`. The key comes from the job's `if:`, never
 # from a rewrite of the job's name, so a rollup that guesses the key from
@@ -910,7 +924,7 @@ _chain_gated() {
   _keys="$(for _k in "${_key[@]}"; do _k="${_k#select_}"; echo "${_k//_/-}"; done | LC_ALL=C sort -u)"
   assert_equal "${_keys}" "$(printf '%s\n' ${_names} ${RELEASE_JOBS} | LC_ALL=C sort)"
   assert_equal "${_key[config-gen-gates]}" select_config_gen
-  assert_equal "${_key[config-gen-redpath]}" select_config_gen
+  assert_equal "${_key[config-gen-redpath]}" select_config_gen_redpath
   # A tag push: the run that selects every gated job, release-only included.
   _out="$(CLASSIFY_REF=refs/tags/v1.2.3 _classify_push zz-new/thing.txt)"
   _results="$(CHAIN_REF=refs/tags/v1.2.3 _chain_results "${_out}")"
