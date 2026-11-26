@@ -1592,7 +1592,7 @@ code, base#1562.
 | `_run_via_compose: the real ids are in the environment compose interpolates (#895)` | - |
 | `_fix_permissions: refuses a non-numeric id instead of handing it to chown (#895)` | - |
 
-### test/bats/unit/classify_testtools_spec.bats (38)
+### test/bats/unit/classify_testtools_spec.bats (39)
 
 `testtools_changed` tells every image-consuming job whether to rebuild the
 tooling image from source instead of pulling the rolling `:main`. On a pull
@@ -1646,6 +1646,7 @@ reads the output the step writes.
 | `chain: a tag push or workflow_dispatch with every job green passes release-checks (base#2205)` | the tag ruleset requires the `release-checks` check, so it must go green on a release run in which every job, both release-only ones included, succeeded. |
 | `chain: release-checks fails on a release run when a release-only job or the rollup does not pass (base#2205)` | a release run whose release-only job failed, never ran, or whose rollup failed must leave `release-checks` red, so the tag is refused. |
 | `chain: a PR, a merge group and a push to main never carry the release-checks name (base#2205)` | GitHub counts a skipped check as passed, so the name must not exist on a run that skips the release-only jobs, in any state. |
+| `chain: a run that selects only one release-only job does not carry the release-checks name (base#2205)` | both release-only jobs must be selected, not one, for the run to be a release run. |
 | `self-test.yaml: release-gate runs always, needs the rollup and both release-only jobs, and reads their keys (base#2205)` | a skipped job is shown under its id or its unexpanded name, so neither may be the required name; and only `always()` keeps a failed need from skipping it on a release run. |
 
 ### test/bats/unit/code_lines_spec.bats (46)
