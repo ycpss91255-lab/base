@@ -33,7 +33,7 @@ setup() {
 
 # Golden names with no corpus input: the case calls the function on a path
 # that does not exist.
-_S82_INPUTLESS=(s82_prune_absent)
+_S82_INPUTLESS=(s82_prune_absent s82_sync_absent)
 
 # _partition_violations -- print one line per corpus input with no golden
 # and per golden with neither an input nor a listed inputless name.
@@ -96,6 +96,39 @@ _run_case() {
   } > "${S}/actual/${_name}.golden"
 }
 
+# _run_sync_case <name> <input|-> -- run _sync_managed_entries with
+# _canonical_gitignore_entries in ${S}/w and write the actual golden to
+# ${S}/actual/<name>.golden, same format as _run_case. <input> is a corpus
+# file copied to the target; `-` calls the function on a missing path
+# (base#2213).
+_run_sync_case() {
+  local _name="${1}" _input="${2}"
+  local _tgt="${S}/w/.gitignore" _rc=0 _m
+  rm -rf -- "${S}/w"
+  mkdir -p "${S}/w" "${S}/actual"
+  if [[ "${_input}" != - ]]; then
+    cp -- "${TESTDATA}/corpus/s82/${_input}" "${_tgt}"
+  fi
+  (
+    # shellcheck source=dist/script/docker/lib/gitignore.sh
+    source /source/dist/script/docker/lib/gitignore.sh
+    _sync_managed_entries "${_tgt}" _canonical_gitignore_entries
+  ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
+  if [[ -e "${_tgt}" ]]; then
+    _m="$(stat -c %a -- "${_tgt}")"
+  else
+    _m=absent
+  fi
+  {
+    printf 'rc=%d\nmode=%s\n--- file\n' "${_rc}" "${_m}"
+    if [[ -e "${_tgt}" ]]; then cat -- "${_tgt}"; fi
+    printf -- '--- stdout\n'
+    sed "s|${S}/w|TMP|g" "${S}/stdout"
+    printf -- '--- stderr\n'
+    sed "s|${S}/w|TMP|g" "${S}/stderr"
+  } > "${S}/actual/${_name}.golden"
+}
+
 # _assert_golden <name> -- the stored golden exists and equals the actual
 # one byte for byte. cmp, never $(...), which drops trailing LFs.
 _assert_golden() {
@@ -138,4 +171,25 @@ _assert_golden() {
 @test "s82 prune: the empty production retired list leaves the file unchanged" {
   _run_case s82_prune_empty_list - no s82_prune_empty_list.gitignore
   _assert_golden s82_prune_empty_list
+}
+
+# why: first sync of a file whose last line has no newline: the newline is
+# added, then the marker and all 18 canonical entries follow (base#2213).
+@test "s82 sync: a first sync terminates the last line and adds marker and entries" {
+  _run_sync_case s82_sync_no_newline s82_sync_no_newline.gitignore
+  _assert_golden s82_sync_no_newline
+}
+
+# why: an absent target is created holding the marker and all 18 entries
+# (base#2213).
+@test "s82 sync: an absent target is created with marker and entries" {
+  _run_sync_case s82_sync_absent -
+  _assert_golden s82_sync_absent
+}
+
+# why: a file already ending in a lone blank line gets the marker right
+# after it, with no extra blank line (base#2213).
+@test "s82 sync: a lone trailing newline gets the marker with no extra blank line" {
+  _run_sync_case s82_sync_lone_newline s82_sync_lone_newline.gitignore
+  _assert_golden s82_sync_lone_newline
 }
