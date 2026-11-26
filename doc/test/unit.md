@@ -7534,7 +7534,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: ci-rollup needs single-issue-pr and classify never gates it (base#1629)` | Branch protection requires ci-rollup alone. A single-issue-pr job outside its needs would be a check nobody is blocked by, and a select_single_issue_pr key would let classify skip it on a doc-only PR, which is exactly where a bundled PR slips through (base#1629). |
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
 
-### test/bats/unit/setup_cmd_spec.bats (227)
+### test/bats/unit/setup_cmd_spec.bats (228)
 
 Mirrors `lib/setup_cmd.sh`. The git-style subcommand dispatcher and its
 mutating verbs (#49): dispatch (Phase B-1), `set` / `show` / `list` (Phase
@@ -7778,6 +7778,7 @@ isolated `_setup_known_section` / `SCHEMA_SECTIONS` (#561) unit checks.
 | `apply preserves an interpolation configured in [logging] local_path (base#1087)` | Escaping the whole assembled logging mount was a regression on the PLAIN apply too: a `${LOG_INSTANCE}` the operator put in `[logging] local_path` became the literal `$${LOG_INSTANCE}`, so compose stopped substituting it and the logs mounted a directory named after the variable. Only the filesystem-derived prefix is a literal that needs escaping; what the operator configured is an interpolation they meant. |
 | `show tells a dotless spec from a split it could not make (base#1185)` | base#1185 -- the splitter gained a second way to answer non-zero, and `show` was reading both as "this spec names a whole section" |
 | `_setup_conf_check_known reads a layer's tables through config-gen, one run (base#1937)` | base#1937 -- the per-layer declared-table read of _setup_conf_check_known goes through config_gen_tables (the config-gen image's `tables` command), not the bridge's `--tables` view. A docker shim records every argv; one layer check must record one config-gen run whose arguments end `tables --name <layer> -`, and no run carrying `--tables`. |
+| `setup apply resolves each tool image once, before any run (base#1844)` | base#1844 -- each tool image is resolved once per top-level `setup apply`, in the top-level shell, before any $(...) that runs it. toml_bridge_parse / toml_bridge_merge run inside command substitutions, so a memo written there is lost and every call inspected the image again. Expected, from the issue's acceptance: 2 inspects (one per image, 12 hex tag each), both before the first `docker run`; the run counts do not move (measured on main after #1937: 13 inspects, 12 bridge runs, 2 config-gen runs on this two-layer layout, not the 15 / 14 / 2 the issue assumed). |
 
 ### test/bats/unit/setup_conf_migrate_spec.bats (15)
 
