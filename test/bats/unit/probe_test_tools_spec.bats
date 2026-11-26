@@ -207,7 +207,7 @@ _probe_image img '${DOCKERFILE}'"
 
 # why: The runner mismatch a presence-only probe cannot see: `just` is
 # there, at the version published before the bump, and
-# just_runner_version_spec is fail-closed on exactly that -- so accepting
+# test_tools_pins_spec is fail-closed on exactly that -- so accepting
 # the image reddens a PR that touched nothing related
 @test "probe: an image shipping ANOTHER just is refused and both versions named (#948)" {
   # The two linters are given their real versions so the refusal below can

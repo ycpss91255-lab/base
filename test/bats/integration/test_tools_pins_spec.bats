@@ -5,12 +5,11 @@
 #
 # The suite runs INSIDE the test-tools image, so every tool on this PATH
 # is the image's own copy: the probe the roster names can simply be run.
-# That is the same trick test/bats/integration/just_runner_version_spec
-# plays for `just` alone; this spec asks the question for the whole
-# roster, and gains each new pin the day it is declared rather than the
-# day somebody remembers to add a case.
+# It is the only check of that kind: this spec asks the question for the
+# whole roster, `just` included, and gains each new pin the day it is
+# declared rather than the day somebody remembers to add a case.
 #
-# DELIBERATELY FAIL-CLOSED, for the reason its `just` sibling states: an
+# DELIBERATELY FAIL-CLOSED (base#948): an
 # image whose tool disagrees with the declaration is exactly the drift
 # this exists to report, and a skip would restore the silence. The one
 # thing it cannot see is a tool the image does not carry at all under a

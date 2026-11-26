@@ -30,7 +30,7 @@
 #
 # The runner is the third such tool and the one that is not a lint gate.
 # `just` is this project's only control surface, and
-# test/bats/integration/just_runner_version_spec.bats is fail-closed on a
+# test/bats/integration/test_tools_pins_spec.bats is fail-closed on a
 # mismatch between the image's runner and ARG JUST_VERSION -- so a :main
 # published before a version bump carries every required tool AND the wrong
 # runner, and a presence-only probe would hand it to a PR that touched

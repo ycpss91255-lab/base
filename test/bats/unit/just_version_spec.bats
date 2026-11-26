@@ -20,7 +20,7 @@
 # exposed by dist/script/base/just-version.sh. This spec pins the
 # declaration, the accessor and each reader's static shape; the
 # behavioural half (the image really ships that version) is
-# test/bats/integration/just_runner_version_spec.bats, and the guard that
+# test/bats/integration/test_tools_pins_spec.bats, and the guard that
 # a NEW provenance path cannot land unpinned is
 # script/test/drivers/just_provenance.sh.
 #
