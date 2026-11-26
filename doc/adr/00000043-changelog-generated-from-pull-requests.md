@@ -18,7 +18,7 @@
 維護者已在 #2206 選定方向：分類來自 PR 標題的 conventional commit 類型，
 條目文字來自 PR 內文的固定段落，release 時產生。本 ADR 決定其中的四個設計
 問題，並列出留給維護者的問題。狀態是 Accepted，指方向與下列建議；待決問題
-回答後以修訂記錄在本檔。
+回答後直接寫進本檔。
 
 ## Context
 
@@ -49,9 +49,13 @@
 
 - repo 只允許 merge commit，`merge_commit_title` 是 `PR_TITLE`，
   `merge_commit_message` 是 `PR_BODY`。所以 main 的 first-parent 歷史裡，每個
-  merge commit 的主旨是 PR 標題加 `(#N)`，內文是合併當時的 PR 內文。從
+  merge commit 的主旨是 PR 標題加 `(#N)`，內文來自合併當時的 PR 內文。從
   v0.43.0-rc1 到 2026-11-26 的 main，285 個 first-parent commit 的主旨都以
   `(#N)` 結尾。
+- merge commit 的內文不是原樣的 PR 內文。GitHub 在空白處把長的一般文字折行，
+  並去掉行尾空白；code fence 內的行不折。例如 #2098 的 PR 內文 24 行，merge
+  commit 內文 29 行，一個以 `- ` 開頭的項目被折成兩行，第二行從第 0 欄開始；
+  #2191 的表格有一列被折成兩行。
 - 同一範圍內的標題類型：`fix` 186、`docs` 26、`feat` 22、`test` 15、`ci` 11、
   `chore` 8、`refactor` 5、`perf` 4、`revert` 2，另有 6 個不是 conventional
   格式（例如 `setup:`、`readme:`、`test harness:`）。
@@ -60,6 +64,8 @@
   #2167 的 merge）。正式版不是最後一個 RC 的同一個 commit：`v0.42.0` 與
   `v0.42.0-rc4` 是不同的 commit，中間只有 `chore: release v0.42.0` 一個 PR。
 - `release` job 的 checkout 是淺的，權限只有 `contents: write`。
+- tag 的 ruleset（`Require CI for release tags`，`refs/tags/v*`）禁止刪除與
+  non-fast-forward，沒有 bypass。tag 打出後，同一個版本號不能再打一次。
 
 ### 本決定推翻的一段舊理由
 
@@ -96,7 +102,9 @@
 
 比對防護：release PR 產生後到合併前，main 可能又合併了其他 PR，這些 PR 會落在
 tag 的範圍裡，卻不在章節裡。所以 tag 的 `release` job 重新算出範圍內有段落的
-PR 編號，若有編號不在該 tag 的章節中就拒絕發布。比對只看 PR 編號，不比對文字，
+PR 編號，若有編號不在該 tag 的章節中就拒絕發布。比對範圍是
+`<上一個 tag>..<tag>^1`，也就是排除 tag 指向的 release PR merge 本身；release
+PR 的內文另外規定不放 `## Changelog`。比對只看 PR 編號，不比對文字，
 因為文字允許在 release PR 上修改。`release` job 現在的 checkout 是淺的，比對需要
 取得到上一個 tag 為止的歷史。拒絕或只警告，是待決問題 5。細節在步驟 4。
 
@@ -109,12 +117,12 @@ PR 編號，若有編號不在該 tag 的章節中就拒絕發布。比對只看
 | `script/release/release_notes.sh` | 保留，不改：仍從 `doc/changelog/` 組出 release 說明與 RC 合併 | — |
 | `script/release/changelog_index.sh` | 保留，不改：release PR 照舊執行 | — |
 | `script/release/justfile.release` | 修改：新增產生腳本的 recipe，與 `changelog-index` 並列 | 2 |
-| `script/test/drivers/changelog_entry.sh` | 移除：它只檢查 `[Unreleased]`。700 字元上限移到 PR 段落檢查；分類清單的檢查改由產生腳本只輸出清單內的分類來保證 | 5 |
+| `script/test/drivers/changelog_entry.sh` | 移除。它檢查兩件事：一是 `[Unreleased]` 的條目（分類標題、700 字元、重複），700 字元上限移到 PR 段落檢查，分類改由產生腳本只輸出清單內的分類來保證；二是 `CONVENTIONS.md` 的 `changelog-categories` 標記區塊必須與 `changelog_categories.sh` 一致，這項比對隨標記區塊一起移除，因為 `CONVENTIONS.md` 改為指向 `changelog_categories.sh`，不再抄一份清單（ADR-00000028），沒有副本就沒有東西要比對 | 5 |
 | `just test changelog-fix`（`--changelog-entry-fix`） | 移除：產生的章節每個分類只出現一次 | 5 |
 | `script/test/drivers/changelog_layout.sh` | 保留並修改：系列檔、compare link、索引推導、一個 tag 一個章節仍然需要；「恰好一個檔案有 `[Unreleased]`」改為「沒有 `[Unreleased]`」 | 5 |
 | `script/test/test.sh` 的 `changelog-entry` 登錄與說明 | 隨 driver 移除 | 5 |
 | `.gitattributes` 的兩行 `merge=union` | 移除：只剩 release PR 寫這些檔案，union 只會把真的衝突藏起來 | 5 |
-| `doc/changelog/CONVENTIONS.md` | 改寫：說明 PR 段落怎麼寫，指向對應表的位置，不再抄一份分類清單 | 3、5 |
+| `doc/changelog/CONVENTIONS.md` | 改寫：說明 PR 段落怎麼寫，指向對應表的位置；移除 `changelog-categories` 標記區塊，不再抄一份分類清單 | 3、5 |
 | `.github/pull_request_template.md` | 修改：加入固定段落（見待決問題 3） | 3 |
 | `.github/workflows/self-test.yaml` | 修改：`single-issue-pr` job 加一個步驟（第 3 節）；`release` job 加比對防護 | 3、4 |
 | `script/ci/config_gen_paths.sh` | 修改：產生腳本若放在 `script/release/`，與其他 release 腳本一樣列入 | 2 |
@@ -123,8 +131,11 @@ PR 編號，若有編號不在該 tag 的章節中就拒絕發布。比對只看
 
 `script/ci/release/archive.manifest` 不變，它只列整個 `doc/`。
 
-release bump 目前由 harness 端的 `release-bump.sh` 執行，不在本 repo。它改為
-呼叫新的 recipe，是 harness 那邊的修改，不在本 ADR 範圍。
+release bump 目前由 `docker_harness` repo 的 `.claude/scripts/release-bump.sh`
+執行，不在本 repo（`justfile.release` 的 coverage-badge 說明，以
+`docker_harness#289` 追蹤同一個 bump 的接線）。它改為呼叫新的 recipe，是那個
+repo 的修改，不在本 ADR 範圍。步驟 4 依賴這項修改：在它完成前，release PR 要
+手動執行新的 recipe。追蹤用的 issue 在步驟 4 之前開。
 
 ### 3. PR 段落在哪裡檢查：`single-issue-pr` job 加一個步驟
 
@@ -138,15 +149,31 @@ release bump 目前由 harness 端的 `release-bump.sh` 執行，不在本 repo�
   要另外傳進去。
 - **C. `commit-attribution` job。** 它走 commit 範圍，不讀 PR 內文。
 
-**建議 A。** 新步驟呼叫步驟 2 產生腳本的檢查模式，不是另一個工具。檢查與產生
-共用同一個段落解析與同一張對應表，兩邊不會判斷不一致。檢查的內容：
+**建議 A。** 新步驟呼叫步驟 2 產生腳本的檢查模式，不是另一個工具。資料來源：
+標題與內文取自 API 的 `pulls/N`（`title`、`body`），改了哪些檔案取自
+`pulls/N/files`；job 的 checkout 是深度 1 的 merge ref，看不到差異。
+
+檢查與產生共用同一個段落解析與同一張對應表，但輸入不同：檢查讀 API 的原文，
+產生讀 merge commit 裡折行後的文字（Context）。折行可能讓 `## `、`- `、`1. `
+或 `|` 出現在行首，使段落提早結束或多出結構。所以段落只允許一般文字，規則是：
+
+- 段落內的行不得以 `#`、`|`、`- `、`* `、`+ `、數字加 `.` 或 code fence 開頭，
+  文字中也不得出現 `## `。檢查讀原文時套用這條規則。
+- 產生腳本把段落的所有行接成一行、合併空白後才排版。
+
+在這個規則下，原文與折行後的文字合併空白後相同，兩邊得到同一個條目。代價：
+條目只能是一段文字，`CONVENTIONS.md` 現在允許的子項目（例如 BREAKING 的遷移
+步驟清單）不能寫在段落裡，要在 release PR 上手動補，或寫在版本章節的開頭段落。
+
+檢查的內容：
 
 1. 段落不存在，或去掉 HTML 註解與空白後是空的：通過，並印出「本 PR 不產生
    changelog 條目」。
-2. 段落有內容：標題必須能對應到一個分類，否則失敗並印出標題。
-3. 段落有內容：去掉多餘空白後不超過 700 字元（原 `changelog_entry.sh` 的
+2. 段落有內容：只能是一般文字（上述規則），否則失敗並印出該行。
+3. 段落有內容：標題必須能對應到一個分類，否則失敗並印出標題。
+4. 段落有內容：去掉多餘空白後不超過 700 字元（原 `changelog_entry.sh` 的
    上限）。
-4. 段落有內容，同時又修改 `doc/changelog/` 的 `[Unreleased]`：失敗。這條只在
+5. 段落有內容，同時又修改 `doc/changelog/` 的 `[Unreleased]`：失敗。這條只在
    過渡期有用（第 4 節），步驟 5 移除。
 
 這個檢查不保證合併時的內容。`pull_request` 事件沒有設定 `types:`，只在開啟、
@@ -171,7 +198,7 @@ job 名稱不再只描述「一個 issue」，是否改名是待決問題 4。
 - 不需要去重。切換前合併的 PR 內文沒有固定段落（上述範圍內為 0 個），所以
   產生腳本不會替它們產生條目；它們的條目就是手寫的那條。
 - 不依賴發版時間，也處理得了切換時還開著、已經寫了 `[Unreleased]` 的 PR。
-- 從步驟 3 合併起，PR 寫段落，不再寫 `[Unreleased]`。第 3 節第 4 項防止同一個
+- 從步驟 3 合併起，PR 寫段落，不再寫 `[Unreleased]`。第 3 節第 5 項防止同一個
   PR 兩邊都寫。
 
 過渡版本之後 `[Unreleased]` 是空的，步驟 5 移除它與相關規則。若維護者打算在
@@ -201,7 +228,8 @@ job 名稱不再只描述「一個 issue」，是否改名是待決問題 4。
 沒有段落的 PR 不產生條目。產生腳本把範圍內的 PR 分成兩份清單印在 stderr：
 
 - **沒有條目**：沒有段落，或段落是空的。
-- **待處理**：有段落，但標題無法對應分類，或段落超過 700 字元。這種 PR 是在檢查
+- **待處理**：有段落，但標題無法對應分類、段落不是一般文字，或段落超過 700
+  字元。這種 PR 是在檢查
   通過後才修改的（第 3 節）。它的條目不寫進章節。
 
 release bump PR 的內文附上這兩份清單。審查者可以看出漏寫，並在 release PR 裡
@@ -213,12 +241,17 @@ release bump PR 的內文附上這兩份清單。審查者可以看出漏寫，�
 
 - 來源是 main first-parent 歷史中 merge commit 的內文，不是 GitHub API。它可以
   離線產生，結果固定，bats 可以用 fixture repo 測。代價：合併後改 PR 內文不會
-  生效，以及依賴上述 repo 設定（`PR_TITLE`、`PR_BODY`）。
+  生效，內文是折行後的文字，以及依賴上述 repo 設定（`PR_TITLE`、`PR_BODY`）。
+- 步驟 2 的 fixture 用折行後的內文，取自真實的 merge commit（例如 #2098），
+  不用 PR 原文；否則測試通過，實際資料卻不同。
 - 段落是 `## Changelog` 標題到下一個 `## ` 標題之間的文字（標題名稱見待決
   問題 3），去掉 HTML 註解。標題比對是完全相同的一整行：第 2 層、大小寫相同，
   fenced code block 內的不算。
-- 一個 PR 一個條目：`- <段落文字> (#N)`。段落第一行是條目的開頭，其餘照
-  `CONVENTIONS.md` 的格式縮排接在後面。
+- 一個 PR 一個條目：段落的行先接成一行、合併空白（第 3 節），輸出為
+  `- <段落文字> (#N)`，再照 `CONVENTIONS.md` 的寬度折行、續行縮排。
+- 條目結尾的編號改變：現在手寫的條目寫 issue，例如 `(closes #2184)`；產生的
+  條目寫 PR，例如 `(#2186)`。PR 連到它的 issue，所以讀者仍找得到。這是讀者看得
+  到的格式改變（待決問題 7）。
 - 同一分類內按合併順序排列；分類按 `CHANGELOG_CATEGORIES` 的順序輸出。
 
 ### 8. 版本範圍
@@ -236,8 +269,11 @@ release bump PR 的內文附上這兩份清單。審查者可以看出漏寫，�
 
 - 每個 tag，不論 RC 或正式版，都有自己的章節，範圍從上一個 tag（RC 也算）到
   這次。
-- 正式版 `vX.Y.0` 的範圍是最後一個 RC 到正式版，通常沒有條目。正式版的 release
-  說明照舊由 `release_notes.sh` 合併它的 RC 章節。
+- 正式版 `vX.Y.0` 的範圍是最後一個 RC 到正式版，通常沒有條目。範圍內沒有條目時，
+  產生腳本不寫空章節，而是寫一句開頭說明，例如「`v0.42.0-rc4` 原樣升為正式
+  版。」，與現在 `v0.42.0` 的章節相同。正式版的 release 說明照舊由
+  `release_notes.sh` 合併它的 RC 章節。沒有 RC 可合併、範圍又沒有條目時，
+  `release_notes.sh` 照舊拒絕。
 - 沒有 RC 的版本，例如修補版，範圍從上一個正式版開始。
 - 條目落在合併後的第一個 tag，與作者何時開 PR 無關，#1039 的情形不再發生。
 
@@ -254,9 +290,13 @@ release bump PR 的內文附上這兩份清單。審查者可以看出漏寫，�
    PR 範本是否預先放這個標題與一段註解說明；預先放的空段落視為沒有段落。
 4. **`single-issue-pr` 是否改名。** 改名要同步修改 `ci-rollup` 與 `release`
    的 `needs:` 及相關 spec。建議不改名，在 job 註解說明多了一個步驟。
-5. **tag 時的比對防護是拒絕還是警告。** 建議拒絕，與 `release_notes.sh` 一致；
-   代價是 tag 已經存在才發現（ADR-00000042 同樣的取捨）。
+5. **tag 時的比對防護是拒絕還是警告。** 建議拒絕，與 `release_notes.sh` 一致。
+   代價是 tag 已經存在才發現（ADR-00000042 同樣的取捨），而且 tag 的 ruleset
+   禁止刪除與 non-fast-forward、沒有 bypass，所以同一個版本號不能重打，只能補
+   一個 PR 再發下一個版本（例如下一個 RC）。
 6. **過渡方式。** 第 4 節的 B（建議），或在步驟 3 前先發一個版本（A）。
+7. **條目結尾的編號。** 只寫 PR 編號（建議），或另外從內文的 `Closes #N` 取出
+   issue 編號一起寫。
 
 ## Consequences
 
@@ -267,6 +307,10 @@ release bump PR 的內文附上這兩份清單。審查者可以看出漏寫，�
 - 忘了寫段落的 PR 不會被 CI 擋，只會出現在 release PR 的清單上。檢查通過後才
   改壞的段落也一樣，會出現在待處理清單上。
 - 合併後才修改的 PR 內文不會進入 changelog，要在 release PR 上改。
+- 條目只能是一段文字。BREAKING 的遷移步驟清單要在 release PR 上補，或寫在
+  版本章節的開頭段落。
+- tag 時的比對若拒絕，同一個版本號不能重打（tag ruleset），只能發下一個版本。
+- 步驟 4 依賴 `docker_harness` 的 `release-bump.sh` 改為呼叫新的 recipe。
 - 產生腳本依賴 repo 的 merge commit 設定（`PR_TITLE`、`PR_BODY`）。設定改變
   時，所有 PR 都讀不到段落，release PR 的清單會列出範圍內所有 PR，審查者可以
   看出來。
