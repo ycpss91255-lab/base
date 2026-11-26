@@ -33,8 +33,9 @@ mock_cmd() {
 #   image. This shim answers `image inspect` as present and serves a
 #   `run ... tables` from the in-container bridge's --tables view of the
 #   file on its stdin (docker run -i); CONFIG_GEN_IMAGE names an image so
-#   nothing is resolved or built. Needs create_mock_dir first. A spec that needs docker to behave
-#   otherwise replaces it with its own mock_cmd docker.
+#   nothing is resolved or built. Needs create_mock_dir first. A spec
+#   that needs docker to behave otherwise replaces it with its own
+#   mock_cmd docker.
 mock_config_gen_docker() {
   mock_cmd docker 'case "$1" in
   image) exit 0 ;;
