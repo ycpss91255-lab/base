@@ -72,3 +72,21 @@ _check_s32() {
 @test "s32 deploy runtime is renamed to gpu_runtime (base#2056)" {
   _check_s32 s32_runtime_alias "ini_to_toml_runtime_renamed ini_to_toml_migrated"
 }
+
+# why: A gap in the numbered keys leaves an empty block for the missing
+# number; the golden pins the bytes (red until the golden exists).
+@test "s32 a gap in numbered keys leaves an empty block (base#2082)" {
+  _check_s32 s32_gap "ini_to_toml_migrated"
+}
+
+# why: A numbered key with an empty value still takes its slot as an empty
+# block; the golden pins the bytes.
+@test "s32 an emptied slot keeps an empty block (base#2082)" {
+  _check_s32 s32_emptied_slot "ini_to_toml_migrated"
+}
+
+# why: Numbered keys are ordered by their numeric suffix, not by file order
+# or string order; the golden pins the bytes.
+@test "s32 numbered keys are ordered by numeric suffix (base#2082)" {
+  _check_s32 s32_suffix_order "ini_to_toml_migrated"
+}
