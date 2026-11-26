@@ -1061,11 +1061,11 @@ _classify() {
   # The script is fetched from base at the SAME ref as this workflow, so the
   # resolver can never drift from the worker it feeds -- the exact
   # version-match pattern the caller-contract preflight uses. Assert the compute-matrix
-  # job checks out ycpss91255-docker/base at github.job_workflow_sha into
+  # job checks out ycpss91255-lab/base at github.job_workflow_sha into
   # the .worker-base path the delegating call reads from.
   run yaml_job_lines "${WF}" compute-matrix
   assert_success
-  assert_output --partial 'repository: ycpss91255-docker/base'
+  assert_output --partial 'repository: ycpss91255-lab/base'
   assert_output --partial 'ref: ${{ github.job_workflow_sha }}'
   assert_output --partial 'path: .worker-base'
 }
@@ -1097,7 +1097,7 @@ _classify() {
   # checkout at the workspace root.
   run yaml_job_lines "${WF}" build
   assert_success
-  assert_output --partial 'repository: ycpss91255-docker/base'
+  assert_output --partial 'repository: ycpss91255-lab/base'
   assert_output --partial 'ref: ${{ github.job_workflow_sha }}'
   assert_output --partial 'path: .worker-base'
 }

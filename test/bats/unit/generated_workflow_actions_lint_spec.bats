@@ -266,7 +266,7 @@ _write_generator_raw() {
   # worker locally, as `./`.
   _load_driver
   _write_workflow 'actions/checkout@v8'
-  _write_upstream_slug 'ycpss91255-docker/base'
+  _write_upstream_slug 'ycpss91255-lab/base'
   _write_own_reusable_workflow 'build-worker.yaml'
   _write_generator \
     '      - uses: ${BASE_UPSTREAM_SLUG}/.github/workflows/build-worker.yaml@${ref}' \
@@ -289,7 +289,7 @@ _write_generator_raw() {
   # in every downstream main.yaml -- only holds when the owner is us.
   _load_driver
   _write_workflow 'actions/checkout@v8'
-  _write_upstream_slug 'ycpss91255-docker/base'
+  _write_upstream_slug 'ycpss91255-lab/base'
   _write_own_reusable_workflow 'build-worker.yaml'
   _write_generator \
     '      - uses: evilorg/evilrepo/.github/workflows/build-worker.yaml@v1' \
@@ -310,7 +310,7 @@ _write_generator_raw() {
   # it is. Only the variable the tree declares its own slug in stands in.
   _load_driver
   _write_workflow 'actions/checkout@v8'
-  _write_upstream_slug 'ycpss91255-docker/base'
+  _write_upstream_slug 'ycpss91255-lab/base'
   _write_own_reusable_workflow 'build-worker.yaml'
   _write_generator \
     '      - uses: ${OTHER_SLUG}/.github/workflows/build-worker.yaml@${ref}' \
@@ -328,10 +328,10 @@ _write_generator_raw() {
   # anywhere, the call home is still a call home.
   _load_driver
   _write_workflow 'actions/checkout@v8'
-  _write_upstream_slug 'ycpss91255-docker/base'
+  _write_upstream_slug 'ycpss91255-lab/base'
   _write_own_reusable_workflow 'build-worker.yaml'
   _write_generator \
-    '      - uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v1.2.3' \
+    '      - uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v1.2.3' \
     '      - uses: actions/checkout@v8'
 
   _gwa_lint
@@ -358,12 +358,12 @@ _write_generator_raw() {
   [ "${status}" -eq 0 ]
 
   _write_generator \
-    '      - uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v1' \
+    '      - uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v1' \
     '      - uses: actions/checkout@v8'
 
   _gwa_lint
   [ "${status}" -ne 0 ]
-  assert_output --partial 'ycpss91255-docker/base'
+  assert_output --partial 'ycpss91255-lab/base'
 }
 
 # why: Fail-closed is the only safe direction for an exemption -- an
@@ -379,7 +379,7 @@ _write_generator_raw() {
   mkdir -p "${SCRATCH}/dist/script/base"
   printf '#!/usr/bin/env bash\n' > "${SCRATCH}/dist/script/base/upstream.sh"
   _write_generator \
-    '      - uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v1' \
+    '      - uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v1' \
     '      - uses: actions/checkout@v8'
 
   _gwa_lint
@@ -396,7 +396,7 @@ _write_generator_raw() {
   # `.../workflows/vendor/build-worker.yaml` claimed our exemption.
   _load_driver
   _write_workflow 'actions/checkout@v8'
-  _write_upstream_slug 'ycpss91255-docker/base'
+  _write_upstream_slug 'ycpss91255-lab/base'
   _write_own_reusable_workflow 'build-worker.yaml'
   _write_generator \
     '      - uses: ${BASE_UPSTREAM_SLUG}/.github/workflows/sub/build-worker.yaml@v1' \

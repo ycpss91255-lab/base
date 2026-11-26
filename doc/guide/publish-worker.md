@@ -41,7 +41,7 @@ jobs:
         target:
           - { name: 'standard',  base: 'python:3.11-slim',     is_latest: true }
           - { name: 'minimal',   base: 'python:3.11-alpine',   is_latest: false }
-    uses: ycpss91255-docker/base/.github/workflows/publish-worker.yaml@vX.Y.Z
+    uses: ycpss91255-lab/base/.github/workflows/publish-worker.yaml@vX.Y.Z
     with:
       image_name: my_image
       tag_suffix: "-${{ matrix.target.name }}"
@@ -50,6 +50,11 @@ jobs:
       build_args: |
         BASE_IMAGE=${{ matrix.target.base }}
 ```
+
+A run may call the worker once per variant, as above: each call keeps its
+intermediate digest artifacts apart by `registry`, `image_name` and
+`tag_suffix`. Two calls in one run must not share all three: they would
+publish the same tag, and their artifacts collide or mix.
 
 ### Tag contract
 

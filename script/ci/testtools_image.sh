@@ -2,7 +2,7 @@
 #
 # testtools_image.sh -- WHICH tooling image a worker build consumes.
 #
-# `ghcr.io/ycpss91255-docker/test-tools:<tag>` is a build-arg of every
+# `ghcr.io/ycpss91255-lab/test-tools:<tag>` is a build-arg of every
 # downstream Dockerfile: its test stage is declared
 # `FROM ${TEST_TOOLS_IMAGE}`, so this reference decides which shellcheck,
 # which hadolint and which bats a downstream repo's CI lints and tests
@@ -67,7 +67,7 @@
 #   the worker's own ref, since the worker checks that out and runs this
 #   copy of the script from inside it.
 #
-# Output: `ghcr.io/ycpss91255-docker/test-tools:<version>` on stdout.
+# Output: `ghcr.io/ycpss91255-lab/test-tools:<version>` on stdout.
 #         The FULL reference, not the tag alone, so the registry path has
 #         one spelling too: a workflow that assembled
 #         `<literal>:${{ steps.x.outputs.tag }}` would be a second place
@@ -87,7 +87,7 @@ _TESTTOOLS_IMAGE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" \
 # workers consume; release-test-tools.yaml names the same package as the
 # PUBLISHER, which resolves its tags from the pushed ref and not from a
 # version file, so it is a different question and keeps its own.
-readonly _TESTTOOLS_IMAGE_REPO='ghcr.io/ycpss91255-docker/test-tools'
+readonly _TESTTOOLS_IMAGE_REPO='ghcr.io/ycpss91255-lab/test-tools'
 
 # The owner of "is this string a release version, and which one".
 readonly _TESTTOOLS_IMAGE_VERSION_OWNER='release-version.sh'

@@ -73,7 +73,7 @@ _OBTAIN_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
 # The rolling tag, and the file a from-source build reads. Written once
 # here rather than in each caller: a second spelling of either is a second
 # thing to keep in agreement.
-_OBTAIN_ROLLING_TAG="ghcr.io/ycpss91255-docker/test-tools:main"
+_OBTAIN_ROLLING_TAG="ghcr.io/ycpss91255-lab/test-tools:main"
 
 # _obtain_dockerfile
 #   The checkout's test-tools Dockerfile, resolved from THIS script's own

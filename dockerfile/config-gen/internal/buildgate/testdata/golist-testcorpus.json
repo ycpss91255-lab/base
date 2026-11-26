@@ -1,10 +1,10 @@
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/helper",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/helper",
 	"Deps": [
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 	]
 }
 {
@@ -257,10 +257,10 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/cmd/x",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/cmd/x",
 	"Deps": [
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/helper",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/helper",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus",
 		"internal/abi",
 		"internal/asan",
 		"internal/bytealg",
@@ -294,17 +294,17 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/b",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/b",
 	"Deps": [
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/helper",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/helper",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/c"
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/c"
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d"
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d"
 }
 {
 	"ImportPath": "internal/unsafeheader",
@@ -5185,8 +5185,8 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/b [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/b.test]",
-	"ForTest": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/b",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/b [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/b.test]",
+	"ForTest": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/b",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5196,8 +5196,8 @@
 		"errors",
 		"flag",
 		"fmt",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/helper",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/helper",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus",
 		"internal/abi",
 		"internal/asan",
 		"internal/bisect",
@@ -5266,7 +5266,7 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/b.test",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/b.test",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5316,9 +5316,9 @@
 		"errors",
 		"flag",
 		"fmt",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/b [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/b.test]",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/helper",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/b [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/b.test]",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/helper",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus",
 		"go/ast",
 		"go/build/constraint",
 		"go/parser",
@@ -5404,8 +5404,8 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/c [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/c.test]",
-	"ForTest": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/c",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/c [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/c.test]",
+	"ForTest": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/c",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5483,7 +5483,7 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/c.test",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/c.test",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5533,7 +5533,7 @@
 		"errors",
 		"flag",
 		"fmt",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/c [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/c.test]",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/c [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/c.test]",
 		"go/ast",
 		"go/build/constraint",
 		"go/parser",
@@ -5619,8 +5619,8 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d_test [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d.test]",
-	"ForTest": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d_test [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d.test]",
+	"ForTest": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5630,8 +5630,8 @@
 		"errors",
 		"flag",
 		"fmt",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus",
 		"internal/abi",
 		"internal/asan",
 		"internal/bisect",
@@ -5700,7 +5700,7 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d.test",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d.test",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5750,9 +5750,9 @@
 		"errors",
 		"flag",
 		"fmt",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d_test [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/d.test]",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d_test [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/d.test]",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus",
 		"go/ast",
 		"go/build/constraint",
 		"go/parser",
@@ -5838,8 +5838,8 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus.test]",
-	"ForTest": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus.test]",
+	"ForTest": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5917,7 +5917,7 @@
 	]
 }
 {
-	"ImportPath": "github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus.test",
+	"ImportPath": "github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus.test",
 	"Deps": [
 		"bufio",
 		"bytes",
@@ -5967,7 +5967,7 @@
 		"errors",
 		"flag",
 		"fmt",
-		"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus [github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus.test]",
+		"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus [github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus.test]",
 		"go/ast",
 		"go/build/constraint",
 		"go/parser",

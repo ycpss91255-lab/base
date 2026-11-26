@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/testcorpus"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/testcorpus"
 )
 
 // (*Config).Entry judges the Address it is handed, not only one that

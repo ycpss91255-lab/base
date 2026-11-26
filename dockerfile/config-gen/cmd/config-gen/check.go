@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ycpss91255-docker/base/dockerfile/config-gen/internal/schema"
+	"github.com/ycpss91255-lab/base/dockerfile/config-gen/internal/schema"
 )
 
 func init() {

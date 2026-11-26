@@ -34,13 +34,13 @@ readonly _MOVING_TAG_SKIP_DIRS=(
 )
 
 # A test-tools reference carrying a moving tag, qualified
-# (ghcr.io/ycpss91255-docker/test-tools) or under any other prefix
+# (ghcr.io/ycpss91255-lab/test-tools) or under any other prefix
 # (${ORG}/test-tools): test-tools after line start or a non-name character.
 readonly _MOVING_TAG_RE='(^|[^A-Za-z0-9_.-])test-tools:(latest|main)([^A-Za-z0-9_.-]|$)'
 
 # The qualified repository with no tag or digest: a base that a later line
 # suffixes ("${IMAGE}:latest") carries no test-tools text on the tag line.
-readonly _MOVING_TAG_UNTAGGED_RE='ghcr\.io/ycpss91255-docker/test-tools([^A-Za-z0-9_.:@/-]|$)'
+readonly _MOVING_TAG_UNTAGGED_RE='ghcr\.io/ycpss91255-lab/test-tools([^A-Za-z0-9_.:@/-]|$)'
 
 # A test-tools tag built from a variable or a format (:${ver}, :%s): the
 # value is decided at run time, so it is not a pin.
@@ -68,13 +68,13 @@ readonly _MOVING_TAG_DEFAULT_RE='^[[:space:]]*default:[[:space:]]*["'"'"']?(late
 # positive integer, an empty <reason> and an empty line anchor.
 # shellcheck disable=SC2016 # tokens are literal file text, never expanded.
 readonly _MOVING_TAG_ALLOWLIST=(
-  'script/test/test.sh|moving|line:just test uses the published image instead|1|ghcr.io/ycpss91255-docker/test-tools:main|a hint a human may type; no build reads it'
+  'script/test/test.sh|moving|line:just test uses the published image instead|1|ghcr.io/ycpss91255-lab/test-tools:main|a hint a human may type; no build reads it'
   "script/test/test.sh|indirect|line:printf 'test-tools:%s|1|test-tools:%s|the local tag: a content hash of the tooling inputs"
-  'script/ci/obtain_test_tools.sh|moving|line:_OBTAIN_ROLLING_TAG=|1|ghcr.io/ycpss91255-docker/test-tools:main|bootstrap pull, retagged to the local content tag only when its hash matches'
+  'script/ci/obtain_test_tools.sh|moving|line:_OBTAIN_ROLLING_TAG=|1|ghcr.io/ycpss91255-lab/test-tools:main|bootstrap pull, retagged to the local content tag only when its hash matches'
   'script/ci/obtain_test_tools.sh|moving|line:::warning::the pulled test-tools:main|1|test-tools:main|warning text naming the bootstrap tag'
-  '.github/workflows/release-test-tools.yaml|untagged|comment|1|ghcr.io/ycpss91255-docker/test-tools|header comment naming the published repository'
-  '.github/workflows/release-test-tools.yaml|untagged|line:IMAGE: |1|ghcr.io/ycpss91255-docker/test-tools|the publish job: the repository the release tags (:<ver>, :latest, :main) are pushed to'
-  'script/ci/testtools_image.sh|untagged|line:readonly _TESTTOOLS_IMAGE_REPO=|1|ghcr.io/ycpss91255-docker/test-tools|the repository the version-scoped tag is built from'
+  '.github/workflows/release-test-tools.yaml|untagged|comment|1|ghcr.io/ycpss91255-lab/test-tools|header comment naming the published repository'
+  '.github/workflows/release-test-tools.yaml|untagged|line:IMAGE: |1|ghcr.io/ycpss91255-lab/test-tools|the publish job: the repository the release tags (:<ver>, :latest, :main) are pushed to'
+  'script/ci/testtools_image.sh|untagged|line:readonly _TESTTOOLS_IMAGE_REPO=|1|ghcr.io/ycpss91255-lab/test-tools|the repository the version-scoped tag is built from'
   'dist/script/docker/wrapper/build.sh|indirect|line:_test_tools_image=|1|test-tools:${_tt_ver}|the local tag for the pinned .base/.version'
   'script/ci/acceptance.sh|indirect|line:--entrypoint toml-bridge|1|test-tools:${ver}|the local version-scoped tag'
   'script/ci/acceptance.sh|indirect|line:echo "toml-bridge in |1|test-tools:${ver}|message naming the local version-scoped tag'

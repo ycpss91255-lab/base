@@ -9,13 +9,13 @@
 # the template began shipping a `Dockerfile`, every repo bootstrapped from
 # it took the existing-repo branch, and the new-repo scaffold (the CI
 # workflow, the changelog, the smoke tree) was never installed
-# (ycpss91255-docker/base#928). Nothing failed, because nothing could name
+# (ycpss91255-lab/base#928). Nothing failed, because nothing could name
 # the proxy: the only statement of it was a bash condition in the middle of
 # `main`.
 #
 # `--list-existing-repo-signals` is that statement, read out of the
 # installer itself, so a checker (the template's shipped-file guard,
-# ycpss91255-docker/template#18) derives the discriminator instead of
+# ycpss91255-lab/template#18) derives the discriminator instead of
 # restating it. Like `--list-installed-paths`, it is a query and not a run:
 # it prints and exits BEFORE the template-source guard and before
 # `cd "${REPO_ROOT}"`, so it can be asked of the base checkout itself

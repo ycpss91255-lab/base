@@ -109,13 +109,26 @@ jobs:
         # tag_matrix full matrix. Tag pushes specifically benefit
         # from full validation since they cut releases; main pushes
         # benefit because the same code path is what tag-cut will see.
+        #
+        # GITHUB_OUTPUT's `name=value` form holds one line, and a caller may
+        # write its matrix as a block scalar: written as given, the second
+        # line fails the step (base#2160). So the value is read as JSON and
+        # written compact. Anything but one strict JSON array is refused here,
+        # by the input's name; `fromJSON` alone is laxer (a trailing comma, a
+        # comment) and would name neither.
         run: |
           set -euo pipefail
           if [[ "${EVENT_NAME}" == "pull_request" ]]; then
-            echo "matrix=${PR_MATRIX}" >> "${GITHUB_OUTPUT}"
+            input=pr_matrix value="${PR_MATRIX}"
           else
-            echo "matrix=${TAG_MATRIX}" >> "${GITHUB_OUTPUT}"
+            input=tag_matrix value="${TAG_MATRIX}"
           fi
+          one_array='if length == 1 and (.[0] | type) == "array" then .[0] else error("expected one array") end'
+          if ! matrix="$(jq -cs "${one_array}" <<< "${value}")"; then
+            echo "::error::${input} is not one JSON array of matrix entries."
+            exit 1
+          fi
+          printf 'matrix=%s\n' "${matrix}" >> "${GITHUB_OUTPUT}"
 
   call-build:
     needs: resolve-matrix
@@ -130,7 +143,15 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.matrix) }}
-    uses: ./.github/workflows/build-worker.yaml
+    # The full path at this release's own tag, not `./`. A caller that names
+    # this workflow by an annotated tag hands `./` the TAG OBJECT's sha as
+    # the ref of the next level, and GitHub then fails `push` and
+    # `workflow_dispatch` runs at startup with "workflow was not found"
+    # (`pull_request` runs start). A ref written out is resolved as written
+    # (base#2171). `uses:` takes no expression, so the tag is a literal that
+    # the release bump rewrites together with `.version`;
+    # multi_distro_build_worker_yaml_spec.bats fails when the two differ.
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.43.0-rc7
     with:
       # Per-shard image_name includes the matrix cell name so the GHCR
       # tag disambiguates multi-cell builds from the same caller repo
