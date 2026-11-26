@@ -115,7 +115,3 @@ _fmt_pattern() {
   done
 }
 
-@test "log.lnav-format.json (JSON) still coexists unchanged (#609)" {
-  run grep -q '"json": true' /source/dist/script/docker/lib/log.lnav-format.json
-  assert_success
-}

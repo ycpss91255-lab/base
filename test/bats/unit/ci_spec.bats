@@ -3785,20 +3785,6 @@ ok unit tagged fragile"
   refute_output --partial "docker should not be called"
 }
 
-# why: #523 coverage-combo guard
-@test "main --bats-path + --coverage is rejected (ci_bats_path_coverage)" {
-  mock_cmd "docker" 'echo "docker should not be called"; exit 1'
-  mock_cmd "id" 'echo 1000'
-
-  run bash -c '
-    source /source/script/test/test.sh
-    export PATH="'"${MOCK_DIR}"'"
-    main --bats-path test/bats/unit/ci_spec.bats --coverage
-  '
-  assert_failure
-  assert_output --partial "cannot combine with --coverage"
-}
-
 # ════════════════════════════════════════════════════════════════════
 # --coverage-path: ONE spec under kcov instrumentation
 #

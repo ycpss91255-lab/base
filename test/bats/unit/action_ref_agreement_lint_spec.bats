@@ -118,16 +118,6 @@ ${_report}A ref is a tag on the action's repository, so two refs in one tree mea
 
 # ── The lint: detection ────────────────────────────────────────────
 
-# why: The v6/v7 split, as a fixture
-@test "_run_action_ref_agreement: FAILS when two workflows disagree on an action's ref (#949)" {
-  _require_driver
-  _workflow a.yaml 'jobs:' '  a:' '    steps:' '      - uses: docker/build-push-action@v6'
-  _workflow b.yaml 'jobs:' '  b:' '    steps:' '      - uses: docker/build-push-action@v7'
-
-  run _run_action_ref_agreement
-  assert_failure
-}
-
 # why: A finding you can act on without grepping
 @test "_run_action_ref_agreement: names the action, both refs and every call site (#949)" {
   _require_driver

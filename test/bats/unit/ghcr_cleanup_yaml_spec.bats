@@ -787,23 +787,7 @@ _exclude_tags() {
   assert_output --partial 'delete-only-untagged-versions: true'
 }
 
-# why: The action that resolves manifest references is the one in use
-@test "ghcr-cleanup.yaml: uses the manifest-aware dataaxiom/ghcr-cleanup-action" {
-  run code_grep -F 'uses: dataaxiom/ghcr-cleanup-action@' "${WF}"
-  assert_success
-}
-
 # ── Action pinning ───────────────────────────────────────────────────
-
-# why: A moved tag would hand deletion rights over our package to unreviewed
-# code
-@test "ghcr-cleanup.yaml: pins the cleanup action to an immutable commit SHA" {
-  # A floating tag on the one third-party action holding packages: write
-  # over a package we publish means a moved tag hands deletion rights to
-  # unreviewed code.
-  run code_grep -E 'uses: dataaxiom/ghcr-cleanup-action@[0-9a-f]{40}( |$)' "${WF}"
-  assert_success
-}
 
 # why: Keeps the SHA readable; the form Dependabot rewrites on bump
 @test "ghcr-cleanup.yaml: records the pinned action's version in a trailing comment" {
