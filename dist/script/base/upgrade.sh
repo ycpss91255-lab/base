@@ -675,12 +675,13 @@ _target_commit_sha() {
 #   Move a base worker ref pinned to a commit sha to <target commit>, where
 #   the line says which release the sha is: a `uses:` with the sha directly
 #   behind it and a `# vX.Y.Z` comment as the rest of the line. The comment
-#   is moved to <target version> with it. A sha with no such comment is a
+#   is moved to <target version> with it, and what ends the line (a CR) is
+#   kept. A sha with no such comment is a
 #   commit the user chose for a reason this cannot read, and stays.
 _rewrite_sha_worker_refs() {
   local _file="${1}" _target="${2}" _sha="${3}"
   [[ -n "${_sha}" ]] || return 0
-  sed -i -E "s%((^|[^A-Za-z0-9_-])uses[\"']?[[:space:]]*:[[:space:]]*[\"']?${BASE_UPSTREAM_SLUG//./\.}/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)@[0-9a-fA-F]{40}([\"']?[[:space:]]+#[[:space:]]*)v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?[[:space:]]*\$%\1@${_sha}\3${_target}%" "${_file}"
+  sed -i -E "s%((^|[^A-Za-z0-9_-])uses[\"']?[[:space:]]*:[[:space:]]*[\"']?${BASE_UPSTREAM_SLUG//./\\.}/\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)@[0-9a-fA-F]{40}([\"']?[[:space:]]+#[[:space:]]*)v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?([[:space:]]*)\$%\1@${_sha}\3${_target}\5%" "${_file}"
 }
 
 # _collect_left_worker_refs <main.yaml> <target version> [<target commit>]

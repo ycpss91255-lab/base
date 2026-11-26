@@ -392,7 +392,8 @@ EOF
   git -C "${TMPL_BARE}" -c user.name=t -c user.email=t@t tag -f -a -m "v0.9.7" v0.9.7 "${_new}"
   _tag_object="$(git -C "${TMPL_BARE}" rev-parse v0.9.7)"
   [ "${_tag_object}" != "${_new}" ]
-  printf 'jobs:\n  a:\n    uses: %s/%s@%s # v0.9.5\n' "${_path}" "${_w}" "${_old}" \
+  # CRLF, as an editor on Windows leaves it: the line keeps its ending.
+  printf 'jobs:\r\n  a:\r\n    uses: %s/%s@%s # v0.9.5\r\n' "${_path}" "${_w}" "${_old}" \
     > .github/workflows/main.yaml
   git add .github/workflows/main.yaml
   git commit -q -m "a ref pinned to a commit sha"
@@ -400,7 +401,7 @@ EOF
   run env TEMPLATE_REMOTE="file://${TMPL_BARE}" ./.base/dist/script/base/upgrade.sh v0.9.7
   assert_success
   refute_output --partial 'base worker ref(s)'
-  grep -Fxq "    uses: ${_path}/${_w}@${_new} # v0.9.7" .github/workflows/main.yaml
+  grep -Fxq "    uses: ${_path}/${_w}@${_new} # v0.9.7"$'\r' .github/workflows/main.yaml
 }
 
 # ── Step 5: declarative Dockerfile/entrypoint migrations ───────
