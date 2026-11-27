@@ -60,10 +60,7 @@ _tree_names() {
 @test "a file or directory name ending in a dot or a space is reported" {
   run _nonportable_names < <(printf '%s\0' \
     "dir/ends." "dir/ends " "ends./file" "ends /file" "dir/fine")
-  assert_equal "${output}" $'dir/ends.
-dir/ends 
-ends./file
-ends /file'
+  assert_equal "${output}" $'dir/ends.\ndir/ends \nends./file\nends /file'
 }
 
 # why: a control character in a name is refused by Windows as well, and
