@@ -2066,7 +2066,7 @@ on hand-edited / malformed setup.conf:
 | `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
 | `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
 
-### test/bats/unit/conf_ini_golden_spec.bats (6)
+### test/bats/unit/conf_ini_golden_spec.bats (7)
 
 `_ini_tokenize` is the single shell INI tokenizer. The Go reader that
 replaces it (the later `ini tokens` slice) must match it byte for byte, so
@@ -2084,6 +2084,7 @@ holds the shell to that record. A golden is tab-separated lines:
 | `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. A colon in a section name is written `%3A` in the golden file name, because Windows cannot create a file whose name holds a colon. |
 | `_conf_load_layers over the base and over layers matches layers.base_over.golden` | `_conf_load_layers` over a two-layer INI chain is section-replace (base#2062, S25c): the upper layer owns section `a`, so `a\|y\|2` from the base layer must not survive. The expected bytes are in golden/s25/layers.base_over.golden; the absent third path adds nothing. |
 | `_conf_load_layers over every single s25 input matches its load golden` | `_conf_load_layers` over a single file is the tokenizer's sections with entries grouped by section; each single-file corpus input has its own <stem>.load.golden. |
+| `_setup_conf_merge_blockers over the s25 blockers trio matches blockers.golden` | `_setup_conf_merge_blockers` is the shell answer the later `ini blockers` slice must reproduce (base#2066, S25d). Over the s25_blockers_* trio the expected blockers are `a` (root differs from legacy and from the template) and `d` (only the root has it), in that order; `b` (legacy and root agree) and `c` (root equals the template) are not. The bytes are in golden/s25/blockers.golden. |
 
 ### test/bats/unit/conf_logging_spec.bats (12)
 
