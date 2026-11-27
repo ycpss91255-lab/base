@@ -653,23 +653,42 @@ _acceptance_code() {
   refute_output --partial 'just docker setup-tui'
 }
 
-@test "self-test.yaml: acceptance runs as a native-runner matrix over amd64 + arm64 (#603)" {
-  # A2: verify the runnability contract on BOTH arches via native
-  # runners (no QEMU), mirroring the platform->runner convention in
-  # build-worker / publish-worker / release-test-tools.
-  run yaml_job_lines "${WF}" acceptance
+# why: acceptance's amd64 leg takes its runner from classify's runs_on_cpu
+# (["ubuntu-latest"] when the switch is off, a fork or an untrusted event);
+# the arm64 leg stays on ubuntu-24.04-arm because the cpu scale set is x64
+# (base#2270, part of base#1586).
+@test "self-test.yaml: acceptance runs as a native-runner matrix over amd64 + arm64 (#603, base#2270)" {
+  # Expected literals are the issue's acceptance criteria.
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[0].platform'
   assert_success
-  assert_output --partial 'fail-fast: false'
-  assert_output --partial 'linux/amd64'
-  assert_output --partial 'ubuntu-latest'
-  assert_output --partial 'linux/arm64'
-  assert_output --partial 'ubuntu-24.04-arm'
+  assert_output 'linux/amd64'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[0].runner'
+  assert_success
+  assert_output '${{ needs.classify.outputs.runs_on_cpu }}'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[1].platform'
+  assert_success
+  assert_output 'linux/arm64'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[1].runner'
+  assert_success
+  assert_output '["ubuntu-24.04-arm"]'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy["fail-fast"]'
+  assert_success
+  assert_output 'false'
 }
 
-@test "self-test.yaml: acceptance shards run on the matrix runner (#603)" {
-  run yaml_job_lines "${WF}" acceptance
+@test "self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance["runs-on"]'
   assert_success
-  assert_output --partial 'runs-on: ${{ matrix.runner }}'
+  assert_output '${{ fromJSON(matrix.runner) }}'
+  run _yaml_eval "${WF}" '.jobs.acceptance["timeout-minutes"]'
+  assert_success
+  assert_output '120'
+  run _yaml_eval "${WF}" '.jobs.acceptance.needs | join(",")'
+  assert_success
+  assert_output 'actionlint,classify,test-tools-image-amd64,test-tools-image-arm64'
+  run _yaml_eval "${WF}" '.jobs.acceptance.if'
+  assert_success
+  assert_output "needs.classify.outputs.select_acceptance == 'true'"
 }
 
 @test "self-test.yaml: acceptance Obtain step pulls the matrix platform, not a hardcoded amd64 (#603)" {
@@ -5221,7 +5240,9 @@ REPO=${{ github.repository }}
 MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
 CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 EOT
-  # This child only adds outputs: no job may take its runs-on from them yet.
-  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | (.value["runs-on"] // "") | tostring')"
-  assert_failure
+  # Only the switched jobs take their runs-on from the classify output;
+  # acceptance is the one switched here (base#2270).
+  run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) | .key'
+  assert_success
+  assert_output 'acceptance'
 }
