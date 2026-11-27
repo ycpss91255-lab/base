@@ -1,4 +1,4 @@
-name: CI
+name: "PR_Push/CI_測試"
 
 # `pull_request:` carries no branch filter, and that is load-bearing
 # rather than incidental: the upstream-release watch opens its proposals

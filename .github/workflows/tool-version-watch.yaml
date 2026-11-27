@@ -1,4 +1,4 @@
-name: Upstream release watch
+name: "Schedule/上游版本檢查"
 
 # Detect a new upstream release -> open a PR that bumps it -> let CI prove
 # it -> STOP THERE.

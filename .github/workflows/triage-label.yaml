@@ -1,4 +1,4 @@
-name: Triage label
+name: "Issue/自動加_triage_標籤"
 
 # Safety net for issues that carry no state label. `doc/agents/triage-labels.md`
 # says every issue carries exactly one of its state roles, but an issue can

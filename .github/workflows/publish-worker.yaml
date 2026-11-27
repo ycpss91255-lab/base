@@ -1,4 +1,4 @@
-name: Publish Docker Image
+name: "Reusable/發佈_Docker_映像檔"
 
 # Reusable workflow that pushes a downstream repo's Dockerfile target
 # stage to a container registry (default: GHCR) on tag push.

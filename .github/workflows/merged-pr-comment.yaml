@@ -1,4 +1,4 @@
-name: Merged PR comment
+name: "PR_Merged/合併後留言"
 
 # GitHub never notifies an account about its own actions, and the owner
 # merges through the merge queue, so a merge leaves no event addressed to
