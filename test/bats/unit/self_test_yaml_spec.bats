@@ -2002,9 +2002,9 @@ _job_names() {
   # coverage-gate skipped, required check green, unit suite and coverage
   # floor never run.
   #
-  # ci-rollup and release are the two SINKS and so are exempt: nothing
-  # aggregates the aggregator, and the tag path is checked separately
-  # below.
+  # ci-rollup, release-gate and release are the SINKS and so are exempt:
+  # nothing aggregates the aggregator, release-gate reads ci-rollup itself,
+  # and the tag path is checked separately below.
   local -a _jobs=()
   mapfile -t _jobs < <(_job_names)
   [ "${#_jobs[@]}" -ge 14 ] \
@@ -2017,7 +2017,7 @@ _job_names() {
   local _job
   for _job in "${_jobs[@]}"; do
     case "${_job}" in
-      ci-rollup | release) continue ;;
+      ci-rollup | release-gate | release) continue ;;
     esac
     grep -qxF -- "${_job}" <<<"${_needs}" \
       || fail "job '${_job}' is declared in self-test.yaml but ci-rollup does not name it in needs: -- its failure cannot reach the required check"
