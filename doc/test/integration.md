@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **379 tests**.
+Integration specs under `test/bats/integration/`: **385 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -329,6 +329,27 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 hash golden: noise goldens are byte-identical to base3` | noise lines must not move the hash, so both noise goldens equal base3's. |
 | `s43 hash golden: a missing Dockerfile gives empty hash and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty result and rc 0. |
 | `s43 hash golden: every hash fixture has exactly one golden and no extra` | a hash fixture with no golden, or a golden with no fixture, must fail. |
+
+### test/bats/integration/config_gen_s72_vm_golden_spec.bats (6)
+
+Before any Go code reads a version string, the shell's reading of it is
+pinned. The corpus file testdata/corpus/s72/s72_vm_versions.txt holds one
+input per line; the golden testdata/golden/s72/s72_vm_versions.golden holds,
+per input, "<input>TAB<_vm_is_semver exit code>TAB<_vm_key output>"
+(dist/script/docker/lib/version_migrate.sh). The third column is "-" when
+the exit code is 1: _vm_key is only ever fed a value that passed
+_vm_is_semver. The spec regenerates the golden from the shell and fails on
+any byte difference, on a corpus with no golden, and on a golden with no
+corpus.
+
+| Test | Description |
+|------|-------------|
+| `s72: the vm_versions corpus and golden exist` | a missing corpus or golden would silently pin nothing. |
+| `s72: the corpus holds the issue's nineteen inputs` | the inputs must be the issue's own nineteen, in its order, including the empty line and the line with a leading space, or the golden pins other cases (base#2300). |
+| `s72: the golden holds the issue's results` | the worked results come from the issue's table, not from the shell. |
+| `s72: the shell result matches the golden` | _vm_is_semver and _vm_key read the corpus the way the golden says; the shell result must match it byte for byte. |
+| `s72: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
+| `s72: every corpus file has a golden` | a corpus file with no golden would pin nothing; and with no files at all the loops above pass vacuously. |
 
 ### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (17)
 
