@@ -17,6 +17,8 @@
 #   - Zero workflow files is a failure, not a pass.
 
 readonly _WORKFLOW_RUN_NAME_DIR_REL='.github/workflows'
+# shellcheck disable=SC2016 # literal expression delimiters, not expansions.
+readonly _WORKFLOW_RUN_NAME_OPEN='${{' _WORKFLOW_RUN_NAME_CLOSE='}}'
 
 # Prints "RUNNAME<TAB><value>" for the top-level run-name, or nothing when
 # the key is absent. A block scalar (`>-`, `|`) is joined into one line.
@@ -45,8 +47,9 @@ _workflow_run_name_finding() {
     return 0
   fi
   _value="${_line#RUNNAME$'\t'}"
-  if [[ "${_value}" != *'${{'*'}}'* ]]; then
-    printf 'run-name has no ${{ }} expression: %s' "${_value:-<empty>}"
+  if [[ "${_value}" != *"${_WORKFLOW_RUN_NAME_OPEN}"*"${_WORKFLOW_RUN_NAME_CLOSE}"* ]]; then
+    printf 'run-name has no %s %s expression: %s' \
+      "${_WORKFLOW_RUN_NAME_OPEN}" "${_WORKFLOW_RUN_NAME_CLOSE}" "${_value:-<empty>}"
   fi
 }
 
