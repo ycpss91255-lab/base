@@ -123,6 +123,41 @@ _gitattributes_install() {
   mv -f -- "${_tmp}" "${_path}"
 }
 
+
+# _gitattributes_compose <src> <bom> <begin_ln> <end_ln>
+#   Print the synced file: the byte order mark when <bom> is 1, then the
+#   canonical block and the repo's own content read from <src>, which never
+#   holds a mark itself.
+#
+#   <begin_ln> 0 means <src> has no block: the block goes first, then a
+#   blank line and <src> as it is. Otherwise the lines <begin_ln> through
+#   <end_ln> are the block to replace, and head / tail copy what stands
+#   before and after it -- they copy bytes, so a missing final newline
+#   comes through exactly as it was.
+#
+#   Every writer is checked. The caller redirects this into a draft that
+#   replaces the repo's file, and a group's exit status is only its last
+#   command's: an unchecked writer that failed midway would hand over a
+#   truncated draft as a success.
+_gitattributes_compose() {
+  local _src="$1" _bom="$2" _begin_ln="$3" _end_ln="$4"
+  if (( _bom )); then
+    printf '\357\273\277' || return 1
+  fi
+  if (( _begin_ln == 0 )); then
+    _canonical_gitattributes_block || return 1
+    [[ -s "${_src}" ]] || return 0
+    printf '\n' || return 1
+    cat -- "${_src}" || return 1
+    return 0
+  fi
+  if (( _begin_ln > 1 )); then
+    head -n "$(( _begin_ln - 1 ))" -- "${_src}" || return 1
+  fi
+  _canonical_gitattributes_block || return 1
+  tail -n "+$(( _end_ln + 1 ))" -- "${_src}" || return 1
+}
+
 # _sync_gitattributes <path>
 #   Make <path> carry the canonical line-ending block, touching nothing
 #   else in it.
@@ -144,6 +179,14 @@ _gitattributes_install() {
 #                          the template's half stops. Guessing is how a
 #                          sync deletes a rule somebody wrote
 #
+#   A UTF-8 byte order mark opening the file stays the file's first three
+#   bytes, and the block goes after it. git skips a mark only at the very
+#   start of .gitattributes; one left at the head of the repo's first line
+#   becomes part of that line's pattern, and the rule stops matching -- a
+#   `fixture.txt -text` silently handed to `* text=auto eol=lf`. The mark
+#   is set aside before the markers are looked for, so the sync's own
+#   output for such a file (mark, then BEGIN) is read back as a block.
+#
 #   The sync never renormalizes. It decides what a FUTURE `git add` stores
 #   and what a checkout writes; a file already committed with CRLF stays
 #   that way until the repo runs `git add --renormalize .` itself, in a
@@ -164,20 +207,16 @@ _sync_gitattributes() {
     return
   fi
 
-  local _tmp
-  _tmp="$(mktemp "${_path}.XXXXXX")" || {
-    _log_err init gitattributes_sync_failed \
-      "display=could not create a temporary file beside ${_path}; the line-ending block was not synced and the file is unchanged" \
-      "file=${_path}"
-    return 1
-  }
-
   # Locate the markers by reading the file in-shell: no pipeline whose
   # reader can leave early, and a final line with no trailing newline is
   # still seen (`|| [[ -n ... ]]`) -- a marker could be it.
-  local _line _lineno=0 _begin_ln=0 _end_ln=0 _begin_n=0 _end_n=0
+  local _line _lineno=0 _begin_ln=0 _end_ln=0 _begin_n=0 _end_n=0 _bom=0
   while IFS= read -r _line || [[ -n "${_line}" ]]; do
     _lineno=$(( _lineno + 1 ))
+    if (( _lineno == 1 )) && [[ "${_line}" == $'\357\273\277'* ]]; then
+      _bom=1
+      _line="${_line#$'\357\273\277'}"
+    fi
     if [[ "${_line}" == "${_begin}" ]]; then
       _begin_n=$(( _begin_n + 1 ))
       _begin_ln="${_lineno}"
@@ -187,34 +226,45 @@ _sync_gitattributes() {
     fi
   done < "${_path}"
 
-  if (( _begin_n == 0 && _end_n == 0 )); then
-    {
-      _canonical_gitattributes_block
-      if [[ -s "${_path}" ]]; then
-        printf '\n'
-        cat -- "${_path}"
-      fi
-    } > "${_tmp}"
-    _gitattributes_install "${_tmp}" "${_path}"
-    return
-  fi
-
-  if (( _begin_n != 1 || _end_n != 1 || _begin_ln > _end_ln )); then
-    rm -f -- "${_tmp}"
+  if (( _begin_n + _end_n > 0 )) \
+     && (( _begin_n != 1 || _end_n != 1 || _begin_ln > _end_ln )); then
     _log_err init gitattributes_managed_block_invalid \
       "display=${_path}: the line-ending managed block is malformed (${_begin_n} begin marker(s), ${_end_n} end marker(s); exactly one of each is expected, begin first). Restore the pair around the template's lines, or delete both markers and the lines between them, then re-run the sync. The file was NOT modified." \
       "path=${_path}" "begin_markers=${_begin_n}" "end_markers=${_end_n}"
     return 1
   fi
 
-  # head / tail copy bytes, so the repo's half -- a missing final newline
-  # included -- comes through exactly as it was.
-  {
-    if (( _begin_ln > 1 )); then
-      head -n "$(( _begin_ln - 1 ))" -- "${_path}"
-    fi
-    _canonical_gitattributes_block
-    tail -n "+$(( _end_ln + 1 ))" -- "${_path}"
-  } > "${_tmp}"
+  # The draft, and for a file with a byte order mark a second working file
+  # holding the content without it, so every line number above counts the
+  # same lines in what head / tail are given.
+  local _tmp _src="${_path}" _body="" _rc=0
+  _tmp="$(mktemp "${_path}.XXXXXX")" || _rc=1
+  if (( _rc == 0 && _bom )); then
+    _body="$(mktemp "${_path}.XXXXXX")" || _rc=1
+    _src="${_body}"
+  fi
+  if (( _rc != 0 )); then
+    [[ -z "${_tmp}" ]] || rm -f -- "${_tmp}"
+    _log_err init gitattributes_sync_failed \
+      "display=could not create a temporary file beside ${_path}; the line-ending block was not synced and the file is unchanged" \
+      "file=${_path}"
+    return 1
+  fi
+
+  if (( _bom )); then
+    tail -c +4 -- "${_path}" > "${_body}" || _rc=1
+  fi
+  if (( _rc == 0 )); then
+    _gitattributes_compose "${_src}" "${_bom}" "${_begin_ln}" "${_end_ln}" \
+      > "${_tmp}" || _rc=1
+  fi
+  [[ -z "${_body}" ]] || rm -f -- "${_body}"
+  if (( _rc != 0 )); then
+    rm -f -- "${_tmp}"
+    _log_err init gitattributes_sync_failed \
+      "display=could not write the rewrite of ${_path}; the line-ending block was not synced and the file is unchanged" \
+      "file=${_path}"
+    return 1
+  fi
   _gitattributes_install "${_tmp}" "${_path}"
 }

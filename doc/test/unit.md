@@ -4018,7 +4018,7 @@ could have said so: that workflow carried no spec at all.
 | `.gitattributes: the generated changelog index merges by union (#926)` | The original scope of the rule, kept rather than assumed: the index is derived and the layout lint re-derives it, so a union duplicate there is reported instead of shipped. |
 | `.gitattributes: CONVENTIONS.md is NOT union-merged (#926)` | The boundary the widened glob nearly crossed. A gitattributes `*` does not cross `/`, so `doc/changelog/*.md` would have covered hand-written prose -- where union merging keeps both copies of a rewritten paragraph in silence, and no gate in this repo reads that file outside its marker block. |
 
-### test/bats/unit/gitattributes_sync_spec.bats (26)
+### test/bats/unit/gitattributes_sync_spec.bats (34)
 
 Unit tests for `dist/script/docker/lib/gitattributes.sh`
 (`_canonical_gitattributes_block`, `_sync_gitattributes`, refs base#2246). A
@@ -4052,10 +4052,18 @@ itself (`git check-attr`) which rule wins.
 | `_sync_gitattributes: a rewritten block still carries exactly one marker pair (base#2246)` | A rewrite must not leave a file the next run reads as malformed |
 | `_sync_gitattributes: a rewrite keeps the file's mode (base#2246)` | The file's mode is the repo's, not mktemp's 0600 |
 | `_sync_gitattributes: leaves no temporary file behind (base#2246)` | No temp file may be left beside the repo's own files |
+| `_sync_gitattributes: the first rule of a file opening with a BOM still wins after the block is added (base#2246)` | THE DEFECT -- the rule on the line right after the mark must still decide its path once the block is added |
+| `_sync_gitattributes: a BOM stays at the very start, the block follows it, the content follows the block (base#2246)` | The mark stays the file's first three bytes, once, and everything the repo wrote follows the block untouched |
+| `_sync_gitattributes: a second run over a BOM file changes nothing (base#2246)` | The sync's own output for such a file opens with the mark and then the begin marker; a second run must read that as its block, not as a lone end |
+| `_sync_gitattributes: a stale block right behind a BOM is rewritten and the BOM is kept once (base#2246)` | The upgrade path for a BOM file -- a stale block right behind the mark is rewritten, with the mark kept once and the repo's rules still deciding |
+| `_sync_gitattributes: a BOM file with lines above a stale block keeps one BOM and those lines (base#2246)` | With the repo's own lines between the mark and a stale block, the mark must be neither dropped nor written a second time |
+| `_sync_gitattributes: a file holding only a BOM ends up as the BOM and the block (base#2246)` | A file that is nothing but the mark has no content to separate from the block |
+| `_sync_gitattributes: a lone begin marker behind a BOM is refused, file unchanged (base#2246)` | A malformed block is refused behind a mark exactly as without one, and the extra working file the mark needs must not be left behind |
 | `_sync_gitattributes: a begin marker with no end marker is refused, file unchanged (base#2246)` | A begin marker with no end gives no place to stop; guessing deletes somebody's rule |
 | `_sync_gitattributes: an end marker with no begin marker is refused, file unchanged (base#2246)` | An end marker with no begin is the same corruption from the other side |
 | `_sync_gitattributes: a repeated marker pair is refused, file unchanged (base#2246)` | Two blocks leave no single one to rewrite |
 | `_sync_gitattributes: an end marker above the begin marker is refused, file unchanged (base#2246)` | An end marker ABOVE the begin marker delimits nothing |
+| `_sync_gitattributes: a draft that cannot be fully written is abandoned, file unchanged (base#2246)` | A writer that fails partway leaves a truncated draft; installing it would replace the repo's file with a shorter one |
 | `_sync_gitattributes: a temp file that cannot be created is refused, file unchanged (base#2246)` | With no temp file there is nowhere to compose the rewrite; the sync must say so and leave the repo's file alone |
 | `_sync_gitattributes: a rewrite that cannot take the file's mode is abandoned, file unchanged (base#2246)` | A rewrite that cannot take the file's mode would land a 0600 file over the repo's own; abandoning it is the only safe answer |
 | `gitattributes: the events the sync can raise are registered (base#2246)` | _log_* is strict -- an unregistered event prints the registry's refusal instead of the message that says what is wrong with the file |

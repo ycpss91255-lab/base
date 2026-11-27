@@ -261,6 +261,120 @@ _repo() {
   assert_output ""
 }
 
+# ── A file that opens with a UTF-8 byte order mark ─────────────────────────
+#
+# git skips a BOM only at the very start of .gitattributes. A block put above
+# one would leave the mark at the head of the repo's first line, where it is
+# part of that line's pattern and the rule stops matching anything.
+
+# _bom -- print the three bytes of a UTF-8 byte order mark.
+_bom() {
+  printf '\357\273\277'
+}
+
+# why: THE DEFECT -- the rule on the line right after the mark must still
+# decide its path once the block is added
+@test "_sync_gitattributes: the first rule of a file opening with a BOM still wins after the block is added (base#2246)" {
+  _repo
+  { _bom; printf '%s\n' 'foo.txt -text' '*.usd binary'; } > "${ATTRS}"
+  [ "$(_attr text foo.txt)" = "unset" ]
+  run _sync_gitattributes "${ATTRS}"
+  assert_success
+  [ "$(_attr text foo.txt)" = "unset" ]
+  [ "$(_attr text scene.usd)" = "unset" ]
+  [ "$(_attr eol run.sh)" = "lf" ]
+}
+
+# why: The mark stays the file's first three bytes, once, and everything the
+# repo wrote follows the block untouched
+@test "_sync_gitattributes: a BOM stays at the very start, the block follows it, the content follows the block (base#2246)" {
+  { _bom; printf '%s\n' 'foo.txt -text' '*.usd binary'; } > "${ATTRS}"
+  _sync_gitattributes "${ATTRS}"
+  {
+    _bom
+    _canonical_gitattributes_block
+    printf '\n'
+    printf '%s\n' 'foo.txt -text' '*.usd binary'
+  } > "${SCRATCH}/want"
+  run cmp -- "${SCRATCH}/want" "${ATTRS}"
+  assert_success
+}
+
+# why: The sync's own output for such a file opens with the mark and then the
+# begin marker; a second run must read that as its block, not as a lone end
+@test "_sync_gitattributes: a second run over a BOM file changes nothing (base#2246)" {
+  { _bom; printf '%s\n' 'foo.txt -text'; } > "${ATTRS}"
+  _sync_gitattributes "${ATTRS}"
+  cp -- "${ATTRS}" "${SCRATCH}/once"
+  run _sync_gitattributes "${ATTRS}"
+  assert_success
+  run cmp -- "${SCRATCH}/once" "${ATTRS}"
+  assert_success
+}
+
+# why: The upgrade path for a BOM file -- a stale block right behind the mark
+# is rewritten, with the mark kept once and the repo's rules still deciding
+@test "_sync_gitattributes: a stale block right behind a BOM is rewritten and the BOM is kept once (base#2246)" {
+  _repo
+  {
+    _bom
+    _gitattributes_marker_begin
+    printf '* text=auto\n'
+    _gitattributes_marker_end
+    printf '\nfoo.txt -text\n'
+  } > "${ATTRS}"
+  run _sync_gitattributes "${ATTRS}"
+  assert_success
+  {
+    _bom
+    _canonical_gitattributes_block
+    printf '\nfoo.txt -text\n'
+  } > "${SCRATCH}/want"
+  run cmp -- "${SCRATCH}/want" "${ATTRS}"
+  assert_success
+  [ "$(_attr text foo.txt)" = "unset" ]
+}
+
+# why: With the repo's own lines between the mark and a stale block, the mark
+# must be neither dropped nor written a second time
+@test "_sync_gitattributes: a BOM file with lines above a stale block keeps one BOM and those lines (base#2246)" {
+  {
+    _bom
+    printf '# header the repo wrote\n'
+    _gitattributes_marker_begin
+    printf '* text=auto\n'
+    _gitattributes_marker_end
+    printf '*.usd binary\n'
+  } > "${ATTRS}"
+  run _sync_gitattributes "${ATTRS}"
+  assert_success
+  {
+    _bom
+    printf '# header the repo wrote\n'
+    _canonical_gitattributes_block
+    printf '*.usd binary\n'
+  } > "${SCRATCH}/want"
+  run cmp -- "${SCRATCH}/want" "${ATTRS}"
+  assert_success
+}
+
+# why: A file that is nothing but the mark has no content to separate from
+# the block
+@test "_sync_gitattributes: a file holding only a BOM ends up as the BOM and the block (base#2246)" {
+  _bom > "${ATTRS}"
+  _sync_gitattributes "${ATTRS}"
+  { _bom; _canonical_gitattributes_block; } > "${SCRATCH}/want"
+  run cmp -- "${SCRATCH}/want" "${ATTRS}"
+  assert_success
+}
+
+# why: A malformed block is refused behind a mark exactly as without one, and
+# the extra working file the mark needs must not be left behind
+@test "_sync_gitattributes: a lone begin marker behind a BOM is refused, file unchanged (base#2246)" {
+  { _bom; _gitattributes_marker_begin; printf '* text=auto eol=lf\n*.usd binary\n'; } > "${ATTRS}"
+  _assert_refused_unchanged
+}
+
 # ── A malformed block ──────────────────────────────────────────────────────
 
 # _assert_refused_unchanged -- the shape every malformed case shares: the
@@ -302,6 +416,22 @@ _assert_refused_unchanged() {
 }
 
 # ── A write that cannot be made ─────────────────────────────────────────────
+
+# why: A writer that fails partway leaves a truncated draft; installing it
+# would replace the repo's file with a shorter one
+@test "_sync_gitattributes: a draft that cannot be fully written is abandoned, file unchanged (base#2246)" {
+  printf '%s\n' '*.usd binary' > "${ATTRS}"
+  cp -- "${ATTRS}" "${SCRATCH}/before"
+  cat() { return 1; }
+  run _sync_gitattributes "${ATTRS}"
+  unset -f cat
+  assert_failure
+  assert_output --partial "could not write the rewrite"
+  run cmp -- "${SCRATCH}/before" "${ATTRS}"
+  assert_success
+  run find "${SCRATCH}" -mindepth 1 -maxdepth 1 -name '.gitattributes.?*'
+  assert_output ""
+}
 
 # why: With no temp file there is nowhere to compose the rewrite; the sync
 # must say so and leave the repo's file alone
