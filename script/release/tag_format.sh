@@ -18,19 +18,20 @@ fi
 # No leading zeros; RC numbers start at 1.
 _TF_TAG_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc[1-9][0-9]*)?$'
 
+err() { printf '[tag-format] %s\n' "$*" >&2; }
+
 # _tf_main <tag> -- check one tag name.
 _tf_main() {
   local _ref="${1-}" _tag
   if [[ -z "${_ref}" ]]; then
-    printf 'tag_format: no tag given. Usage: tag_format.sh <tag>, e.g. v0.43.0 or refs/tags/v0.43.0-rc9.\n' >&2
+    err "no tag given. Usage: tag_format.sh <tag>, e.g. v0.43.0 or refs/tags/v0.43.0-rc9."
     return 2
   fi
   _tag="${_ref#refs/tags/}"
   if [[ "${_tag}" =~ ${_TF_TAG_RE} ]]; then
     return 0
   fi
-  printf "tag_format: '%s' is not a version tag. Version tags are vX.Y.Z or vX.Y.Z-rcN (e.g. v0.43.0, v0.43.0-rc9): no leading zeros, N from 1. Pattern: %s\n" \
-    "${_tag}" "${_TF_TAG_RE}" >&2
+  err "'${_tag}' is not a version tag. Version tags are vX.Y.Z or vX.Y.Z-rcN (e.g. v0.43.0, v0.43.0-rc9): no leading zeros, N from 1. Pattern: ${_TF_TAG_RE}"
   return 1
 }
 
