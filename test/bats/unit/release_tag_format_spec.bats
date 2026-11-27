@@ -28,12 +28,15 @@ setup() {
 }
 
 # why: Each name is one way a tag goes wrong: missing patch, no `v`, a
-# dotted or zero RC number, a leading zero, a non-version name.
+# dotted or zero RC number, a leading zero, a non-version name, stray
+# whitespace. A value with a newline is refused as a whole, even when one
+# of its lines is a valid tag.
 @test "tag_format.sh: every other name is refused with the format printed" {
   local _t
   for _t in v1.0 release-1 v1.2.3-rc.1 v1.2.3-rc0 v01.2.3 1.2.3 \
       v1.02.3 v1.2.03 v1.2.3-rc01 v1.2.3-beta1 v1.2.3+build.5 \
-      v1.2.3-rc 'v1.2.3 ' V1.2.3 v1.2.3.4; do
+      v1.2.3-rc 'v1.2.3 ' V1.2.3 v1.2.3.4 \
+      $'v1.2.3\n' $'v1.0\nv1.2.3' $'v1.2.3\nv1.0' ' v1.2.3' $'v1.2.3\t'; do
     run "${CHECK}" "${_t}"
     [[ "${status}" -eq 1 ]] || fail "'${_t}' exited ${status}, want 1: ${output}"
     [[ "${output}" == *"'${_t}'"* ]] || fail "message does not name '${_t}': ${output}"
