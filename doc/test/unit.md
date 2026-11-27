@@ -4105,7 +4105,7 @@ itself (`git check-attr`) which rule wins.
 | `_sync_gitattributes: a rewrite that cannot take the file's mode is abandoned, file unchanged (base#2246)` | A rewrite that cannot take the file's mode would land a 0600 file over the repo's own; abandoning it is the only safe answer |
 | `gitattributes: the events the sync can raise are registered (base#2246)` | _log_* is strict -- an unregistered event prints the registry's refusal instead of the message that says what is wrong with the file |
 
-### test/bats/unit/githooks_spec.bats (13)
+### test/bats/unit/githooks_spec.bats (18)
 
 Unit tests for the local git hooks (`.githooks/pre-push`) and their
 installer (`script/githooks/install.sh`). The pre-push hook is the first,
@@ -4122,6 +4122,11 @@ silently disable hooks that are already in use.
 | `pre-push: blocks a pushed commit that is bad even when the working tree is fixed` | The hook checks the commit being pushed, not the working tree: a fix that is only in the working tree does not reach the remote |
 | `pre-push: allows a pushed commit that is good even when the working tree is broken` | An unstaged mistake in the working tree is not what is pushed, so it does not block a good commit |
 | `pre-push: a branch deletion is not checked` | Deleting a remote branch pushes no commit, so there is nothing to check |
+| `pre-push: blocks a tag whose name is not vX.Y.Z or vX.Y.Z-rcN` | A tag outside vX.Y.Z / vX.Y.Z-rcN is stopped before it reaches the remote, with the format printed, instead of failing the release later. |
+| `pre-push: allows a tag named vX.Y.Z or vX.Y.Z-rcN` | The accepted shapes must still push. |
+| `pre-push: a tag deletion is not checked` | Deleting a badly named tag is how it gets cleaned up, so it is never blocked. |
+| `pre-push: a branch named like a bad tag is not checked as a tag` | The name rule is for tags; a branch called v1.0 is not a release. |
+| `pre-push: a bad tag on a commit already pushed in the same push is still blocked` | `git push --follow-tags` sends the branch and its tag on one commit; skipping a commit already checked must not skip the tag's name. |
 | `pre-push: is tracked as an executable file` | The hook must be executable in the index, or git skips it on Linux and macOS checkouts |
 | `install: sets core.hooksPath to .githooks in the local config` | One command turns the hooks on, in this repo's own config only |
 | `install: is idempotent` | Running the installer twice is harmless |
