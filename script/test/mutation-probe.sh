@@ -863,12 +863,13 @@ _mutation_probe_witnesses() {
 # comment lines bats printed under it, which say where the test stopped and
 # why. A red baseline is a refusal about the suite rather than the mutation,
 # and the test names alone do not tell a reader whether an assertion failed
-# or the test never finished. Capped, so one runaway test cannot bury the
-# refusal it is quoted in.
+# or the test never finished. Capped at 200 lines, so one runaway test
+# cannot bury the refusal it is quoted in; the cap is counted in awk, which
+# reads the file to its end, rather than by a reader that stops early.
 _mutation_probe_red_output() {
-  awk '/^not ok /{ red = 1; print; next }
+  awk '/^not ok /{ red = 1; if (n++ < 200) print; next }
        /^ok /{ red = 0 }
-       red && /^#/{ print }' "${1}" | head -n 200
+       red && /^#/{ if (n++ < 200) print }' "${1}"
 }
 
 # _mutation_probe_normalise <path> -- print <path> as git would spell it,
