@@ -2004,7 +2004,7 @@ unreadable layer, and a directory where the layer should be.
 | `a directory in place of setup.toml is refused with its event id and path` | A directory where setup.toml should be is not an absent layer either. Measured before base#1400: apply logged conf_no_repo_conf ("using template defaults"), then conf_upsert_file_missing writing the workspace bind into it, and exited 0 with compose.yaml generated. It must be refused like any other layer that is there and cannot be read. |
 | `a FIFO in place of setup.toml is refused within a bound, with its event id and path` | A FIFO where setup.toml should be is there too, and unlike a directory it does not fail on open: open(2) on a FIFO blocks until a writer arrives, so an `-e` gate that hands it to the bridge hangs apply forever instead of refusing (review round 3 of base#1400). The bound makes the hang a failure instead of a wedged suite. |
 
-### test/bats/unit/conf_accessor_spec.bats (40)
+### test/bats/unit/conf_accessor_spec.bats (43)
 
 Unit tests for the `conf.sh` opaque accessor interface (#564 / #563):
 `_conf_load` loads a file into a named handle, `_conf_get` reads a value by
@@ -2065,6 +2065,9 @@ on hand-edited / malformed setup.conf:
 | `_conf_load_layers does not memo a failed merge (base#2234)` | base#2234 acceptance 3 -- a failed merge is not remembered. The stub exits 1 both times; each load returns 1 and logs conf_toml_merge_failed, and the bridge is called twice. |
 | `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
 | `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
+| `_conf_load_layers degrades to no memo and warns once when the memo dir is unwritable (base#2235)` | base#2235 acceptance 1-4 -- an unwritable memo directory degrades to no memo. Three loads of the same two-layer chain (the middle one inside $(...)): every load returns 0 and answers `wayland`, the bridge is called 3 times (nothing to hit), and conf_memo_unwritable is logged once for the whole command with path=<memo dir>. |
+| `_conf_load_layers still fails by name when the bridge fails and the memo dir is unwritable (base#2235)` | base#2235 acceptance 5 -- the degrade does not change failure semantics: with the same unwritable memo dir and the bridge exiting 1, the load still returns 1 and logs conf_toml_merge_failed. |
+| `_conf_load_layers does not log conf_memo_unwritable when the memo dir is writable (base#2235)` | base#2235 acceptance 6 -- a writable memo dir never logs the event. |
 
 ### test/bats/unit/conf_ini_golden_spec.bats (6)
 
