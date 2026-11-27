@@ -182,6 +182,18 @@ _tag_line() {
   assert_output --partial "'release-1' is not a version tag"
 }
 
+# why: `git push origin v1.2.3:refs/tags/v1.0` creates `v1.0` on the remote;
+# the name that matters is the remote ref, not the local one.
+@test "pre-push: the pushed tag name is the remote ref, not the local one" {
+  local _sha
+  _sha="$(_good_commit)"
+  _push_hook "$(printf 'refs/tags/v1.2.3 %s refs/tags/v1.0 %s\n' "${_sha}" "${ZERO_SHA}")"
+  assert_failure
+  assert_output --partial "'v1.0' is not a version tag"
+  _push_hook "$(printf 'refs/tags/v1.0 %s refs/tags/v1.2.3 %s\n' "${_sha}" "${ZERO_SHA}")"
+  assert_success
+}
+
 # why: The hook must be executable in the index, or git skips it on Linux
 # and macOS checkouts
 @test "pre-push: is tracked as an executable file" {
