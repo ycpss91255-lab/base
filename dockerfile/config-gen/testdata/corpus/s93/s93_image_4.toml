@@ -1,2 +1,2 @@
 [[image.rules]]
-rule = "string:A..B"
+rule = "@default:A..B"

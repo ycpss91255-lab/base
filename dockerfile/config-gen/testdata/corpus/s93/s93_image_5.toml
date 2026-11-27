@@ -1,2 +1,2 @@
 [[image.rules]]
-rule = "prefix:zzz_"
+rule = "suffix:_ws"

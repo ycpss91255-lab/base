@@ -1,6 +1,6 @@
-/h/docker_foo
-/h/foo_ws
-/h/foo
+/home/u/docker_foo
+/home/u/foo_ws
+/home/u/foo/
 /
-//
-/a/b/
+
+/a//b/
