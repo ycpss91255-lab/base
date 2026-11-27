@@ -6516,6 +6516,20 @@ rule with nothing comparing them is the #1012 shape with one fewer copy.
 | `release-ref: every prerelease classifier under script/ci is one this spec can ask (#1012)` | "One home per classified thing" is only true while the homes agree wherever their inputs overlap. #1012's own reasoning is that three hand-kept copies of a rule are a defect BECAUSE nothing in the tree compared any pair of them; two hand-kept copies with nothing comparing them is the same shape with one fewer copy. The owner list is derived by the same predicate the site scan uses, so a third classifier lands here the day it lands in script/ci/ -- and it fails until someone states how to ask it, because an interface is the one thing a scan cannot derive. |
 | `release-ref: no two prerelease classifiers disagree where both answer (#1012)` | The two owners accept different grammars on purpose -- a released VERSION must carry the `v` a downstream repo pins, a git REF may be a full `refs/tags/...` -- so each refuses inputs the other reads. What must never happen is the pair ANSWERING a shared input differently: one of them would be marking a Release final or moving the org's `test-tools:latest` for a tag the other calls a release candidate. Only inputs both owners accept are compared; a refusal is not a disagreement. |
 
+### test/bats/unit/release_tag_format_spec.bats (5)
+
+Release notes, RC lookup and downstream upgrade all read a tag as `vX.Y.Z`
+or `vX.Y.Z-rcN`. A tag in any other shape publishes a release those tools
+misread, so the name is refused before anything is published.
+
+| Test | Description |
+|------|-------------|
+| `tag_format.sh: vX.Y.Z and vX.Y.Z-rcN pass` | The accepted shapes. A check that refuses a real release tag would fail the release it exists to protect. |
+| `tag_format.sh: every other name is refused with the format printed` | Each name is one way a tag goes wrong: missing patch, no `v`, a dotted or zero RC number, a leading zero, a non-version name. |
+| `tag_format.sh: a refs/tags/ ref is checked by its tag name` | The pre-push hook holds a full remote ref, the release job a bare tag name; both must get the same answer. |
+| `tag_format.sh: no tag or an empty tag is a usage error` | A missing name must not read as a valid one. |
+| `tag_format.sh: every published tag passes` | The format was chosen to fit every tag already published. If one failed, the rule would refuse a shape that already shipped. |
+
 ### test/bats/unit/release_test_tools_yaml_spec.bats (64)
 
 Structural assertions for `.github/workflows/release-test-tools.yaml`. Locks
@@ -7193,7 +7207,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (165)
+### test/bats/unit/self_test_yaml_spec.bats (166)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7632,6 +7646,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: the release body is assembled by a script that can refuse (#926)` | The extraction has to live somewhere a spec can drive it AND somewhere that can exit non-zero; inline in the workflow it was neither. This is what stops it drifting back into a `run:` block where a no-match is a silent success. |
 | `self-test.yaml: the release page carries the curated notes alone (#926)` | With both sources the larger drowns the smaller: the measured v0.42.0 body was 26,690 characters of which the curated part was five lines and the rest raw PR titles. The workflow input is the only place that choice is expressed, so it is the only place it can regress. |
 | `self-test.yaml: the release job verifies the tagged commit is on main before creating the Release (base#1712)` | The release job's needs: are test gates, which a green PR head also passes, so a v* tag pushed on a commit that is not on main would publish a Release. The base#1143 guard ran only in the reusable worker (release-worker.yaml); base's own tag path had none (base#1712). |
+| `self-test.yaml: the release job refuses a tag name outside vX.Y.Z / vX.Y.Z-rcN before publishing` | The release job runs on any tag push. Only a name check before the notes and the publish keeps a `v1.0` or `release-1` tag from shipping. |
 | `self-test.yaml: declares bats-fragile job (#677)` | - |
 | `self-test.yaml: bats-fragile is a single job (no shard matrix) (#677)` | - |
 | `self-test.yaml: bats-fragile invokes test.sh --bats-fragile (#677)` | - |
