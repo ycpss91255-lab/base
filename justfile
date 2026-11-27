@@ -58,6 +58,9 @@ mod? release 'script/release/justfile.release'
 # Upstream-release watch: declared pins vs upstream (just watch [pins|bump])
 mod? watch 'script/watch/justfile.watch'
 
+# Tracked git hooks: install / verify (just githooks [install|check])
+mod? githooks 'script/githooks/justfile.githooks'
+
 # Default: list available recipes / namespaces.
 default:
     @just --list

@@ -4497,9 +4497,9 @@ CG_GATES_JOB='config-gen-gates'
 CG_REDPATH_JOB='config-gen-redpath'
 CG_GATES_RUN='just test go-gates'
 CG_SHARDS_TSV='/source/script/test/config_gen_redpath_shards.tsv'
-CG_SELF_TEST_TOP='["concurrency","env","jobs","name","on","permissions"]'
+CG_SELF_TEST_TOP='["concurrency","env","jobs","name","on","permissions","run-name"]'
 CG_SELF_TEST_ENV='["CI_RUN_KEY","COMPOSE_PROJECT_NAME","TEST_TOOLS_ARTIFACT_TAG","TEST_TOOLS_IMAGE"]'
-CG_COV_LOCAL_TOP='["concurrency","jobs","name","on","permissions"]'
+CG_COV_LOCAL_TOP='["concurrency","jobs","name","on","permissions","run-name"]'
 CG_COV_LOCAL_ENV='[]'
 COV_LOCAL_WF="/source/.github/workflows/coverage-local.yaml"
 
