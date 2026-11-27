@@ -1389,7 +1389,7 @@ code, base#1562.
 | `workflows: every ACTIONLINT_IMAGE step pulls via script/ci/retry.sh before a --pull never run (base#1562)` | A Docker Hub 502 on the actionlint image pull failed the lint job because the only pull was the implicit `--pull missing` of the `docker run`, with no retry. Every step that names ACTIONLINT_IMAGE must pre-pull it through retry.sh (more than one attempt) before the run, and the run must say `--pull never`, so dropping the pre-pull or its retry fails loud instead of falling back to the unretried pull, base#1562. |
 | `workflows: every just-pin job installs just via script/ci/install-just.sh and none uses extractions/setup-just (base#1562)` | A GitHub API 504 in extractions/setup-just failed the just install after three quick tries a `uses:` step gives the workflow no way to extend. Every job that checks the just on PATH is the pin must install it through script/ci/install-just.sh (which fetches through retry.sh), fed the pin step's output, and no workflow may keep the unretried action -- so one job (the self-hosted coverage-local one included) reverting to setup-just is a finding, base#1562. |
 
-### test/bats/unit/ci_spec.bats (202)
+### test/bats/unit/ci_spec.bats (165)
 
 | Test | Description |
 |------|-------------|
@@ -1505,43 +1505,6 @@ code, base#1562.
 | `main --bats-path: non-existent path dies with ci_bats_path_not_found` | #523 missing-path guard |
 | `main --bats-path: test/bats/system/ path dies with a clear hint` | #523 system guard |
 | `main --bats-path + --coverage is rejected (ci_bats_path_coverage)` | #523 coverage-combo guard |
-| `_run_coverage_path: writes nothing into the checkout's coverage/ (#887)` | The gate's artifacts stay untouched -- no figure can be fabricated from one spec |
-| `_run_coverage_path: the kcov report dir is a throwaway outside the checkout, removed after the run (#887)` | Report lands in container-local scratch and is deleted |
-| `_run_coverage_path: kcov's exactly the named spec, never a shard slice (#887)` | Shard independence: a planted .shard-weights pulls in nothing |
-| `_run_coverage_path: instruments with the same include/exclude set a coverage shard uses (#887)` | Same instrumented tree as a shard, so the failure reproduces |
-| `_run_coverage_path: propagates the spec's exit status so a red spec is a red run (#887)` | Exit-status propagation -- the loop is useless if failure is swallowed |
-| `_run_coverage_path: BATS_FILTER appends a bats -f name filter (#887)` | Composes with --filter to instrument a single @test |
-| `main --coverage-path: routes one spec to the coverage service with COVERAGE_PATH + BATS_ONLY=1 (#887)` | Dispatch: coverage service, COVERAGE_PATH plumbed, never a shard |
-| `main --ci: COVERAGE=1 with COVERAGE_PATH runs the one spec and reports no coverage figure (#887)` | In-container branch sits ahead of _run_coverage; no report line |
-| `main --coverage-path: non-existent path dies before docker is called (#887)` | Host-side missing-path guard |
-| `main --coverage-path: test/bats/system/ dies with the ci-system hint (#887)` | Host-side system-spec guard (needs the ci-system service) |
-| `main --coverage-path + --coverage-shard is rejected (#887)` | A figure over a partition and one instrumented spec are different asks |
-| `main --coverage-path + --bats-path is rejected (#887)` | Two runners, two services -- refused by name |
-| `main --bats-path + --coverage stays rejected: the fast loop is still kcov-free (#887)` | #523's refusal is intact; the combination is --coverage-path |
-| `main: unknown option dies with ci_unknown_option (#692)` | #692 unknown-flag guard |
-| `main: --hadolint without --lint dies (narrowing flag, not standalone) (#692)` | #692 narrowing-flag typo guard |
-| `main: --group without --lint, or beside a tool, dies before compose (base#1412)` | base#1412. `--group` narrows `--lint` the way `--hadolint` does; standalone it is a typo, and with a tool it asks for two narrowings of one run. Both refuse before compose, so neither costs an image or runs a lint the caller did not ask for. |
-| `main: --lint --group refuses a malformed spec before compose (base#1412)` | base#1412. A malformed group spec is refused on the host, before compose: it is a typo, and a typo should cost no image build. |
-| `main --ci: LINT_GROUP routes the lint-only run to one group (base#1412)` | base#1412. LINT_GROUP is how the in-image lint-static job selects its group; it has to reach `_run_lint_group`, whose refusal of an out-of-range spec is the observable proof that the group branch, not the whole-phase or single-tool branch, took the run. |
-| `_run_lint_tool: every host lint entry point is refused on a CI runner (base#1412)` | base#1412 review round 7. CI lints inside the test-tools image, as the local gate does. A reading of the workflow cannot see every way a step reaches a host arm (a value an earlier step put in $GITHUB_ENV, a step that runs only on some runs), so the one lint dispatch refuses a CI runner's host itself. Every host entry point goes through it: the --<tool>-only family, --hadolint-only, --lint-group and `--ci` run on the host. None of them may reach a driver. |
-| `_run_lint_tool: off a CI runner a host arm still reaches its driver (base#1412)` | base#1412 review round 7. The refusal is the runner's mark, not a refusal of host arms: off a runner an operator still times one driver with them. |
-| `main --ci: unknown LINT_TOOL dies with ci_unknown_lint_tool (#692)` | #692 LINT_TOOL validation |
-| `main --ci: LINT_TOOL=stale-setup-conf runs the stale setup.conf lint (#845)` | #845 stale setup.conf lint reaches the CI gate |
-| `main --ci: LINT_TOOL=readme-sync runs the localized README sync lint (#846)` | #846 localized README sync lint reaches the CI gate |
-| `main --ci: LINT_TOOL=doc-counts runs the doc/test count drift gate (#864)` | #864 doc/test count drift gate reaches the CI gate |
-| `main --doc-counts-only: runs the drift gate on the host, no compose (#864)` | #864 host-direct primitive so a CI job can run the gate without compose |
-| `main --issueref-only: runs the issue-ref comment lint on the host, no compose (#866)` | - |
-| `main --adr-structure-only: runs the ADR-structure lint on the host, no compose (#994)` | - |
-| `main --adr-numbering-only: runs the ADR-numbering lint on the host, no compose (#866)` | - |
-| `main --stale-setup-conf-only: runs the stale setup.conf path lint on the host, no compose (#866)` | - |
-| `main --home-literal-only: runs the hardcoded home path lint on the host, no compose (#799)` | - |
-| `main --changelog-entry-only: runs the changelog entry-length lint on the host, no compose (#917)` | - |
-| `main --action-ref-agreement-only: runs the action ref agreement lint on the host, no compose (#949)` | The CI join is host-direct, like its siblings |
-| `main --readme-sync-only: runs the localized README sync lint on the host, no compose (#866)` | - |
-| `main: _LINT_TOOLS is the one table every lint-phase caller dispatches through (#866)` | - |
-| `main --filter: dispatches with BATS_FILTER + BATS_ONLY=1 and no BATS_FILE` | #523 filter-only dispatch |
-| `_run_bats_path: BATS_FILE runs bats on that path; BATS_FILTER appends -f` | #523 single-path runner |
-| `_run_bats_path: filter-only runs bats across unit + integration` | #523 filter-only runner |
 | `drivers: bats.sh, shellcheck.sh and hadolint.sh driver files exist` | #650 driver files present (incl. hadolint) |
 | `drivers: test.sh sources every driver file in drivers/ (base#1113)` | base#1113 three source lines were checked against a directory of twenty-nine driver files |
 | `_LINT_TOOLS: every lint entry point under drivers/ is in the table or stated exempt (base#1113)` | base#1113 a driver never added to the table is in no lint phase and no CI group, and the guards all read the table |
@@ -2103,7 +2066,7 @@ on hand-edited / malformed setup.conf:
 | `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
 | `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
 
-### test/bats/unit/conf_ini_golden_spec.bats (4)
+### test/bats/unit/conf_ini_golden_spec.bats (6)
 
 `_ini_tokenize` is the single shell INI tokenizer. The Go reader that
 replaces it (the later `ini tokens` slice) must match it byte for byte, so
@@ -2118,7 +2081,9 @@ holds the shell to that record. A golden is tab-separated lines:
 | `the s25 corpus holds its eight inputs` | a corpus input added or dropped without a golden changes what the Go reader is held to; the count makes that a visible edit. |
 | `every s25 input has a golden, and no golden is orphaned` | an input without a golden is compared against nothing, and a golden without an input is a record of nothing. |
 | `_ini_tokenize over every s25 input matches its golden byte for byte` | this is the record itself: the shell answer the Go reader must reproduce byte for byte. |
-| `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. |
+| `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. A colon in a section name is written `%3A` in the golden file name, because Windows cannot create a file whose name holds a colon. |
+| `_conf_load_layers over the base and over layers matches layers.base_over.golden` | `_conf_load_layers` over a two-layer INI chain is section-replace (base#2062, S25c): the upper layer owns section `a`, so `a\|y\|2` from the base layer must not survive. The expected bytes are in golden/s25/layers.base_over.golden; the absent third path adds nothing. |
+| `_conf_load_layers over every single s25 input matches its load golden` | `_conf_load_layers` over a single file is the tokenizer's sections with entries grouped by section; each single-file corpus input has its own <stem>.load.golden. |
 
 ### test/bats/unit/conf_logging_spec.bats (12)
 
@@ -2506,7 +2471,7 @@ The planted copy is traced once per file and shared by every case.
 | `config_gen_readers: the run blocks are both config-gen jobs', each matrix value expanded (base#1584)` | cycle 30, review round 2. Each run block runs as the job runs it, so a `${{ matrix.<key> }}` is expanded once per value of the job's matrix: config-gen-redpath runs `just test go-redpath <n>/5` for shards 1..5 (its matrix, which self_test_yaml_spec holds to the shard table), and together the five shards run every redpath case. Both jobs' just-pin blocks are there too. |
 | `config_gen_readers: a run block with an expression it cannot evaluate is refused (base#1584)` | cycle 30, review round 2. An expression other than one matrix key is a value this script would have to guess, so the block is refused rather than run with the expression left in or dropped. |
 
-### test/bats/unit/config_gen_s32_golden_spec.bats (8)
+### test/bats/unit/config_gen_s32_golden_spec.bats (12)
 
 The Go converter that replaces `_migrate_ini_to_toml` must match the shell
 byte for byte. Each corpus/s32/<name>.ini is converted by the shell into a
@@ -2525,6 +2490,10 @@ missing or differs, so a golden can never drift from the shell.
 | `s32 a gap in numbered keys leaves an empty block (base#2082)` | A gap in the numbered keys leaves an empty block for the missing number; the golden pins the bytes. |
 | `s32 an emptied slot keeps an empty block (base#2082)` | A numbered key with an empty value still takes its slot as an empty block; the golden pins the bytes. |
 | `s32 numbered keys are ordered by numeric suffix (base#2082)` | Numbered keys are ordered by their numeric suffix, not by file order or string order; the golden pins the bytes. |
+| `s32 a padded index is declined (base#2085)` | An index with leading zeros cannot be represented; the converter declines, keeps .setup.conf and logs one event id. |
+| `s32 a zero index is declined (base#2085)` | Index 0 cannot be represented; the converter declines. |
+| `s32 a duplicate index is declined (base#2085)` | The same index written twice is declined as a duplicate index. |
+| `s32 clearing an index after filling it is declined (base#2085)` | Filling then clearing the same index is declined as a duplicate index. |
 
 ### test/bats/unit/config_gen_s7_verdicts_spec.bats (2)
 
@@ -2851,6 +2820,51 @@ workflow, whose shape the last section pins.
 | `coverage-local workflow: runs on the self-hosted GPU runner behind the fork guard` | the runner is the point -- an in-job parallel mode measured on a hosted two-core runner would prove nothing about the fat machine it was written for. And a job that can land on the org's self-hosted runner is arbitrary code execution on a shared workstation unless it carries the fork guard, which is what `self-hosted-guard` enforces for every job in this tree. Read off the CODE, comments dropped: this file's header spends a paragraph on why one self-hosted runner is not a PR gate, so the words "self-hosted" are in it whatever the job runs on -- a whole-file read answers the question with the prose that explains the answer. That is the rule the sibling `self-test.yaml` case already applies to `runs-on:`. |
 | `coverage-local workflow: drives test.sh --coverage-local` | the workflow has to drive the MODE, through the same entry an operator uses. A validation job that called `--coverage` would be a second, slower way of running what CI already runs and would never exercise the merge this issue is about. Read as the SET of modes the workflow invokes, off the code, because two things would otherwise pass a broken file: the header comment names `test.sh --coverage-local` twice, so a whole-file `--partial` stays green after the run step is switched back to the serial mode; and there are TWO invocations (with and without `--jobs`), so a `--partial` over either one is satisfied by the other. A set has neither hole -- and the `--jobs` branch matters most, because `--jobs` on the serial mode is an invocation the entry refuses outright. |
 | `self-test.yaml: the PR gate is unchanged -- no self-hosted runner, no local mode` | production must be untouched. The acceptance criterion is explicit that the PR gate keeps the hosted matrix, and the cheapest way for that to rot is a job quietly added to self-test.yaml on the way past. |
+
+### test/bats/unit/coverage_path_spec.bats (37)
+
+the mode writes no coverage figure and does not depend on the shard
+partition; the cases below pin both, and what it refuses.
+
+| Test | Description |
+|------|-------------|
+| `_run_coverage_path: writes nothing into the checkout's coverage/ (#887)` | The gate's artifacts stay untouched -- no figure can be fabricated from one spec |
+| `_run_coverage_path: the kcov report dir is a throwaway outside the checkout, removed after the run (#887)` | Report lands in container-local scratch and is deleted |
+| `_run_coverage_path: kcov's exactly the named spec, never a shard slice (#887)` | Shard independence: a planted .shard-weights pulls in nothing |
+| `_run_coverage_path: instruments with the same include/exclude set a coverage shard uses (#887)` | Same instrumented tree as a shard, so the failure reproduces |
+| `_run_coverage_path: propagates the spec's exit status so a red spec is a red run (#887)` | Exit-status propagation -- the loop is useless if failure is swallowed |
+| `_run_coverage_path: BATS_FILTER appends a bats -f name filter (#887)` | Composes with --filter to instrument a single @test |
+| `main --coverage-path: routes one spec to the coverage service with COVERAGE_PATH + BATS_ONLY=1 (#887)` | Dispatch: coverage service, COVERAGE_PATH plumbed, never a shard |
+| `main --ci: COVERAGE=1 with COVERAGE_PATH runs the one spec and reports no coverage figure (#887)` | In-container branch sits ahead of _run_coverage; no report line |
+| `main --coverage-path: non-existent path dies before docker is called (#887)` | Host-side missing-path guard |
+| `main --coverage-path: test/bats/system/ dies with the ci-system hint (#887)` | Host-side system-spec guard (needs the ci-system service) |
+| `main --coverage-path + --coverage-shard is rejected (#887)` | A figure over a partition and one instrumented spec are different asks |
+| `main --coverage-path + --bats-path is rejected (#887)` | Two runners, two services -- refused by name |
+| `main --bats-path + --coverage stays rejected: the fast loop is still kcov-free (#887)` | #523's refusal is intact; the combination is --coverage-path |
+| `main: unknown option dies with ci_unknown_option (#692)` | #692 unknown-flag guard |
+| `main: --hadolint without --lint dies (narrowing flag, not standalone) (#692)` | #692 narrowing-flag typo guard |
+| `main: --group without --lint, or beside a tool, dies before compose (base#1412)` | base#1412. `--group` narrows `--lint` the way `--hadolint` does; standalone it is a typo, and with a tool it asks for two narrowings of one run. Both refuse before compose, so neither costs an image or runs a lint the caller did not ask for. |
+| `main: --lint --group refuses a malformed spec before compose (base#1412)` | base#1412. A malformed group spec is refused on the host, before compose: it is a typo, and a typo should cost no image build. |
+| `main --ci: LINT_GROUP routes the lint-only run to one group (base#1412)` | base#1412. LINT_GROUP is how the in-image lint-static job selects its group; it has to reach `_run_lint_group`, whose refusal of an out-of-range spec is the observable proof that the group branch, not the whole-phase or single-tool branch, took the run. |
+| `_run_lint_tool: every host lint entry point is refused on a CI runner (base#1412)` | base#1412 review round 7. CI lints inside the test-tools image, as the local gate does. A reading of the workflow cannot see every way a step reaches a host arm (a value an earlier step put in $GITHUB_ENV, a step that runs only on some runs), so the one lint dispatch refuses a CI runner's host itself. Every host entry point goes through it: the --<tool>-only family, --hadolint-only, --lint-group and `--ci` run on the host. None of them may reach a driver. |
+| `_run_lint_tool: off a CI runner a host arm still reaches its driver (base#1412)` | base#1412 review round 7. The refusal is the runner's mark, not a refusal of host arms: off a runner an operator still times one driver with them. |
+| `main --ci: unknown LINT_TOOL dies with ci_unknown_lint_tool (#692)` | #692 LINT_TOOL validation |
+| `main --ci: LINT_TOOL=stale-setup-conf runs the stale setup.conf lint (#845)` | #845 stale setup.conf lint reaches the CI gate |
+| `main --ci: LINT_TOOL=readme-sync runs the localized README sync lint (#846)` | #846 localized README sync lint reaches the CI gate |
+| `main --ci: LINT_TOOL=doc-counts runs the doc/test count drift gate (#864)` | #864 doc/test count drift gate reaches the CI gate |
+| `main --doc-counts-only: runs the drift gate on the host, no compose (#864)` | #864 host-direct primitive so a CI job can run the gate without compose |
+| `main --issueref-only: runs the issue-ref comment lint on the host, no compose (#866)` | - |
+| `main --adr-structure-only: runs the ADR-structure lint on the host, no compose (#994)` | - |
+| `main --adr-numbering-only: runs the ADR-numbering lint on the host, no compose (#866)` | - |
+| `main --stale-setup-conf-only: runs the stale setup.conf path lint on the host, no compose (#866)` | - |
+| `main --home-literal-only: runs the hardcoded home path lint on the host, no compose (#799)` | - |
+| `main --changelog-entry-only: runs the changelog entry-length lint on the host, no compose (#917)` | - |
+| `main --action-ref-agreement-only: runs the action ref agreement lint on the host, no compose (#949)` | The CI join is host-direct, like its siblings |
+| `main --readme-sync-only: runs the localized README sync lint on the host, no compose (#866)` | - |
+| `main: _LINT_TOOLS is the one table every lint-phase caller dispatches through (#866)` | - |
+| `main --filter: dispatches with BATS_FILTER + BATS_ONLY=1 and no BATS_FILE` | #523 filter-only dispatch |
+| `_run_bats_path: BATS_FILE runs bats on that path; BATS_FILTER appends -f` | #523 single-path runner |
+| `_run_bats_path: filter-only runs bats across unit + integration` | #523 filter-only runner |
 
 ### test/bats/unit/coverage_shard_parity_spec.bats (14)
 
@@ -5761,6 +5775,35 @@ the outer run's value, which is the wrong mode's value.
 | `_pin_uncovered: a _pin_read failure is its failure, not masked by the pipe (base#1463)` | _pin_uncovered took `_pin_read \| awk`'s status, and pipefail is off, so a reader failure was masked by awk's 0. |
 | `_run_pin_coverage: pin-coverage is in test.sh's _LINT_TOOLS table` | Membership in that table is what gives the lint a CI job; without it the lint would gate only a local run |
 | `_run_pin_coverage: --pin-coverage-only runs it host-direct` | The host-direct entry point is how a bump proposal's author checks coverage without building the image |
+
+### test/bats/unit/portable_filename_lint_spec.bats (6)
+
+The guard that keeps every path in this tree creatable on Windows. The whole
+repository is carried into downstream repos as their `.base/` subtree, so
+one name Windows refuses makes each of those repos impossible to check out
+there. A golden named after its INI section, `stage:dev`, did exactly that:
+Linux and CI saw nothing, and a Windows checkout stopped at `error: invalid
+path`.
+
+A path is refused when any component holds one of the characters Windows
+reserves in a file name -- `<` `>` `:` `"` `|` `?` `*` and the backslash --
+or a control character, or ends in a dot or a space.
+
+The scan walks the mounted tree with `find` rather than asking git: the
+suite runs in a container that cannot always resolve the checkout's `.git`,
+and a check that passed wherever git was unreadable would pass in the place
+it runs most. The directories pruned from the walk are the derived ones
+`.gitignore` names that hold other trees or timestamped names; nothing
+tracked lives under them.
+
+| Test | Description |
+|------|-------------|
+| `a name holding any one character Windows reserves is reported` | each reserved character is its own way to break a checkout, and a rule that lost one of them would still pass on the other seven. |
+| `a file or directory name ending in a dot or a space is reported` | Windows drops a trailing dot or space when it creates a name, so the file git wrote is not the file git then looks for. |
+| `a name holding a control character is reported` | a control character in a name is refused by Windows as well, and a newline in one would otherwise split into two innocent-looking names. |
+| `names Windows accepts are not reported` | the control group -- dots and spaces inside a name, a leading dot and the percent-encoding that replaces a colon are all legal, and a rule that refused them would send people to rename files that work. |
+| `the tree walk reaches a planted name and skips the derived directories` | the walk is the half the pure rule cannot vouch for -- a planted name has to reach the rule, and the derived directories must not. |
+| `no path in this tree is one Windows cannot create (base#2226)` | this is the gate itself. The walk must have seen the tree -- this file among it -- or an empty answer would mean nothing was asked. |
 
 ### test/bats/unit/pr_template_spec.bats (2)
 
@@ -9635,6 +9678,46 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `watch: a go 1.26 go.mod under golang:1.27.2 exits 1 before any resolver runs (base#1440)` | A go.mod `go` directive names the Go a module needs and the golang pin the Go that builds it; the watch compared neither, so `go 1.26` under golang:1.27.2 read as a clean week. The directive is checked against the pin before any upstream is asked: the run is refused by name with both sides and the directive's line, and no resolver is called (base#1440). |
 | `watch: an unreadable tracked file exits 1, not 0 (base#1463)` | An unreadable tracked file used to print `Permission denied` and leave the reader's status 0, so the watch reported the rest as a clean week (base#1463). As root the run drops to nobody, the only user a mode-000 file applies to. |
 | `watch: an unknown option is a usage error, distinct from both` | Exit 2 keeps a typo apart from 1 (nothing compared) and 10 (drift), which is what the workflow branches on |
+
+### test/bats/unit/tracked_crlf_lint_spec.bats (23)
+
+Unit tests for `script/test/drivers/tracked_crlf.sh` (`_run_tracked_crlf`,
+refs base#2246), the "no tracked text file is stored with CRLF line endings"
+lint. The root `.gitattributes` rule `* text=auto eol=lf` fixes what a
+checkout holds, but `text=auto` leaves a file alone once the copy in the
+index carries a CR, so a CRLF file committed before the rule stays CRLF with
+nothing reporting it. The lint reads the INDEX side of `git ls-files --eol`,
+which is the same bytes on a Windows clone and on a CI runner. `-text` in
+`.gitattributes` is the only exemption -- the mark this repo's deliberate
+CRLF fixtures already carry -- and `eol=crlf` is not one. Driven over
+throwaway repositories, with a case for each way the lint could go green
+having read nothing.
+
+| Test | Description |
+|------|-------------|
+| `_run_tracked_crlf: passes when every tracked file is stored with LF (base#2246)` | A tree of LF files must not be reported |
+| `_run_tracked_crlf: the clean report names how many tracked files it examined (base#2246)` | The clean report states how many files it read, so a run over nothing cannot look like a run over the tree |
+| `_run_tracked_crlf: FAILS on a tracked file stored with CRLF, naming it (base#2246)` | The defect itself -- a text file stored with CRLF |
+| `_run_tracked_crlf: FAILS on a tracked file with mixed line endings (base#2246)` | A file with only SOME lines ending in CRLF breaks the same readers |
+| `_run_tracked_crlf: names EVERY offender, not only the first (base#2246)` | Every offender is reported, so one run is the whole list |
+| `_run_tracked_crlf: a path with a space is named verbatim, unquoted (base#2246)` | The report must name a path a reader can hand straight back to git |
+| `_run_tracked_crlf: a CRLF file whose path is marked -text is exempt (base#2246)` | A byte-exact CRLF fixture marked `-text` is content, not a finding |
+| `_run_tracked_crlf: a CRLF file whose path is marked binary is exempt (base#2246)` | The `binary` macro carries -text, so it exempts the same way |
+| `_run_tracked_crlf: a -text line does not exempt a different path (base#2246)` | The exemption is per path -- one -text line must not excuse a sibling |
+| `_run_tracked_crlf: eol=crlf does NOT exempt a file already stored with CRLF (base#2246)` | `eol=crlf` is a checkout rule, not an exemption -- such a file is still stored with LF, and one that is not needs the same renormalize |
+| `_run_tracked_crlf: an eol=crlf file normalised on add passes although its working copy is CRLF (base#2246)` | The ordinary Windows-script case must stay green -- CRLF on disk, LF in the index |
+| `_run_tracked_crlf: an untracked CRLF file is not reported (base#2246)` | Only the index is judged; a stray untracked file is not this repo's content |
+| `_run_tracked_crlf: a file git detects as binary is not reported (base#2246)` | A file git detects as binary has no line ending to get wrong |
+| `_run_tracked_crlf: an empty tracked file is counted and not reported (base#2246)` | An empty tracked file is a real file with nothing to judge |
+| `_run_tracked_crlf: a tree that is not a git work tree DIES rather than passing (base#2246)` | A directory with no index has no answer, and no answer is not a pass |
+| `_run_tracked_crlf: a work tree with no tracked file DIES rather than passing (base#2246)` | A repository tracking nothing would make the loop visit nothing |
+| `_run_tracked_crlf: an unreachable worktree gitdir is reported NOT RUN, never clean (base#2246)` | A worktree checkout bind-mounted without its gitdir cannot be read at all; the driver must say it examined nothing instead of claiming clean |
+| `_run_tracked_crlf: a .git file that is not a gitdir pointer DIES rather than being skipped (base#2246)` | The NOT RUN branch is for a pointer that does not resolve; a `.git` file that is not a pointer at all must still be refused |
+| `tracked-crlf: is a member of the lint phase's tool table` | A lint nobody runs is a comment |
+| `tracked-crlf: has a lint-static CI join` | One lint group and exactly one, because none gates nothing and two pays twice |
+| `tracked-crlf: its failure event id is registered` | An unregistered event id is an anonymous exit: the log line carries no name a reader can look up |
+| `tracked-crlf: the dispatcher has a case arm for it (base#2246)` | The driver must be dispatchable by the name the table carries |
+| `tracked-crlf: base's own root .gitattributes carries the LF rule the lint cites (base#2246)` | The rule the lint cites must be the one the root .gitattributes opens with; a lint guarding a rule the file no longer carries guards nothing |
 
 ### test/bats/unit/transcript_lnav_spec.bats (8)
 
