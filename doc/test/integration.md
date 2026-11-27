@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **321 tests**.
+Integration specs under `test/bats/integration/`: **344 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -229,7 +229,38 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
 
-### test/bats/integration/config_gen_s43_stage_golden_spec.bats (11)
+### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
+
+Before any Go parser exists, the shell `_dockerfile_stage_from_line`
+(dist/script/docker/lib/stage.sh) is the oracle for which FROM lines are
+accepted. Each
+dockerfile/config-gen/testdata/corpus/s43/s43_from_<case>.Dockerfile holds
+exactly one FROM-relevant line plus optional lint-allow comment lines. Its
+goldens in testdata/golden/s43/ are s43_from_<case>.stages (stdout of
+`_parse_dockerfile_stages`, empty output is a 0-byte file) and
+s43_from_<case>.hash (`_compute_dockerfile_hash` plus a trailing newline).
+The Go side must later match these byte for byte. The spec regenerates both
+from the shell and compares them with the goldens, and a partition check
+keeps fixtures and goldens one-to-one.
+
+| Test | Description |
+|------|-------------|
+| `s43 from golden: plain lists runtime` | the plain `FROM <image> AS <stage>` form is accepted. |
+| `s43 from golden: platform lists runtime` | one --flag=value before the image is accepted. |
+| `s43 from golden: multiflag lists runtime` | several flags before the image are accepted. |
+| `s43 from golden: lower rejects lowercase as` | a lowercase `as` is not accepted. |
+| `s43 from golden: comment rejects a commented FROM` | a commented FROM is not accepted. |
+| `s43 from golden: bare rejects a junk word` | an extra word between the image and AS is not accepted. |
+| `s43 from golden: inline rejects an inline comment` | an inline comment before AS is not accepted. |
+| `s43 from golden: flagimage rejects a flag as image` | a flag standing in for the image is not accepted. |
+| `s43 from golden: indented rejects leading spaces` | an indented FROM is not accepted. |
+| `s43 from golden: copyfrom rejects COPY --from` | COPY --from is not a FROM line. |
+| `s43 from golden: accepted cases carry the issue's hash literals` | the issue's table gives the expected hashes; pin them as literals so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 from golden: rejected cases hash to the empty sha256 with a 0-byte stages` | every rejected case hashes to the empty-string sha256 and lists no stage. |
+| `s43 from golden: accepted cases list runtime` | accepted cases list exactly the stage runtime. |
+| `s43 from golden: every fixture has exactly one .stages and one .hash and no extra` | a fixture missing a .stages or .hash golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
+
+### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
 Before any Go parser exists, the shell `_parse_dockerfile_stages`
 (dist/script/docker/lib/stage.sh) is the oracle for the stage list. Every
@@ -253,6 +284,15 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 stage golden: baseline goldens are 0-byte files` | an empty stage list is a 0-byte file, not a file holding a blank line. |
 | `s43 stage golden: a missing Dockerfile gives empty output and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty output and rc 0. |
 | `s43 stage golden: every fixture has exactly one golden and no extra` | a fixture with no golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
+| `s43 hash golden: base3 matches its golden` | three stages is the baseline hash. |
+| `s43 hash golden: added matches its golden` | adding a stage changes the hash. |
+| `s43 hash golden: two matches its golden` | a second added stage changes the hash again. |
+| `s43 hash golden: noise_a matches its golden` | RUN and ENV lines do not change the hash. |
+| `s43 hash golden: noise_b matches its golden` | other RUN/ENV values and a comment do not change the hash either. |
+| `s43 hash golden: goldens equal the issue's literal digests` | the issue's table gives the expected values as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 hash golden: noise goldens are byte-identical to base3` | noise lines must not move the hash, so both noise goldens equal base3's. |
+| `s43 hash golden: a missing Dockerfile gives empty hash and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty result and rc 0. |
+| `s43 hash golden: every hash fixture has exactly one golden and no extra` | a hash fixture with no golden, or a golden with no fixture, must fail. |
 
 ### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (7)
 

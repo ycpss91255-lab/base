@@ -90,3 +90,48 @@ _check_s32() {
 @test "s32 numbered keys are ordered by numeric suffix (base#2082)" {
   _check_s32 s32_suffix_order "ini_to_toml_migrated"
 }
+
+# _check_s32_declined <name>
+#   Convert corpus/s32/<name>.ini with the shell. A declined input writes no
+#   setup.toml, keeps .setup.conf unchanged, logs exactly one event id and
+#   returns 1. The golden golden/s32/<name>.declined holds two lines: the
+#   event id, then the exit code 1. The shell's event id and return are
+#   re-derived here and must equal both lines.
+_check_s32_declined() {
+  local _name="${1}" _got _event _rc
+  cp "${TESTDATA}/corpus/s32/${_name}.ini" "${TEMP_DIR}/.setup.conf"
+  LOG_FORMAT=json run --separate-stderr bash -c \
+    "source '${LIB}/_lib.sh'; source '${LIB}/ini_to_toml_migrate.sh'; _migrate_ini_to_toml '${TEMP_DIR}'"
+  _rc="${status}"
+  _got="$(printf '%s\n%s\n' "${output}" "${stderr}" \
+    | sed -n 's/.*"body":"\([a-z_]*\)".*/\1/p' | paste -sd' ')"
+  assert [ ! -e "${TEMP_DIR}/setup.toml" ]
+  run cmp "${TEMP_DIR}/.setup.conf" "${TESTDATA}/corpus/s32/${_name}.ini"
+  assert_success
+  assert [ -f "${TESTDATA}/golden/s32/${_name}.declined" ]
+  _event="$(sed -n 1p "${TESTDATA}/golden/s32/${_name}.declined")"
+  assert_equal "${_got}" "${_event}"
+  assert_equal "${_rc}" "$(sed -n 2p "${TESTDATA}/golden/s32/${_name}.declined")"
+  assert_equal "$(wc -l < "${TESTDATA}/golden/s32/${_name}.declined")" "2"
+}
+
+# why: An index with leading zeros cannot be represented; the converter
+# declines, keeps .setup.conf and logs one event id.
+@test "s32 a padded index is declined (base#2085)" {
+  _check_s32_declined s32_padded_index
+}
+
+# why: Index 0 cannot be represented; the converter declines.
+@test "s32 a zero index is declined (base#2085)" {
+  _check_s32_declined s32_zero_index
+}
+
+# why: The same index written twice is declined as a duplicate index.
+@test "s32 a duplicate index is declined (base#2085)" {
+  _check_s32_declined s32_duplicate_index
+}
+
+# why: Filling then clearing the same index is declined as a duplicate index.
+@test "s32 clearing an index after filling it is declined (base#2085)" {
+  _check_s32_declined s32_clear_after_fill
+}
