@@ -172,11 +172,12 @@ _aggregate() {
 # ── 3. the rollup passes a skip only where classify decided it ────────
 
 # _gated_job <job>
-#   Does <job> carry a job-level `if:`? Those are the jobs a PR may skip;
-#   the ones without it run on every PR, so a skip there is a workflow bug.
-#   Read from the file rather than listed here, so the roster cannot drift.
+#   Does <job>'s job-level `if:` read a select_* key? Those are the jobs a
+#   PR may skip; the others run on every PR, so a skip there is a workflow
+#   bug. Read from the file rather than listed here, so the roster cannot
+#   drift.
 _gated_job() {
-  _yaml_eval "${SELF_WF}" ".jobs.\"${1}\" | has(\"if\")" 2>/dev/null \
+  _yaml_eval "${SELF_WF}" "(.jobs.\"${1}\".if // \"\") | test(\"classify.outputs.select_\")" 2>/dev/null \
       | grep -Fxq true
 }
 
