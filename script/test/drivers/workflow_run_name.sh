@@ -22,6 +22,7 @@ readonly _WORKFLOW_RUN_NAME_OPEN='${{' _WORKFLOW_RUN_NAME_CLOSE='}}'
 
 # Prints "RUNNAME<TAB><value>" for the top-level run-name, or nothing when
 # the key is absent. A block scalar (`>-`, `|`) is joined into one line.
+# shellcheck disable=SC2016 # awk program; $-vars are awk's, not the shell's.
 readonly _WORKFLOW_RUN_NAME_AWK='
 state == 0 && /^run-name:/ {
   v = $0; sub(/^run-name:[ \t]*/, "", v)
