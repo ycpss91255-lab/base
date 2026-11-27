@@ -157,7 +157,7 @@ jobs:
     # (base#2171). `uses:` takes no expression, so the tag is a literal that
     # the release bump rewrites together with `.version`;
     # multi_distro_build_worker_yaml_spec.bats fails when the two differ.
-    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.43.0-rc8
+    uses: ycpss91255-lab/base/.github/workflows/build-worker.yaml@v0.43.0-rc9
     with:
       # Per-shard image_name includes the matrix cell name so the GHCR
       # tag disambiguates multi-cell builds from the same caller repo

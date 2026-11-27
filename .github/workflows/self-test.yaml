@@ -932,6 +932,14 @@ jobs:
     #                     entry added to the function fails until the file
     #                     agrees. One-directional (extras allowed), which
     #                     is what _sync_dockerignore does for a consumer
+    #   tracked-crlf      no tracked file is stored with CRLF line endings
+    #                     in the git index unless .gitattributes marks its
+    #                     path `-text`. The root .gitattributes rule
+    #                     `* text=auto eol=lf` fixes the checkout side;
+    #                     this reads the index side, which is the same
+    #                     bytes on a Windows clone and on this runner, and
+    #                     which `text=auto` leaves alone for a file
+    #                     already committed with a CR
     #   workflow-run-name every file in this directory sets a top-level
     #                     run-name holding a ${{ }} expression, so each run
     #                     in the Actions list names its PR, push or tag

@@ -567,10 +567,42 @@ _conf_load_layers() {
     # acted on. An empty stdout from a SUCCESSFUL merge is still a success:
     # the herestring's single blank line is dropped by the guard below.
     local _cll_kv
-    if ! _cll_kv="$(toml_bridge_merge --kv "${_cll_existing[@]}")"; then
-      _log_err conf conf_toml_merge_failed \
-        "display=_conf_load_layers: the TOML merge of ${_cll_existing[*]} failed; refusing to report an empty configuration as a loaded one"
-      return 1
+    # Within one command the same chain is loaded again and again. When the
+    # command gave a memo directory (_CONF_LAYERS_MEMO_DIR), the merged rows
+    # are kept there under a key over each layer's path and content, so a
+    # changed or newly appeared layer is a miss. A chain holding anything
+    # but regular files skips the memo and reaches the bridge, which refuses
+    # it by name. A failed merge is never written (base#2234).
+    local _cll_memo="" _cll_f _cll_key
+    # A memo directory the command cannot write to degrades to no memo, and
+    # says so once per command: the shared flag file is created exclusively,
+    # so only the first load (even from a subshell) logs (base#2235).
+    if [[ -n "${_CONF_LAYERS_MEMO_DIR:-}" && ! ( -d "${_CONF_LAYERS_MEMO_DIR}" && -w "${_CONF_LAYERS_MEMO_DIR}" ) ]]; then
+      if [[ -z "${_CONF_LAYERS_MEMO_WARN_FLAG:-}" ]] \
+        || ( set -C; : > "${_CONF_LAYERS_MEMO_WARN_FLAG}" ) 2>/dev/null; then
+        _log_warn conf conf_memo_unwritable \
+          "path=${_CONF_LAYERS_MEMO_DIR}" \
+          "display=_conf_load_layers: the memo directory is not writable (path=${_CONF_LAYERS_MEMO_DIR}); continuing without the layer memo"
+      fi
+    elif [[ -n "${_CONF_LAYERS_MEMO_DIR:-}" ]]; then
+      local _cll_regular=1
+      for _cll_f in "${_cll_existing[@]}"; do
+        [[ -f "${_cll_f}" ]] || _cll_regular=0
+      done
+      if (( _cll_regular )); then
+        _cll_key="$(sha256sum -- "${_cll_existing[@]}" | sha256sum)" || _cll_key=""
+        [[ -n "${_cll_key}" ]] && _cll_memo="${_CONF_LAYERS_MEMO_DIR}/${_cll_key%% *}"
+      fi
+    fi
+    if [[ -n "${_cll_memo}" && -f "${_cll_memo}" ]]; then
+      _cll_kv="$(<"${_cll_memo}")"
+    else
+      if ! _cll_kv="$(toml_bridge_merge --kv "${_cll_existing[@]}")"; then
+        _log_err conf conf_toml_merge_failed \
+          "display=_conf_load_layers: the TOML merge of ${_cll_existing[*]} failed; refusing to report an empty configuration as a loaded one"
+        return 1
+      fi
+      [[ -n "${_cll_memo}" ]] && printf '%s' "${_cll_kv}" > "${_cll_memo}"
     fi
     local _cll_row
     while IFS= read -r _cll_row; do

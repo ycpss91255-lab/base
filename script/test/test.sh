@@ -163,6 +163,8 @@ source "${SCRIPT_DIR}/drivers/log_event_registry.sh"
 source "${SCRIPT_DIR}/drivers/toml_fixture.sh"
 # shellcheck source=script/test/drivers/canonical_ignore_sync.sh
 source "${SCRIPT_DIR}/drivers/canonical_ignore_sync.sh"
+# shellcheck source=script/test/drivers/tracked_crlf.sh
+source "${SCRIPT_DIR}/drivers/tracked_crlf.sh"
 # shellcheck source=script/test/drivers/workflow_run_name.sh
 source "${SCRIPT_DIR}/drivers/workflow_run_name.sh"
 # shellcheck source=script/test/drivers/shell_metrics.sh
@@ -213,6 +215,7 @@ readonly _LINT_TOOLS=(
   test-name-backtick
   toml-fixture
   canonical-ignore-sync
+  tracked-crlf
   workflow-run-name
 )
 
@@ -511,6 +514,7 @@ _run_lint_tool() {
     log-event-registry) _run_log_event_registry ;;
     toml-fixture)     _run_toml_fixture ;;
     canonical-ignore-sync) _run_canonical_ignore_sync ;;
+    tracked-crlf)     _run_tracked_crlf ;;
     workflow-run-name) _run_workflow_run_name ;;
     # The three implementation-standard metric lints and their combined
     # report (base#994 phase 2). Dispatchable here -- this is the one
@@ -877,6 +881,11 @@ Options:
                           refuses leaves an empty config handle, so a test
                           asserting a schema default passes without its
                           fixture ever being read)
+  --tracked-crlf          With --lint: run only the tracked CRLF lint (no
+                          tracked file is stored with CRLF line endings
+                          in the git index unless .gitattributes marks
+                          its path `-text`; the root .gitattributes rule
+                          `* text=auto eol=lf` covers the checkout side)
   --workflow-run-name     With --lint: run only the workflow run-name lint
                           (every .github/workflows/ file sets a top-level
                           run-name holding a ${{ }} expression)
@@ -1113,6 +1122,7 @@ Examples:
   just test lint --test-name-backtick # @test name backtick lint only
   just test lint --log-event-registry # log event registry lint only
   just test lint --toml-fixture   # TOML fixture body gate only
+  just test lint --tracked-crlf   # tracked CRLF lint only
   just test lint --workflow-run-name # workflow run-name lint only
   ./test.sh --shellcheck-only     # Direct shellcheck, no compose
   ./test.sh --doc-counts-only     # Direct doc/test count drift gate, no compose
@@ -1139,6 +1149,7 @@ Examples:
   ./test.sh --log-event-registry-only # Direct log event registry lint, no compose
   ./test.sh --toml-fixture-only   # Direct TOML fixture body gate, no compose
   ./test.sh --canonical-ignore-sync-only # Direct canonical ignore-sync lint, no compose
+  ./test.sh --tracked-crlf-only   # Direct tracked CRLF lint, no compose
   ./test.sh --workflow-run-name-only # Direct workflow run-name lint, no compose
   ./test.sh --hadolint-only       # Hadolint only (inside ci container)
   ./test.sh --bats-only           # Compose-bats only, skip ShellCheck
@@ -2939,6 +2950,7 @@ main() {
       --test-name-backtick) lint_tool="test-name-backtick"; shift ;;
       --log-event-registry) lint_tool="log-event-registry"; shift ;;
       --toml-fixture) lint_tool="toml-fixture"; shift ;;
+      --tracked-crlf) lint_tool="tracked-crlf"; shift ;;
       --workflow-run-name) lint_tool="workflow-run-name"; shift ;;
       --group) lint_group="${2:?--group expects <n>/<total>}"; shift 2 ;;
       --shellcheck-only) host_lint="shellcheck"; shift ;;
@@ -2970,6 +2982,7 @@ main() {
       --log-event-registry-only) host_lint="log-event-registry"; shift ;;
       --toml-fixture-only) host_lint="toml-fixture"; shift ;;
       --canonical-ignore-sync-only) host_lint="canonical-ignore-sync"; shift ;;
+      --tracked-crlf-only) host_lint="tracked-crlf"; shift ;;
       --workflow-run-name-only) host_lint="workflow-run-name"; shift ;;
       --nesting-depth-only) host_lint="nesting-depth"; shift ;;
       --function-length-only) host_lint="function-length"; shift ;;
