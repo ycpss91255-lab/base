@@ -78,7 +78,11 @@ _push_hook() {
 # why: The hook must be executable in the index, or git skips it on Linux
 # and macOS checkouts
 @test "pre-push: is tracked as an executable file" {
-  run git -C /source ls-files -s .githooks/pre-push
+  [ -x "${HOOK}" ] || fail "${HOOK} is not executable"
+  # /source is not always a git worktree; check the index mode where it is.
+  git -c safe.directory='*' -C /source rev-parse --git-dir >/dev/null 2>&1 \
+    || return 0
+  run git -c safe.directory='*' -C /source ls-files -s .githooks/pre-push
   assert_success
   assert_output --regexp '^100755 '
 }
