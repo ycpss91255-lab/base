@@ -1,0 +1,6 @@
+/data/docker_foo
+/data/foo_ws
+/data/foo/
+/
+
+/a//b/
