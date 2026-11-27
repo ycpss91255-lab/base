@@ -143,6 +143,10 @@ _tag_line() {
     assert_output --partial "'${_t}' is not a version tag"
     assert_output --partial "vX.Y.Z-rcN"
   done
+  # A valid tag in the same push does not let the bad one through.
+  _push_hook "$(_tag_line v1.2.3 "${_sha}"; _tag_line release-1 "${_sha}")"
+  assert_failure
+  assert_output --partial "'release-1' is not a version tag"
 }
 
 # why: The accepted shapes must still push.
