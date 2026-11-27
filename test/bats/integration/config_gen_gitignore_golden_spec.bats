@@ -35,7 +35,8 @@ setup() {
 # that does not exist, or reuses another case's input (s82_sync_mode).
 _S82_INPUTLESS=(s82_prune_absent s82_sync_absent s82_sync_mode
   s82_pathspec_log s82_pathspec_coverage s82_pathspec_env
-  s82_pathspec_deploy s82_pathspec_empty)
+  s82_pathspec_deploy s82_pathspec_empty s82_logging_create
+  s82_logging_empty_absent)
 
 # _partition_violations -- print one line per corpus input with no golden
 # and per golden with neither an input nor a listed inputless name.
@@ -142,6 +143,34 @@ _run_pathspec_case() {
     # shellcheck source=dist/script/docker/lib/gitignore.sh
     source /source/dist/script/docker/lib/gitignore.sh
     _canonical_entry_pathspec "${_entry}"
+  ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
+  _write_actual "${_name}" "${_rc}"
+}
+
+# _run_logging_case <name> <input|-> <global> <per_svc> -- run
+# _sync_logging_gitignore in ${S}/w and write the actual golden to
+# ${S}/actual/<name>.golden, same format as _run_case. _collect_logging is
+# replaced by a stub that hands back <global> (lines `local_path=<v>`) and
+# <per_svc> (lines `<svc>:local_path=<v>`), the two outputs the function
+# reads, so no setup.toml is involved. <input> is a corpus file copied to
+# the target; `-` calls the function with no .gitignore (base#2084).
+_run_logging_case() {
+  local _name="${1}" _input="${2}" _glob="${3}" _svc="${4}"
+  local _tgt="${S}/w/.gitignore" _rc=0
+  rm -rf -- "${S}/w"
+  mkdir -p "${S}/w" "${S}/actual"
+  if [[ "${_input}" != - ]]; then
+    cp -- "${TESTDATA}/corpus/s82/${_input}" "${_tgt}"
+  fi
+  (
+    # shellcheck source=dist/script/docker/lib/gitignore.sh
+    source /source/dist/script/docker/lib/gitignore.sh
+    _collect_logging() {
+      local -n _o_glob="${2}" _o_svc="${3}"
+      _o_glob="${_glob}"
+      _o_svc="${_svc}"
+    }
+    _sync_logging_gitignore "${S}/w"
   ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
   _write_actual "${_name}" "${_rc}"
 }
@@ -262,4 +291,45 @@ _assert_golden() {
 @test "s82 pathspec: an empty entry is refused" {
   _run_pathspec_case s82_pathspec_empty ""
   _assert_golden s82_pathspec_empty
+}
+
+# why: the lines between the begin and end markers are template-owned and
+# are rewritten to the desired entry; the stale /old/ goes and the lines
+# outside the block stay (base#2084).
+@test "s82 logging: the managed block is rewritten to the desired entry" {
+  _run_logging_case s82_logging_rewrite s82_logging_rewrite.gitignore \
+    "local_path=log/a/" ""
+  _assert_golden s82_logging_rewrite
+}
+
+# why: only relative paths are entries; a leading ./ and trailing / are
+# normalised, duplicates collapse, and absolute and ~ paths are skipped. An
+# absent file is created holding the block (base#2084).
+@test "s82 logging: an absent file is created with the normalised entries" {
+  _run_logging_case s82_logging_create - \
+    $'local_path=log/a/\nlocal_path=./log/a\nlocal_path=/abs\nlocal_path=~/x' \
+    "svc:local_path=log/b"
+  _assert_golden s82_logging_create
+}
+
+# why: a block left with no entries is removed, both markers with it
+# (base#2084).
+@test "s82 logging: an emptied block loses both markers" {
+  _run_logging_case s82_logging_empty_block s82_logging_empty_block.gitignore \
+    "" ""
+  _assert_golden s82_logging_empty_block
+}
+
+# why: no block and nothing desired leaves the file byte for byte
+# (base#2084).
+@test "s82 logging: no block and no entries leaves the file unchanged" {
+  _run_logging_case s82_logging_empty_no_block \
+    s82_logging_empty_no_block.gitignore "" ""
+  _assert_golden s82_logging_empty_no_block
+}
+
+# why: an absent file with nothing desired stays absent (base#2084).
+@test "s82 logging: an absent file with no entries stays absent" {
+  _run_logging_case s82_logging_empty_absent - "" ""
+  _assert_golden s82_logging_empty_absent
 }
