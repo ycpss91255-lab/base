@@ -4660,7 +4660,7 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `_ISSUEREF_AWK: flags the 2-digit and 4-digit accept boundaries under every awk engine (#692)` | #692 boundary parity across engines |
 | `_ISSUEREF_AWK: keeps the must-keep cases clean under every awk engine` | Exemption parity across busybox-awk / mawk / gawk |
 
-### test/bats/unit/job_env_spec.bats (9)
+### test/bats/unit/job_env_spec.bats (11)
 
 Several cpu-runner jobs share one sibling docker daemon, so a fixed compose
 project name or /tmp path lets two jobs trample each other. The project name
@@ -4672,6 +4672,8 @@ RUNNER_TEMP so sibling containers can see it, base#2274.
 | `job_env: worked example prints exactly the two documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
 | `job_env: creates the TMPDIR directory` | The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274. |
 | `job_env: different JOB_KEY values give different output` | Distinct jobs of one run must not share a compose project or TMPDIR, which is the whole reason the script exists, base#2274. |
+| `job_env: every non-alphanumeric character becomes one dash, none collapsed or trimmed` | The slug rule is one '-' per non-alphanumeric character with no collapsing or trimming; a realistic matrix JOB_KEY with multi and edge separators pins it, base#2274. |
+| `job_env: JOB_KEYs differing only in separator count give different output` | Collapsing dashes would map distinct JOB_KEYs to one project name and defeat per-job uniqueness, base#2274. |
 | `job_env: same input twice gives the same output and does not fail` | A job re-run in the same attempt hits an already-created directory; mkdir must not fail and the output must stay stable, base#2274. |
 | `job_env: missing GITHUB_RUN_ID reports it and creates nothing` | A missing input must stop before anything is created or printed, so a half-formed name never reaches GITHUB_ENV, base#2274. |
 | `job_env: empty GITHUB_RUN_ATTEMPT counts as not set` | GitHub can hand over an empty value; it must be refused like an unset one, not folded into the name as an empty segment, base#2274. |

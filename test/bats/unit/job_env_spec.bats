@@ -61,6 +61,25 @@ _run_env() {
   [ "${output}" != "${first}" ]
 }
 
+# why: The slug rule is one '-' per non-alphanumeric character with no collapsing or trimming; a realistic matrix JOB_KEY with multi and edge separators pins it, base#2274.
+@test "job_env: every non-alphanumeric character becomes one dash, none collapsed or trimmed" {
+  _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
+    "JOB_KEY=Lint (ubuntu, 22.04)" RUNNER_TEMP="${RT}"
+  [ "${status}" -eq 0 ]
+  [ "${lines[0]}" = "COMPOSE_PROJECT_NAME=ci-42-1-lint--ubuntu--22-04-" ]
+  [ "${lines[1]}" = "TMPDIR=${RT}/job-42-1-lint--ubuntu--22-04-" ]
+}
+
+# why: Collapsing dashes would map distinct JOB_KEYs to one project name and defeat per-job uniqueness, base#2274.
+@test "job_env: JOB_KEYs differing only in separator count give different output" {
+  _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 JOB_KEY=a-b RUNNER_TEMP="${RT}"
+  [ "${status}" -eq 0 ]
+  local first="${output}"
+  _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 JOB_KEY=a--b RUNNER_TEMP="${RT}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" != "${first}" ]
+}
+
 # why: A job re-run in the same attempt hits an already-created directory; mkdir must not fail and the output must stay stable, base#2274.
 @test "job_env: same input twice gives the same output and does not fail" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
