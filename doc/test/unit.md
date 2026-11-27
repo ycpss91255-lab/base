@@ -7303,7 +7303,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (168)
+### test/bats/unit/self_test_yaml_spec.bats (169)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7791,6 +7791,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
 | `self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)` | classify is where the runner choice is made once for the whole workflow. It must run script/ci/select_runner.sh in a step `runner` and publish its two lines as job outputs, so later children can read them without re-deriving trust (base#2268, part of base#1586). |
 | `self-test.yaml: only config-gen-gates takes runs-on from runs_on_cpu (base#2269)` | config-gen-gates is the longest image job, and the first one to take its runs-on from classify's runs_on_cpu so the CI_SELF_HOSTED switch decides where it runs; every other job, config-gen-redpath included, keeps its own runs-on until its own child moves it (base#2269, part of base#1586). |
+| `self-test.yaml: config-gen-gates if: ANDs the canonical same-repo guard onto its gate (base#2269)` | a job whose runs-on is an expression must carry the canonical same-repo guard ANDed onto its existing gate, or a fork PR could reach the self-hosted runner (base#2269, self_hosted_guard lint). |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 
