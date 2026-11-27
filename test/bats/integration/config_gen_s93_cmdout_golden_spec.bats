@@ -175,13 +175,113 @@ _check_prefix() {
   done
 }
 
+# _rules_result -- print, for each line of s93_rules_paths.txt, the line
+# "<_rule_prefix path docker_>|<_rule_suffix path _ws>|<_rule_basename path>"
+# (base#2079). The rule applier functions live in setup_conf.sh.
+_rules_result() {
+  local _path
+  while IFS= read -r _path || [[ -n "${_path}" ]]; do
+    PTH="${_path}" bash -c '
+      source /source/dist/script/docker/lib/setup_conf.sh
+      printf "%s|%s|%s\n" "$(_rule_prefix "${PTH}" docker_)" \
+        "$(_rule_suffix "${PTH}" _ws)" "$(_rule_basename "${PTH}")"
+    '
+  done < "${CORPUS}/s93_rules_paths.txt"
+}
+
+# _image_path <n> -- the repo path detect_image_name is given for
+# s93_image_<n>.toml; it lives here, not in the corpus (base#2079).
+_image_path() {
+  case "${1}" in
+    1) printf '%s' /h/My.Repo__X ;;
+    2) printf '%s' /h/x ;;
+    3) printf '%s' /h/docker_Foo ;;
+    4) printf '%s' /h/x ;;
+    5) printf '%s' /h/x ;;
+    6) printf '%s' /h/x ;;
+    *) return 1 ;;
+  esac
+}
+
+# _image_result <stem> -- print what detect_image_name leaves in its outvar
+# for the rules in <stem>.toml (copied to setup.toml under BASE_PATH), then a
+# newline (base#2079).
+_image_result() {
+  local _stem="${1}" _n="${1##*_}" _dir _p
+  _dir="$(mktemp -d "${BATS_TEST_TMPDIR}/img.XXXXXX")"
+  cp -- "${CORPUS}/${_stem}.toml" "${_dir}/setup.toml"
+  _p="$(_image_path "${_n}")"
+  BASE_PATH="${_dir}" REPO_PATH="${_p}" bash -c '
+    source /source/dist/script/docker/wrapper/setup.sh
+    toml_bridge_parse() {
+      local _file="${1:?missing file}"; shift
+      /usr/local/bin/toml-bridge "$@" < "${_file}"
+    }
+    detect_image_name _out "${REPO_PATH}" >/dev/null 2>&1
+    printf "%s\n" "${_out}"
+  '
+}
+
+# why: base#2079 (S93d) names one rule-applier corpus file and six image
+# rule files; a missing one would silently shrink what is pinned.
+@test "s93: the named image-rule corpus files exist" {
+  local _s _n
+  [[ -f "${CORPUS}/s93_rules_paths.txt" ]] || { echo "missing corpus: s93_rules_paths"; return 1; }
+  for _n in 1 2 3 4 5 6; do
+    _s="s93_image_${_n}"
+    [[ -f "${CORPUS}/${_s}.toml" ]] || { echo "missing corpus: ${_s}"; return 1; }
+  done
+}
+
+# why: _rule_prefix / _rule_suffix / _rule_basename read the last non-empty
+# path segment; the shell result must match the golden byte for byte.
+@test "s93: the rule appliers match the rules_paths golden" {
+  [[ -f "${GOLDEN}/s93_rules_paths.golden" ]] || { echo "missing golden: s93_rules_paths"; return 1; }
+  _rules_result > "${BATS_TEST_TMPDIR}/got"
+  cmp -- "${BATS_TEST_TMPDIR}/got" "${GOLDEN}/s93_rules_paths.golden"
+}
+
+# why: the worked results come from the issue, not from the shell.
+@test "s93: the rules_paths golden holds the issue's six results" {
+  local _want
+  _want=$'foo||docker_foo\n|foo|foo_ws\n||foo\n||\n||\n||b\n'
+  [[ -f "${GOLDEN}/s93_rules_paths.golden" ]] || { echo "missing golden: s93_rules_paths"; return 1; }
+  [ "$(cat -- "${GOLDEN}/s93_rules_paths.golden"; echo x)" = "${_want}x" ]
+  [ "$(wc -l < "${CORPUS}/s93_rules_paths.txt")" -eq 6 ]
+}
+
+# why: detect_image_name applies [image] rules then sanitizes the name.
+@test "s93: detect_image_name result matches every golden" {
+  local _n _stem _bad=0
+  for _n in 1 2 3 4 5 6; do
+    _stem="s93_image_${_n}"
+    [[ -f "${CORPUS}/${_stem}.toml" ]] || { echo "missing corpus: ${_stem}"; _bad=1; continue; }
+    [[ -f "${GOLDEN}/${_stem}.golden" ]] || { echo "corpus with no golden: ${_stem}"; _bad=1; continue; }
+    _image_result "${_stem}" > "${BATS_TEST_TMPDIR}/got"
+    cmp -s -- "${BATS_TEST_TMPDIR}/got" "${GOLDEN}/${_stem}.golden" \
+      || { echo "golden differs: ${_stem}"; _bad=1; }
+  done
+  [ "${_bad}" -eq 0 ]
+}
+
+# why: the worked names come from the issue, not from the shell.
+@test "s93: the six image goldens hold the issue's names" {
+  local _n _want _wants=(my-repo__x foo-bar foo a-b unknown unknown)
+  for _n in 1 2 3 4 5 6; do
+    _want="${_wants[$((_n - 1))]}"
+    [[ -f "${GOLDEN}/s93_image_${_n}.golden" ]] || { echo "missing golden: s93_image_${_n}"; return 1; }
+    [ "$(cat -- "${GOLDEN}/s93_image_${_n}.golden")" = "${_want}" ] || { echo "wrong golden: s93_image_${_n}"; return 1; }
+  done
+}
+
 # why: a golden whose corpus file was deleted would stand for nothing.
 @test "s93: every golden has a corpus file" {
   local _g _stem _bad=0
   for _g in "${GOLDEN}"/*.golden; do
     [[ -e "${_g}" ]] || continue
     _stem="$(basename -- "${_g}" .golden)"
-    if [[ ! -f "${CORPUS}/${_stem}.txt" && ! -f "${CORPUS}/${_stem}.env" ]]; then
+    if [[ ! -f "${CORPUS}/${_stem}.txt" && ! -f "${CORPUS}/${_stem}.env" \
+          && ! -f "${CORPUS}/${_stem}.toml" ]]; then
       printf 'golden with no corpus: %s\n' "${_stem}"
       _bad=1
     fi
