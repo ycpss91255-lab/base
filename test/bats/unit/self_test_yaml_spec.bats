@@ -686,13 +686,15 @@ _acceptance_code() {
   run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
   assert_success
   assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
-  run _yaml_eval "${WF}" '[.jobs.acceptance.steps[] | (.run // "") | test("job_env.sh")] | index(true)'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
   assert_success
-  job_env_idx="${output}"
-  run _yaml_eval "${WF}" '[.jobs.acceptance.steps[] | (.run // "") | test("script/ci/acceptance.sh")] | index(true)'
+  job_env_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/acceptance.sh")) | .key'
   assert_success
-  [ "${job_env_idx}" != "null" ]
-  [ "${job_env_idx}" -lt "${output}" ]
+  scaffold_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  [[ "${scaffold_idx}" =~ ^[0-9]+$ ]]
+  [ "${job_env_idx}" -lt "${scaffold_idx}" ]
 }
 
 @test "self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)" {
