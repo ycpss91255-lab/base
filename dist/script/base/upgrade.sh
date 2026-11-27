@@ -1012,6 +1012,7 @@ chore: update template references to ${target_ver}
 
 - main.yaml: ${_ref_note}
 - .gitignore: synced canonical entries (template lib/gitignore.sh)
+- .gitattributes: synced the line-ending block (template lib/gitattributes.sh)
 - untracked any derived artifacts now covered by .gitignore
 COMMIT
 )" || _log upgrade_nothing_to_commit "No additional changes to commit"

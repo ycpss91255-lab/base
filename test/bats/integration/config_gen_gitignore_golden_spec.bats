@@ -32,8 +32,10 @@ setup() {
 }
 
 # Golden names with no corpus input: the case calls the function on a path
-# that does not exist.
-_S82_INPUTLESS=(s82_prune_absent s82_sync_absent)
+# that does not exist, or reuses another case's input (s82_sync_mode).
+_S82_INPUTLESS=(s82_prune_absent s82_sync_absent s82_sync_mode
+  s82_pathspec_log s82_pathspec_coverage s82_pathspec_env
+  s82_pathspec_deploy s82_pathspec_empty)
 
 # _partition_violations -- print one line per corpus input with no golden
 # and per golden with neither an input nor a listed inputless name.
@@ -105,23 +107,41 @@ _run_case() {
   _write_actual "${_name}" "${_rc}"
 }
 
-# _run_sync_case <name> <input|-> -- run _sync_managed_entries with
-# _canonical_gitignore_entries in ${S}/w and write the actual golden to
-# ${S}/actual/<name>.golden, same format as _run_case. <input> is a corpus
-# file copied to the target; `-` calls the function on a missing path
-# (base#2213).
+# _run_sync_case <name> <input|-> [target-mode|-] -- run
+# _sync_managed_entries with _canonical_gitignore_entries in ${S}/w and
+# write the actual golden to ${S}/actual/<name>.golden, same format as
+# _run_case. <input> is a corpus file copied to the target (chmod to
+# <target-mode> when not `-`, default `-`); `-` calls the function on a
+# missing path (base#2213, base#2215).
 _run_sync_case() {
-  local _name="${1}" _input="${2}"
+  local _name="${1}" _input="${2}" _mode="${3:--}"
   local _tgt="${S}/w/.gitignore" _rc=0
   rm -rf -- "${S}/w"
   mkdir -p "${S}/w" "${S}/actual"
   if [[ "${_input}" != - ]]; then
     cp -- "${TESTDATA}/corpus/s82/${_input}" "${_tgt}"
+    [[ "${_mode}" == - ]] || chmod "${_mode}" "${_tgt}"
   fi
   (
     # shellcheck source=dist/script/docker/lib/gitignore.sh
     source /source/dist/script/docker/lib/gitignore.sh
     _sync_managed_entries "${_tgt}" _canonical_gitignore_entries
+  ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
+  _write_actual "${_name}" "${_rc}"
+}
+
+# _run_pathspec_case <name> <entry> -- run _canonical_entry_pathspec on
+# <entry> and write the actual golden to ${S}/actual/<name>.golden, same
+# format as _run_case. No target file is involved, so mode=absent and the
+# file section is empty (base#2083).
+_run_pathspec_case() {
+  local _name="${1}" _entry="${2}" _rc=0
+  rm -rf -- "${S}/w"
+  mkdir -p "${S}/w" "${S}/actual"
+  (
+    # shellcheck source=dist/script/docker/lib/gitignore.sh
+    source /source/dist/script/docker/lib/gitignore.sh
+    _canonical_entry_pathspec "${_entry}"
   ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
   _write_actual "${_name}" "${_rc}"
 }
@@ -189,4 +209,57 @@ _assert_golden() {
 @test "s82 sync: a lone trailing newline gets the marker with no extra blank line" {
   _run_sync_case s82_sync_lone_newline s82_sync_lone_newline.gitignore
   _assert_golden s82_sync_lone_newline
+}
+
+# why: a file that already has the marker gets only the missing canonical
+# entry (compose.yaml) appended at the end; every other line stays
+# (base#2215).
+@test "s82 sync: an existing marker gets only the missing entry appended" {
+  _run_sync_case s82_sync_missing_one s82_sync_missing_one.gitignore
+  _assert_golden s82_sync_missing_one
+}
+
+# why: a file with the marker and all 18 entries is left byte for byte
+# (base#2215).
+@test "s82 sync: a complete file is left unchanged" {
+  _run_sync_case s82_sync_complete s82_sync_complete.gitignore
+  _assert_golden s82_sync_complete
+}
+
+# why: the missing entry is appended in place, so the file keeps mode 640
+# (base#2215).
+@test "s82 sync: an in-place append keeps the file mode" {
+  _run_sync_case s82_sync_mode s82_sync_missing_one.gitignore 640
+  _assert_golden s82_sync_mode
+}
+
+# why: a trailing slash marks a directory in a pattern and means nothing in
+# a pathspec, so it is dropped (base#2083).
+@test "s82 pathspec: a trailing slash is dropped from log/" {
+  _run_pathspec_case s82_pathspec_log "log/"
+  _assert_golden s82_pathspec_log
+}
+
+@test "s82 pathspec: a trailing slash is dropped from coverage/" {
+  _run_pathspec_case s82_pathspec_coverage "coverage/"
+  _assert_golden s82_pathspec_coverage
+}
+
+# why: an entry with no slash passes through unchanged (base#2083).
+@test "s82 pathspec: a plain file entry is unchanged" {
+  _run_pathspec_case s82_pathspec_env ".env"
+  _assert_golden s82_pathspec_env
+}
+
+# why: a leading slash anchors a pattern and has no settled pathspec
+# translation, so it is refused with rc 1 and no output (base#2083).
+@test "s82 pathspec: a leading slash is refused" {
+  _run_pathspec_case s82_pathspec_deploy "/deploy/"
+  _assert_golden s82_pathspec_deploy
+}
+
+# why: an empty entry names nothing, so it is refused with rc 1 (base#2083).
+@test "s82 pathspec: an empty entry is refused" {
+  _run_pathspec_case s82_pathspec_empty ""
+  _assert_golden s82_pathspec_empty
 }
