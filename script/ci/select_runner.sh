@@ -3,14 +3,15 @@
 # for a self-hosted runner.
 #
 # Usage: EVENT_NAME=<event> REPO=<owner/name> [HEAD_REPO=<owner/name>] \
-#          [MERGE_GROUP_SAME_REPO=true|false] [CI_SELF_HOSTED=cpu] \
+#          [MERGE_GROUP_SAME_REPO=true|false] [CI_SELF_HOSTED=cpu|off] \
 #          select_runner.sh
 #
 # Prints two lines on stdout and always exits 0: `trusted=true|false`, then
 # `runs_on=<compact JSON array>`. runs_on is the cpu fleet
 # `["self-hosted","linux","x64","cpu"]` only when the event is trusted and
-# CI_SELF_HOSTED is exactly `cpu`; every other case is `["ubuntu-latest"]`,
-# so unsetting the switch falls back to the hosted pool, base#2266.
+# CI_SELF_HOSTED is unset, empty or `cpu`; every other case is
+# `["ubuntu-latest"]`, so setting the switch to `off` falls back to the
+# hosted pool, base#2266, base#2287.
 #
 # push (a tag push is a push), workflow_dispatch, a pull_request whose head
 # repository equals REPO, and a merge_group whose MERGE_GROUP_SAME_REPO is
@@ -58,7 +59,8 @@ case "${EVENT_NAME}" in
 esac
 
 runs_on="${HOSTED_RUNS_ON}"
-if [[ "${trusted}" == "true" && "${CI_SELF_HOSTED:-}" == "cpu" ]]; then
+# Default-on (base#2287): unset or empty means cpu; only `off` or another value falls back.
+if [[ "${trusted}" == "true" && ( -z "${CI_SELF_HOSTED:-}" || "${CI_SELF_HOSTED}" == "cpu" ) ]]; then
   runs_on="${CPU_RUNS_ON}"
 fi
 
