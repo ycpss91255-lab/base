@@ -676,6 +676,25 @@ _acceptance_code() {
   assert_output 'false'
 }
 
+# why: on the cpu fleet /tmp is private to the job container while the
+# toml-bridge `docker run -v` goes to the host daemon, so a scaffold under
+# /tmp is invisible to it (conf_toml_merge_failed, run 46080939073). Only
+# paths under RUNNER_TEMP are same-path visible, so the job must export a
+# TMPDIR there via script/ci/job_env.sh before acceptance.sh's mktemp runs
+# (base#2270, base#2274).
+@test "self-test.yaml: acceptance exports a RUNNER_TEMP TMPDIR via job_env.sh before the scaffold step (base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
+  run _yaml_eval "${WF}" '[.jobs.acceptance.steps[] | (.run // "") | test("job_env.sh")] | index(true)'
+  assert_success
+  job_env_idx="${output}"
+  run _yaml_eval "${WF}" '[.jobs.acceptance.steps[] | (.run // "") | test("script/ci/acceptance.sh")] | index(true)'
+  assert_success
+  [ "${job_env_idx}" != "null" ]
+  [ "${job_env_idx}" -lt "${output}" ]
+}
+
 @test "self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)" {
   run _yaml_eval "${WF}" '.jobs.acceptance["runs-on"]'
   assert_success
