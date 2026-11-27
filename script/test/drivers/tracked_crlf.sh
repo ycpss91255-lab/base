@@ -114,7 +114,11 @@ _run_tracked_crlf() {
   echo "--- Running tracked CRLF lint ---"
 
   if _tracked_crlf_gitdir_unreachable; then
-    echo "tracked CRLF lint: NOT RUN -- ${REPO_ROOT}/.git names a worktree"          "gitdir this process cannot see (the checkout is bind-mounted"          "without it), so the index could not be read and NO file was"          "examined. Run './script/test/test.sh --tracked-crlf-only' on"          "the host for the real answer."
+    echo "tracked CRLF lint: NOT RUN -- ${REPO_ROOT}/.git names a worktree" \
+         "gitdir this process cannot see (the checkout is bind-mounted" \
+         "without it), so the index could not be read and NO file was" \
+         "examined. Run './script/test/test.sh --tracked-crlf-only' on" \
+         "the host for the real answer."
     return 0
   fi
 
