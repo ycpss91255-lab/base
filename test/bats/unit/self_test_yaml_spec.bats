@@ -317,7 +317,7 @@
 #
 # - `doc-counts` job declared + `needs: [actionlint, classify]` + runs
 # `test.sh --lint --doc-counts` inside the test-tools image + carries no
-# diff gate, only classify's full_run (#864, base#1412)
+# diff gate, only classify's full_run
 #
 # - `hadolint` job declared + `needs: [actionlint, classify]` + `if:
 # code_changed == 'true'` + lints both template-owned Dockerfiles via
@@ -1868,7 +1868,7 @@ _builder_setups_out_of_step_with_their_consumer() {
   [[ -z "${_bad}" ]] || fail "ci-rollup passes a skip of:${_bad}"
 }
 
-# why: The amd64 test-tools-image builder (base#1588) feeds doc-counts and
+# why: The amd64 test-tools-image builder feeds doc-counts and
 # lint-static on every run but a push to main, and coverage on that push,
 # so it must run on every event -- merge_group included -- and its skip
 # must fail the rollup

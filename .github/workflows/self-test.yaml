@@ -1111,7 +1111,7 @@ jobs:
         run: ./script/ci/reclaim.sh --run "${CI_RUN_KEY}" --stale 12h
 
   single-issue-pr:
-    # A PR closes one issue (base#1629). No diff gate: a doc-only PR is
+    # A PR closes one issue. No diff gate: a doc-only PR is
     # where a bundled PR slips through. It runs on every run but a push to
     # main (classify's full_run); on merge_group, other pushes and dispatch
     # there is no PR to read, so it exits 0 (a queued PR was already
@@ -2294,7 +2294,7 @@ jobs:
     # every failure or cancel. The job set is read from `needs` itself, so
     # a job added there is covered with no edit here; one that gains an
     # `if:` but no map entry fails on its first skip. The amd64
-    # test-tools-image builder (base#1588) feeds doc-counts and lint-static
+    # test-tools-image builder feeds doc-counts and lint-static
     # on every run but a push to main, and coverage on that push, so it
     # always runs and stays out of the map on purpose.
     #
