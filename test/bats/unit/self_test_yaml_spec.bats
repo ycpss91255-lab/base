@@ -3867,6 +3867,7 @@ _lint_probe_fixture() {
   printf 'cd /source\n%s\n' "${_run}" > "${BATS_TEST_TMPDIR}/step.sh"
   run env REF=v1.0 bash --noprofile --norc -eo pipefail "${BATS_TEST_TMPDIR}/step.sh"
   assert_failure 1
+  assert_output --partial "'v1.0' is not a version tag"
   run env REF=v0.43.0-rc9 bash --noprofile --norc -eo pipefail "${BATS_TEST_TMPDIR}/step.sh"
   assert_success
 }
