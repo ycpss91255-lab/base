@@ -1,4 +1,10 @@
 name: Triage label
+run-name: >-
+  ${{ github.event_name }} ·
+  ${{ github.event_name == 'pull_request' && format('PR #{0} · {1}', github.event.pull_request.number || '?', github.event.pull_request.title || '(no title)')
+  || github.event_name == 'merge_group' && format('{0} · {1}', github.event.merge_group.head_ref || github.ref_name || '(unknown ref)', github.event.merge_group.head_commit.message || '(no commit message)')
+  || github.event_name == 'issues' && format('issue #{0} · {1}', github.event.issue.number || '?', github.event.issue.title || '(no title)')
+  || format('{0} · {1}', github.ref_name || '(unknown ref)', github.sha || '(unknown SHA)') }}
 
 # Safety net for issues that carry no state label. `doc/agents/triage-labels.md`
 # says every issue carries exactly one of its state roles, but an issue can

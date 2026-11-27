@@ -38,6 +38,7 @@ apply_repo_conf_unsettled
 compose_relocated_root_unusable
 conf_write_shadowed
 conf_toml_merge_failed
+conf_memo_unwritable
 conf_toml_parse_failed
 config_components_provisioned
 config_components_absent
@@ -341,6 +342,7 @@ ci_log_event_registry
 ci_toml_fixture
 ci_canonical_ignore_sync
 ci_tracked_crlf
+ci_workflow_run_name
 ci_home_literal
 ci_arch_literal
 ci_moving_tag

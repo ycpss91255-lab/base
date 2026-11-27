@@ -224,6 +224,7 @@ tool therefore needs its own join to `.github/workflows/self-test.yaml`:
 | `toml-fixture` | every fixture body a spec writes to a `*.toml` path parses as TOML -- a body the bridge refuses leaves an empty config handle, so a test asserting a schema default passes without its fixture ever being read | `lint-static` (one group) | ungated |
 | `canonical-ignore-sync` | base's own root `.dockerignore` carries a line for every entry `_canonical_dockerignore_entries` emits -- the block is headed as a copy of that function, so both sides are derived and compared rather than the copy being re-synchronised by hand. One-directional: extras are allowed, and presence is a whole line (the `grep -qxF` the shipped sync applies) | `lint-static` (one group) | ungated |
 | `tracked-crlf` | no tracked file is stored with CRLF line endings in the git index unless `.gitattributes` marks its path `-text` -- the root rule `* text=auto eol=lf` fixes the checkout side, and this reads the index side, which `text=auto` leaves alone for a file already committed with a CR | `lint-static` (one group) | ungated |
+| `workflow-run-name` | every `.github/workflows/*.yaml` / `*.yml` sets a top-level `run-name` holding a `${{ }}` expression that reads `github.event.merge_group.head_ref`, so each run in the Actions list names its PR, push or tag instead of the bare workflow name. Missing, static, without the merge queue ref, commented-out or job-level only fails; zero workflow files fails too | `lint-static` (one group) | ungated |
 
 `lint-static` is a matrix of GROUPS, not of lints (base#1071): each entry is a
 position (`1/4` ... `4/4`) and `test.sh --lint --group N/T` computes which lints
@@ -541,8 +542,8 @@ no `if:` and no `continue-on-error`. No `test.sh` mode runs it, the no-flag
 `just test` included, and the pre-PR mirror lists it as excluded.
 
 **Before a release**, run both release-only checks, this roster and the config
-generator's redpath, on the commit to be tagged: locally with the first two
-commands, or hosted with the third alone.
+generator's redpath, on the commit to be tagged. The hosted run is the one the
+tag needs; the local commands find a failure sooner.
 
 ```bash
 just test mutation-required                 # local: the roster
@@ -553,19 +554,23 @@ gh workflow run self-test.yaml --ref main   # hosted: the whole CI, both include
 `just test go` runs the Go gates and then the redpath; a pull request and the
 pre-PR mirror run the gates alone (`just test go-gates`).
 
+The release steps:
+
+1. Run the hosted CI on `main`, the third command above.
+2. Wait for its `release-checks` check to pass. The `release-gate` job is named
+   that only on a run that selected both release-only jobs, and it passes only
+   when `ci-rollup` and both of them succeeded.
+3. Tag that commit and push the tag.
+
+Once the `v*` tag ruleset requires `release-checks` as well as `ci-rollup`,
+GitHub refuses a tag on a commit without it, rc tags included. A pull
+request, a merge group and a push to `main` never produce a check of that name,
+so the merge queue's green `ci-rollup` does not stand in for it.
+
 The hosted run takes the branch's latest commit, so check that it is the one
 to be tagged. It shares one concurrency group with the pushes to `main`, which
 keeps a single pending run: a later merge cancels it while it waits, and it
-cancels a push run that waits.
-
-Nothing enforces this step. A release-only check that is red on the tag itself
-withholds the GitHub Release and nothing else:
-
-- The tag is pushed all the same: the `v*` ruleset asks for a green
-  `ci-rollup` on the commit, and the merge group's is green without them.
-- `upgrade.sh` and `init.sh` pick the newest `vX.Y.Z` tag, not the newest
-  GitHub Release, so a downstream upgrade takes it.
-- `release-test-tools.yaml` has published its images.
+cancels a push run that waits. If that happens, run it again.
 
 ## Maintaining these docs
 

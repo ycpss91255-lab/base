@@ -184,7 +184,8 @@ readonly RERUN_HINT="Re-run \`just test coverage\` (or \`just test coverage-loca
 # instrumented and its edits do not move the figure. What the guard would
 # NOT notice is the suite gaining a second interpreter kcov instruments;
 # that is a roster change no test will ask for.
-readonly SOURCE_PATHSPEC=('*.sh' '*.bats' '*.bash' '*justfile*' '*Dockerfile*')
+# Tracked git hooks carry no extension, so their directory is named.
+readonly SOURCE_PATHSPEC=('*.sh' '*.bats' '*.bash' '*justfile*' '*Dockerfile*' '.githooks/*')
 
 # The header block from `# Usage:` to the first non-comment line is the
 # help text: one source, so an option cannot be documented in the file and

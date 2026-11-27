@@ -1559,7 +1559,7 @@ code, base#1562.
 | `_run_via_compose: the real ids are in the environment compose interpolates (#895)` | - |
 | `_fix_permissions: refuses a non-numeric id instead of handing it to chown (#895)` | - |
 
-### test/bats/unit/classify_testtools_spec.bats (34)
+### test/bats/unit/classify_testtools_spec.bats (39)
 
 `testtools_changed` tells every image-consuming job whether to rebuild the
 tooling image from source instead of pulling the rolling `:main`. On a pull
@@ -1610,6 +1610,11 @@ reads the output the step writes.
 | `chain: a tag push and workflow_dispatch run the release-only jobs, and only the tag releases (base#2176, base#2177)` | the tag is where the release-only jobs block, and a dispatch on a branch is how they are checked before the tag exists, with nothing published. |
 | `chain: a tag on which a release-only job fails or never runs publishes no release (base#2176, base#2177)` | the rollup excuses a job classify deselected, so `release` cannot rest on the rollup: it must need each release-only job itself. |
 | `chain: the gated jobs, the map's job list, classify's loop and the release-only jobs are one set, and each selected skip fails the rollup (base#1584, base#2177)` | cycle 4. One source for every gate: the map's names, the map's --jobs and classify's loop list are the same set, and with the release-only jobs the keys the gated jobs' `if:`s read. Each gated job reads exactly one select_* key, the one its `if:` names; config-gen-gates reads select_config_gen. The rollup must resolve each gated job to that same key: its skip fails while the key is `true` and passes once that key alone is `false`. The key comes from the job's `if:`, never from a rewrite of the job's name, so a rollup that guesses the key from the name fails here. |
+| `chain: a tag push or workflow_dispatch with every job green passes release-checks (base#2205)` | the tag ruleset requires the `release-checks` check, so it must go green on a release run in which every job, both release-only ones included, succeeded. |
+| `chain: release-checks fails on a release run when a release-only job or the rollup does not pass (base#2205)` | a release run whose release-only job failed, never ran, or whose rollup failed must leave `release-checks` red, so the tag is refused. |
+| `chain: a PR, a merge group and a push to main never carry the release-checks name (base#2205)` | GitHub counts a skipped check as passed, so the name must not exist on a run that skips the release-only jobs, in any state. |
+| `chain: a run that selects only one release-only job does not carry the release-checks name (base#2205)` | both release-only jobs must be selected, not one, for the run to be a release run. |
+| `self-test.yaml: release-gate runs always, needs the rollup and both release-only jobs, and reads their keys (base#2205)` | a skipped job is shown under its id or its unexpanded name, so neither may be the required name; and only `always()` keeps a failed need from skipping it on a release run. |
 
 ### test/bats/unit/code_lines_spec.bats (46)
 
@@ -2004,7 +2009,7 @@ unreadable layer, and a directory where the layer should be.
 | `a directory in place of setup.toml is refused with its event id and path` | A directory where setup.toml should be is not an absent layer either. Measured before base#1400: apply logged conf_no_repo_conf ("using template defaults"), then conf_upsert_file_missing writing the workspace bind into it, and exited 0 with compose.yaml generated. It must be refused like any other layer that is there and cannot be read. |
 | `a FIFO in place of setup.toml is refused within a bound, with its event id and path` | A FIFO where setup.toml should be is there too, and unlike a directory it does not fail on open: open(2) on a FIFO blocks until a writer arrives, so an `-e` gate that hands it to the bridge hangs apply forever instead of refusing (review round 3 of base#1400). The bound makes the hang a failure instead of a wedged suite. |
 
-### test/bats/unit/conf_accessor_spec.bats (40)
+### test/bats/unit/conf_accessor_spec.bats (43)
 
 Unit tests for the `conf.sh` opaque accessor interface (#564 / #563):
 `_conf_load` loads a file into a named handle, `_conf_get` reads a value by
@@ -2065,6 +2070,9 @@ on hand-edited / malformed setup.conf:
 | `_conf_load_layers does not memo a failed merge (base#2234)` | base#2234 acceptance 3 -- a failed merge is not remembered. The stub exits 1 both times; each load returns 1 and logs conf_toml_merge_failed, and the bridge is called twice. |
 | `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
 | `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
+| `_conf_load_layers degrades to no memo and warns once when the memo dir is unwritable (base#2235)` | base#2235 acceptance 1-4 -- an unwritable memo directory degrades to no memo. Three loads of the same two-layer chain (the middle one inside $(...)): every load returns 0 and answers `wayland`, the bridge is called 3 times (nothing to hit), and conf_memo_unwritable is logged once for the whole command with path=<memo dir>. |
+| `_conf_load_layers still fails by name when the bridge fails and the memo dir is unwritable (base#2235)` | base#2235 acceptance 5 -- the degrade does not change failure semantics: with the same unwritable memo dir and the bridge exiting 1, the load still returns 1 and logs conf_toml_merge_failed. |
+| `_conf_load_layers does not log conf_memo_unwritable when the memo dir is writable (base#2235)` | base#2235 acceptance 6 -- a writable memo dir never logs the event. |
 
 ### test/bats/unit/conf_ini_golden_spec.bats (7)
 
@@ -4096,6 +4104,31 @@ itself (`git check-attr`) which rule wins.
 | `_sync_gitattributes: a temp file that cannot be created is refused, file unchanged (base#2246)` | With no temp file there is nowhere to compose the rewrite; the sync must say so and leave the repo's file alone |
 | `_sync_gitattributes: a rewrite that cannot take the file's mode is abandoned, file unchanged (base#2246)` | A rewrite that cannot take the file's mode would land a 0600 file over the repo's own; abandoning it is the only safe answer |
 | `gitattributes: the events the sync can raise are registered (base#2246)` | _log_* is strict -- an unregistered event prints the registry's refusal instead of the message that says what is wrong with the file |
+
+### test/bats/unit/githooks_spec.bats (13)
+
+Unit tests for the local git hooks (`.githooks/pre-push`) and their
+installer (`script/githooks/install.sh`). The pre-push hook is the first,
+local gate for the workflow run-name rule and must run the same driver CI
+runs; CI stays the real gate. The installer is the one command that turns
+the hooks on for a checkout, sets only this repo's config, and refuses to
+silently disable hooks that are already in use.
+
+| Test | Description |
+|------|-------------|
+| `pre-push: blocks when a workflow lacks a dynamic run-name` | The hook blocks a push when a workflow has no dynamic run-name |
+| `pre-push: blocks when a workflow has no run-name` | The hook blocks a workflow with no run-name at all |
+| `pre-push: allows the push when every workflow has a dynamic run-name` | The hook lets a push through when every workflow passes |
+| `pre-push: blocks a pushed commit that is bad even when the working tree is fixed` | The hook checks the commit being pushed, not the working tree: a fix that is only in the working tree does not reach the remote |
+| `pre-push: allows a pushed commit that is good even when the working tree is broken` | An unstaged mistake in the working tree is not what is pushed, so it does not block a good commit |
+| `pre-push: a branch deletion is not checked` | Deleting a remote branch pushes no commit, so there is nothing to check |
+| `pre-push: is tracked as an executable file` | The hook must be executable in the index, or git skips it on Linux and macOS checkouts |
+| `install: sets core.hooksPath to .githooks in the local config` | One command turns the hooks on, in this repo's own config only |
+| `install: is idempotent` | Running the installer twice is harmless |
+| `install: refuses to replace another core.hooksPath` | A hooks path already set elsewhere is not overwritten, so hooks the contributor already relies on keep running |
+| `install: refuses when .git/hooks has an active hook, --force overrides` | Setting core.hooksPath stops .git/hooks from running, so an active hook there is a refusal unless --force says it may stop |
+| `install --check: fails before install and passes after` | The verify step says whether the hooks are active, by exit status |
+| `install: a different fresh repo stays without core.hooksPath` | Other repos, such as the ones the suite creates, never get the hooks |
 
 ### test/bats/unit/gitignore_spec.bats (55)
 
@@ -7153,6 +7186,34 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [deploy] keys the resolver reads (#876)` | - |
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
+
+### test/bats/unit/select_runner_spec.bats (19)
+
+A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
+`false` silently moves every run to the hosted pool. Each row of the issue's
+table is pinned so neither direction can drift (base#2265).
+
+| Test | Description |
+|------|-------------|
+| `select_runner.sh: push is trusted (base#2265)` | A tag push is a push too; answering false would move every release run to the hosted pool (base#2265). |
+| `select_runner.sh: workflow_dispatch is trusted (base#2265)` | Only someone with write access can dispatch, so the run is the owner's own code (base#2265). |
+| `select_runner.sh: a same-repository pull_request is trusted (base#2265)` | The head repository equals this one, so the code was pushed by someone with write access (base#2265). |
+| `select_runner.sh: a fork pull_request is not trusted (base#2265)` | A fork's code on a self-hosted runner is the exact hole this script closes (base#2265). |
+| `select_runner.sh: a pull_request with an empty head repository is not trusted (base#2265)` | An empty head repository proves nothing about who wrote the code, so it fails closed (base#2265). |
+| `select_runner.sh: a merge_group proven same-repository is trusted (base#2265)` | The only case that opens a self-hosted runner on a queue run (base#2265). |
+| `select_runner.sh: a merge_group proven not same-repository is not trusted (base#2265)` | A group holding a fork's pull request must stay on the hosted pool (base#2265). |
+| `select_runner.sh: a merge_group with no proof is not trusted (base#2265)` | A merge_group payload names no head repository, so no proof means false (base#2265). |
+| `select_runner.sh: schedule is not trusted (base#2265)` | A schedule is not in the listed events; the default answer is false (base#2265). |
+| `select_runner.sh: an unlisted event is not trusted (base#2265)` | An event nobody listed (issue_comment) can carry attacker text, so the default is false (base#2265). |
+| `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
+| `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=cpu selects the cpu fleet (base#2266)` | The switch on with a trusted event is the only way to reach the CPU fleet (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED unset selects ubuntu-latest (base#2266)` | An unset switch is the rollback path, so a trusted event stays on hosted (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)` | Only the value cpu opens the fleet; gpu has no fleet here, so it falls back (base#2266). |
+| `select_runner.sh: a fork pull_request with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A fork must never get a self-hosted runner, even with the switch on (base#2266). |
+| `select_runner.sh: schedule with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | An unlisted event is untrusted, so the switch cannot lift it onto self-hosted (base#2266). |
+| `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
+| `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
 
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
@@ -11002,6 +11063,32 @@ before reading an empty result as a clean one.
 | `workflows: no concurrency group cancels a run whose verdict is the record (#1014)` | Cancellation is only free where the cancelled run's verdict no longer matters. On a PR branch a superseded push replaces it; on a main push or a tag the run IS the record, and on the publish path a cancelled `imagetools create` is how a rolling tag loses an arch. So a group may cancel a pull_request and nothing else -- and an `if: always()` aggregator turns whatever it cancels into a red required check. |
 | `workflows: every job that runs steps bounds them (#1014)` | A hung buildx burns GitHub's six-hour default before anyone sees it. The population is every workflow file, not the reusable workers alone: the workers were bounded first because a worker spends the CALLER's minutes, but the jobs that actually run a build here are self-test's eight-shard coverage matrix and its two-arch `acceptance` matrix, both self-hosted-eligible and both unbounded -- so the hazard the rule names lived entirely outside the set the rule scanned. The bound is per job rather than per workflow because that is the only place GitHub accepts one, and the roster is derived from the directory so the ninth workflow cannot land unbounded. |
 | `workflows: every workflow a trigger can start declares its own default permission (#1116)` | The posture is correct and nothing in the tree says so. Both the repo and the org report `default_workflow_permissions: read`, so the fourteen jobs of base's own CI workflow that declare no block of their own are read-only -- held entirely by a checkbox on a settings page, which no diff, no review and no spec can see. Flip it and those jobs get write on contents, packages, actions, issues and pull-requests, on a workflow that checks out fourteen times with a persisted token and then runs the whole suite and scaffolds a repo. The caller-token question is a different one, asked of the reusable workers in reusable_worker_permissions_spec.bats over exactly the complement of this population; this is the repository default, so it is asked here, of the workflows a trigger can start. Five of the six already declare one, so the exception was a house convention nothing enforced. |
+
+### test/bats/unit/workflow_run_name_lint_spec.bats (14)
+
+Unit tests for `script/test/drivers/workflow_run_name.sh`
+(`_run_workflow_run_name`), the "every workflow has a dynamic run-name"
+lint. Without a run-name every run in the Actions list shows only the
+workflow name, so a run cannot be traced to its PR, push or tag. Each case
+plants a small `.github/workflows/` tree and checks which shapes pass and
+which fail, including the ways the lint could pass having checked nothing.
+
+| Test | Description |
+|------|-------------|
+| `_run_workflow_run_name: a one-line dynamic run-name passes` | The shape every workflow here uses passes |
+| `_run_workflow_run_name: a workflow without run-name fails and is named` | A missing run-name fails and names the file; an expression in another top-level key does not count |
+| `_run_workflow_run_name: a static run-name fails` | Static text is the default title spelled out, so it fails |
+| `_run_workflow_run_name: a dynamic run-name without merge_group.head_ref fails` | A merge queue run is traced to its PR only through merge_group.head_ref, so an expression without it fails |
+| `_run_workflow_run_name: a folded dynamic run-name passes` | A folded block scalar is read across its lines |
+| `_run_workflow_run_name: a folded static run-name fails` | A folded block with static lines only fails |
+| `_run_workflow_run_name: a commented-out run-name fails` | A commented-out run-name is not a run-name |
+| `_run_workflow_run_name: an indented run-name does not count` | Only the top-level key names the run; an indented one does not |
+| `_run_workflow_run_name: a .yml workflow is checked` | GitHub also loads .yml files, so they are checked too |
+| `_run_workflow_run_name: zero workflow files fails` | An empty or missing workflow directory must fail, not pass having checked nothing |
+| `workflow-run-name: is a member of the lint phase's tool table` | A lint nobody runs is a comment |
+| `workflow-run-name: has a lint-static CI join` | Exactly one lint-static group runs it: none gates nothing and two pay twice |
+| `workflow-run-name: its failure event id is registered` | An unregistered event id is an anonymous exit |
+| `workflow-run-name: the dispatcher has a case arm for it` | The driver must be dispatchable by the name the table carries |
 
 ### test/bats/unit/workflow_unchecked_producer_spec.bats (6)
 

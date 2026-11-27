@@ -1,4 +1,10 @@
 name: CI
+run-name: >-
+  ${{ github.event_name }} ·
+  ${{ github.event_name == 'pull_request' && format('PR #{0} · {1}', github.event.pull_request.number || '?', github.event.pull_request.title || '(no title)')
+  || github.event_name == 'merge_group' && format('{0} · {1}', github.event.merge_group.head_ref || github.ref_name || '(unknown ref)', github.event.merge_group.head_commit.message || '(no commit message)')
+  || github.event_name == 'issues' && format('issue #{0} · {1}', github.event.issue.number || '?', github.event.issue.title || '(no title)')
+  || format('{0} · {1}', github.ref_name || '(unknown ref)', github.sha || '(unknown SHA)') }}
 
 # `pull_request:` carries no branch filter, and that is load-bearing
 # rather than incidental: the upstream-release watch opens its proposals
@@ -934,6 +940,9 @@ jobs:
     #                     bytes on a Windows clone and on this runner, and
     #                     which `text=auto` leaves alone for a file
     #                     already committed with a CR
+    #   workflow-run-name every file in this directory sets a top-level
+    #                     run-name holding a ${{ }} expression, so each run
+    #                     in the Actions list names its PR, push or tag
     #
     # GROUPED, not one job per driver, and not one job for the phase
     # (base#1071). One job per driver read best in the checks list -- the
@@ -2398,6 +2407,42 @@ jobs:
               echo "::notice::Passed with jobs classify deselected for this run, skipped by design:${deselected}"
             fi
           fi
+          exit "${fail}"
+
+  release-gate:
+    # The check the `v*` tag ruleset requires (ADR-00000042).
+    # - Named `release-checks` only on a run that selects both release-only
+    #   jobs. A PR, merge group or push to main never shows that name, not
+    #   even as a skip, which GitHub would count as a pass.
+    # - always(): a failed need must fail this job, not skip it.
+    name: ${{ needs.classify.outputs.select_mutation_roster == 'true' && needs.classify.outputs.select_config_gen_redpath == 'true' && 'release-checks' || 'release-gate (not a release run)' }}
+    needs: [classify, ci-rollup, mutation-roster, config-gen-redpath]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify the release run
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          # The same keys as the job name.
+          release="$(jq -r '.classify.outputs // {}
+            | (.select_mutation_roster == "true" and .select_config_gen_redpath == "true")' \
+            <<<"${NEEDS_JSON}")"
+          if [[ "${release}" != "true" ]]; then
+            echo "::notice::Not a release run: the release-only jobs were not selected, so this is not release-checks."
+            exit 0
+          fi
+          fail=0
+          for job in ci-rollup mutation-roster config-gen-redpath; do
+            result="$(jq -r --arg j "${job}" '.[$j].result // ""' <<<"${NEEDS_JSON}")"
+            printf '%-20s%s\n' "${job}:" "${result}"
+            if [[ "${result}" != "success" ]]; then
+              echo "::error::${job} did not succeed (${result:-no result}); this commit cannot be tagged"
+              fail=1
+            fi
+          done
           exit "${fail}"
 
   release:
