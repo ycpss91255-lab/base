@@ -2004,7 +2004,7 @@ unreadable layer, and a directory where the layer should be.
 | `a directory in place of setup.toml is refused with its event id and path` | A directory where setup.toml should be is not an absent layer either. Measured before base#1400: apply logged conf_no_repo_conf ("using template defaults"), then conf_upsert_file_missing writing the workspace bind into it, and exited 0 with compose.yaml generated. It must be refused like any other layer that is there and cannot be read. |
 | `a FIFO in place of setup.toml is refused within a bound, with its event id and path` | A FIFO where setup.toml should be is there too, and unlike a directory it does not fail on open: open(2) on a FIFO blocks until a writer arrives, so an `-e` gate that hands it to the bridge hangs apply forever instead of refusing (review round 3 of base#1400). The bound makes the hang a failure instead of a wedged suite. |
 
-### test/bats/unit/conf_accessor_spec.bats (35)
+### test/bats/unit/conf_accessor_spec.bats (40)
 
 Unit tests for the `conf.sh` opaque accessor interface (#564 / #563):
 `_conf_load` loads a file into a named handle, `_conf_get` reads a value by
@@ -2060,8 +2060,13 @@ on hand-edited / malformed setup.conf:
 | `_conf_split_nskey: follows the registry, so a new sub-sectioned name needs no edit here (base#1185)` | base#1185 -- the set of sub-sectioned names must come from the registry, or base#1152 / base#1184 cannot add one |
 | `_conf_split_nskey: sourcing conf.sh alone carries the registry with it (base#1185)` | base#1185 -- conf.sh gains its first dependency on schema.sh, and it must declare that itself rather than trust the caller |
 | `_conf_split_nskey: refuses rather than guessing when the registry is gone (base#1185)` | base#1185 -- an unloaded registry must not read as "nothing is sub-sectioned", an answer worse than the literal it replaced |
+| `_conf_load_layers runs the bridge once for a chain loaded twice (base#2234)` | base#2234 -- the same layer chain loaded twice in one command runs the bridge once. Expected from the issue's acceptance 1: one `--merge --kv` for the two-layer chain however many times it is loaded, and both loads answer the same value. |
+| `_conf_load_layers re-runs the bridge when a layer changed in between (base#2234)` | base#2234 acceptance 2 -- the key carries the layer's content, so a layer edited between two loads is a miss. First load `wayland`, the upper layer rewritten to `x11`, second load `x11`, two bridge calls. |
+| `_conf_load_layers does not memo a failed merge (base#2234)` | base#2234 acceptance 3 -- a failed merge is not remembered. The stub exits 1 both times; each load returns 1 and logs conf_toml_merge_failed, and the bridge is called twice. |
+| `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
+| `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
 
-### test/bats/unit/conf_ini_golden_spec.bats (6)
+### test/bats/unit/conf_ini_golden_spec.bats (7)
 
 `_ini_tokenize` is the single shell INI tokenizer. The Go reader that
 replaces it (the later `ini tokens` slice) must match it byte for byte, so
@@ -2079,6 +2084,7 @@ holds the shell to that record. A golden is tab-separated lines:
 | `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. A colon in a section name is written `%3A` in the golden file name, because Windows cannot create a file whose name holds a colon. |
 | `_conf_load_layers over the base and over layers matches layers.base_over.golden` | `_conf_load_layers` over a two-layer INI chain is section-replace (base#2062, S25c): the upper layer owns section `a`, so `a\|y\|2` from the base layer must not survive. The expected bytes are in golden/s25/layers.base_over.golden; the absent third path adds nothing. |
 | `_conf_load_layers over every single s25 input matches its load golden` | `_conf_load_layers` over a single file is the tokenizer's sections with entries grouped by section; each single-file corpus input has its own <stem>.load.golden. |
+| `_setup_conf_merge_blockers over the s25 blockers trio matches blockers.golden` | `_setup_conf_merge_blockers` is the shell answer the later `ini blockers` slice must reproduce (base#2066, S25d). Over the s25_blockers_* trio the expected blockers are `a` (root differs from legacy and from the template) and `d` (only the root has it), in that order; `b` (legacy and root agree) and `c` (root equals the template) are not. The bytes are in golden/s25/blockers.golden. |
 
 ### test/bats/unit/conf_logging_spec.bats (12)
 
@@ -4041,6 +4047,56 @@ could have said so: that workflow carried no spec at all.
 | `.gitattributes: the generated changelog index merges by union (#926)` | The original scope of the rule, kept rather than assumed: the index is derived and the layout lint re-derives it, so a union duplicate there is reported instead of shipped. |
 | `.gitattributes: CONVENTIONS.md is NOT union-merged (#926)` | The boundary the widened glob nearly crossed. A gitattributes `*` does not cross `/`, so `doc/changelog/*.md` would have covered hand-written prose -- where union merging keeps both copies of a rewritten paragraph in silence, and no gate in this repo reads that file outside its marker block. |
 
+### test/bats/unit/gitattributes_sync_spec.bats (34)
+
+Unit tests for `dist/script/docker/lib/gitattributes.sh`
+(`_canonical_gitattributes_block`, `_sync_gitattributes`, refs base#2246). A
+repo that vendors base had no line-ending rule, so a Windows clone on the
+default `core.autocrlf` checked scripts out with CRLF. The sync installs `*
+text=auto eol=lf` as a marker-delimited block at the TOP of
+`.gitattributes`: the last matching line decides an attribute there, so a
+block appended below a repo's own `binary` / `-text` / `eol=crlf` lines
+would override them. The cases pin each state the sync can meet -- no file,
+no marker, a current block, a stale block, a malformed block -- and ask git
+itself (`git check-attr`) which rule wins.
+
+| Test | Description |
+|------|-------------|
+| `_canonical_gitattributes_block: carries the LF rule for every text file (base#2246)` | The rule itself -- text is LF everywhere |
+| `_canonical_gitattributes_block: keeps *.bat and *.cmd CRLF on checkout (base#2246)` | The two script types a Windows shell needs with CRLF stay CRLF on checkout |
+| `_canonical_gitattributes_block: opens with the begin marker and closes with the end marker (base#2246)` | The sync finds its block by these two lines; a block that does not open and close with them cannot be rewritten later |
+| `_canonical_gitattributes_block: names each marker exactly once (base#2246)` | A marker repeated inside the block would make the sync's own output malformed on the next run |
+| `_canonical_gitattributes_block: base's own root .gitattributes opens with it byte for byte (base#2246)` | base ships this rule and must live under it -- the block at the top of base's own root file is the emitter's output, byte for byte |
+| `_sync_gitattributes: creates the file holding exactly the block when none exists (base#2246)` | A new repo gets the rule without anyone writing it |
+| `_sync_gitattributes: a created file makes git check a script out with LF and a .bat with CRLF (base#2246)` | The created file must do what it says when git reads it |
+| `_sync_gitattributes: a repo's own rules still win after the block is added (base#2246)` | THE POINT OF THE PLACEMENT -- a repo's own binary / -text / eol rules must still decide the paths they name after the sync |
+| `_sync_gitattributes: the block is placed above the existing content (base#2246)` | The block goes ABOVE the repo's lines -- below them it would be the last match and override every one |
+| `_sync_gitattributes: the existing content follows the block byte for byte (base#2246)` | The repo's half is copied, not re-emitted -- the bytes after the block and its blank separator are the original file |
+| `_sync_gitattributes: an existing file with no final newline keeps exactly that (base#2246)` | A last line with no newline is content the sync must not repair or lose |
+| `_sync_gitattributes: an empty existing file ends up holding exactly the block (base#2246)` | An empty file has no content to separate the block from |
+| `_sync_gitattributes: a second run over its own output changes nothing (base#2246)` | Running the sync twice must not stack a second block |
+| `_sync_gitattributes: a file already opening with the canonical block is left byte-identical (base#2246)` | A repo that hand-wrote the same block ahead of the upgrade must see no diff when the upgrade arrives |
+| `_sync_gitattributes: an up-to-date file is not replaced (base#2246)` | An up-to-date file must not even be rewritten -- the staging step asks whether this run wrote it |
+| `_sync_gitattributes: a stale block is rewritten in place and the lines around it are kept (base#2246)` | The upgrade path -- a block an earlier release wrote is brought to the current text, and nothing outside it moves |
+| `_sync_gitattributes: a rewritten block still carries exactly one marker pair (base#2246)` | A rewrite must not leave a file the next run reads as malformed |
+| `_sync_gitattributes: a rewrite keeps the file's mode (base#2246)` | The file's mode is the repo's, not mktemp's 0600 |
+| `_sync_gitattributes: leaves no temporary file behind (base#2246)` | No temp file may be left beside the repo's own files |
+| `_sync_gitattributes: the first rule of a file opening with a BOM still wins after the block is added (base#2246)` | THE DEFECT -- the rule on the line right after the mark must still decide its path once the block is added |
+| `_sync_gitattributes: a BOM stays at the very start, the block follows it, the content follows the block (base#2246)` | The mark stays the file's first three bytes, once, and everything the repo wrote follows the block untouched |
+| `_sync_gitattributes: a second run over a BOM file changes nothing (base#2246)` | The sync's own output for such a file opens with the mark and then the begin marker; a second run must read that as its block, not as a lone end |
+| `_sync_gitattributes: a stale block right behind a BOM is rewritten and the BOM is kept once (base#2246)` | The upgrade path for a BOM file -- a stale block right behind the mark is rewritten, with the mark kept once and the repo's rules still deciding |
+| `_sync_gitattributes: a BOM file with lines above a stale block keeps one BOM and those lines (base#2246)` | With the repo's own lines between the mark and a stale block, the mark must be neither dropped nor written a second time |
+| `_sync_gitattributes: a file holding only a BOM ends up as the BOM and the block (base#2246)` | A file that is nothing but the mark has no content to separate from the block |
+| `_sync_gitattributes: a lone begin marker behind a BOM is refused, file unchanged (base#2246)` | A malformed block is refused behind a mark exactly as without one, and the extra working file the mark needs must not be left behind |
+| `_sync_gitattributes: a begin marker with no end marker is refused, file unchanged (base#2246)` | A begin marker with no end gives no place to stop; guessing deletes somebody's rule |
+| `_sync_gitattributes: an end marker with no begin marker is refused, file unchanged (base#2246)` | An end marker with no begin is the same corruption from the other side |
+| `_sync_gitattributes: a repeated marker pair is refused, file unchanged (base#2246)` | Two blocks leave no single one to rewrite |
+| `_sync_gitattributes: an end marker above the begin marker is refused, file unchanged (base#2246)` | An end marker ABOVE the begin marker delimits nothing |
+| `_sync_gitattributes: a draft that cannot be fully written is abandoned, file unchanged (base#2246)` | A writer that fails partway leaves a truncated draft; installing it would replace the repo's file with a shorter one |
+| `_sync_gitattributes: a temp file that cannot be created is refused, file unchanged (base#2246)` | With no temp file there is nowhere to compose the rewrite; the sync must say so and leave the repo's file alone |
+| `_sync_gitattributes: a rewrite that cannot take the file's mode is abandoned, file unchanged (base#2246)` | A rewrite that cannot take the file's mode would land a 0600 file over the repo's own; abandoning it is the only safe answer |
+| `gitattributes: the events the sync can raise are registered (base#2246)` | _log_* is strict -- an unregistered event prints the registry's refusal instead of the message that says what is wrong with the file |
+
 ### test/bats/unit/gitignore_spec.bats (55)
 
 Unit tests for `template/script/docker/lib/gitignore.sh` — the canonical
@@ -4457,7 +4513,7 @@ the source INI where it was, writes no target, and says so
 | `init.sh --list-installed-paths output is sorted and free of duplicates` | - |
 | `init.sh --list-installed-paths mutates nothing and never leaves its cwd` | - |
 
-### test/bats/unit/init_spec.bats (108)
+### test/bats/unit/init_spec.bats (110)
 
 Unit coverage for `init.sh` helpers that previous rounds exercised only
 through the Level-1 integration test. Complements
@@ -4534,6 +4590,8 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `the resync: leaves a .gitignore it did not write unstaged (#1036)` | the sync writes nothing when the file already carries every canonical entry, so on the ordinary upgrade .gitignore holds only the repo's own rules and staging it commits a rule the user had not finished |
 | `the resync: leaves a .dockerignore it did not write unstaged (#1036)` | the sibling half of the same list -- .dockerignore is synced by the same mechanism, from the same canonical set, and carries the same hand-maintained build-context region the sync never touches |
 | `the resync: stages the ignore files it wrote this run (#1036)` | the half that must not regress -- the run that actually creates the ignore files wrote them, and leaving THOSE out of the commit is the tree/commit disagreement the staging step exists to close |
+| `the resync: stages the .gitattributes it wrote this run (base#2246)` | .gitattributes is the third file of the same shape -- the run that creates the line-ending block wrote it, and it must land in the commit |
+| `the resync: leaves a .gitattributes it did not write unstaged (base#2246)` | once the block is current the sync writes nothing, so what the file holds below it is the repo's own unfinished rule and must stay unstaged |
 | `the resync: stages a .gitignore whose one change is its final newline (#1036)` | the ignore-file half of the same sentinel -- the [logging] block sync re-emits the file line by line, so restoring a final newline a hand edit dropped is a real pass whose ONLY change a substitution would eat |
 | `_stage_resync_output: a dot-dot path out of the repo loses only itself (#1036)` | `git add` refuses the WHOLE batch on a path outside the repo, and a path spelled out of the repo through the repo root with a `..` segment walks straight past a prefix test -- the one input shape the fence against that failure was not written for |
 | `_stage_resync_output: drops a gitignored path git would quote (#1036)` | the ignored-path filter matches check-ignore's answer back against the strings it fed in, and under the default core.quotePath git C-quotes any path carrying a byte over 0x7F -- so the answer never equals the question, the ignored path survives the filter, and `git add` reports a failure over a batch it did stage |
