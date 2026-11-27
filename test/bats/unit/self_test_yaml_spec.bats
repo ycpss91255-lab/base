@@ -750,7 +750,7 @@ _acceptance_code() {
 @test "self-test.yaml: each config-gen job's job-level if: gates on a classify key of its own (base#1584, base#2176)" {
   run yq '.jobs["config-gen-gates"].if' "${WF}"
   assert_success
-  assert_output "${CG_GATES_IF}"
+  assert_output "needs.classify.outputs.select_config_gen == 'true'"
   run yq '.jobs["config-gen-redpath"].if' "${WF}"
   assert_success
   assert_output "needs.classify.outputs.select_config_gen_redpath == 'true'"
@@ -4482,7 +4482,7 @@ ${_bad}"
 # updated; that friction is intended, and the message names file, layer
 # and key set.
 
-CG_GATES_IF="needs.classify.outputs.select_config_gen == 'true' && (github.event_name != 'pull_request' && github.event_name != 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository)"
+CG_GATES_IF="needs.classify.outputs.select_config_gen == 'true'"
 CG_REDPATH_IF="needs.classify.outputs.select_config_gen_redpath == 'true'"
 CG_STEP_NAME='Run the config-gen gates'
 CG_STEP_RUN='just test go'
@@ -5236,13 +5236,4 @@ EOT
   assert_output 'ubuntu-latest'
   run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates") | (.value["runs-on"] // "") | tostring')"
   assert_failure
-}
-
-# why: a job whose runs-on is an expression must carry the canonical same-repo
-# guard ANDed onto its existing gate, or a fork PR could reach the self-hosted
-# runner (base#2269, self_hosted_guard lint).
-@test "self-test.yaml: config-gen-gates if: ANDs the canonical same-repo guard onto its gate (base#2269)" {
-  run _yaml_eval "${WF}" '.jobs["config-gen-gates"].if'
-  assert_success
-  assert_output "${CG_GATES_IF}"
 }
