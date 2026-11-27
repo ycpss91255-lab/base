@@ -250,6 +250,27 @@ _image_result() {
   [ "$(wc -l < "${CORPUS}/s93_rules_paths.txt")" -eq 6 ]
 }
 
+# why: the inputs must be the issue's own, or the goldens pin other cases
+# (base#2079): trailing slash, root, the empty path and an empty segment.
+@test "s93: the rules_paths corpus holds the issue's six paths" {
+  local _want
+  _want=$'/home/u/docker_foo\n/home/u/foo_ws\n/home/u/foo/\n/\n\n/a//b/\n'
+  [[ -f "${CORPUS}/s93_rules_paths.txt" ]] || { echo "missing corpus: s93_rules_paths"; return 1; }
+  [ "$(cat -- "${CORPUS}/s93_rules_paths.txt"; echo x)" = "${_want}x" ]
+}
+
+# why: the image rules must be the issue's own (a space, @default, suffix),
+# or the goldens pin other cases (base#2079).
+@test "s93: the image corpus holds the issue's six rules" {
+  local _n _want _wants=('@basename' 'string:Foo Bar' 'prefix:docker_' \
+    '@default:A..B' 'suffix:_ws' 'string:---')
+  for _n in 1 2 3 4 5 6; do
+    _want=$'[[image.rules]]\nrule = "'"${_wants[$((_n - 1))]}"$'"\n'
+    [[ -f "${CORPUS}/s93_image_${_n}.toml" ]] || { echo "missing corpus: s93_image_${_n}"; return 1; }
+    [ "$(cat -- "${CORPUS}/s93_image_${_n}.toml"; echo x)" = "${_want}x" ] || { echo "wrong corpus: s93_image_${_n}"; return 1; }
+  done
+}
+
 # why: detect_image_name applies [image] rules then sanitizes the name.
 @test "s93: detect_image_name result matches every golden" {
   local _n _stem _bad=0
