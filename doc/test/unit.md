@@ -7166,7 +7166,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/select_runner_spec.bats (12)
+### test/bats/unit/select_runner_spec.bats (19)
 
 A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
 `false` silently moves every run to the hosted pool. Each row of the issue's
@@ -7186,6 +7186,13 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: an unlisted event is not trusted (base#2265)` | An event nobody listed (issue_comment) can carry attacker text, so the default is false (base#2265). |
 | `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
 | `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=cpu selects the cpu fleet (base#2266)` | The switch on with a trusted event is the only way to reach the CPU fleet (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED unset selects ubuntu-latest (base#2266)` | An unset switch is the rollback path, so a trusted event stays on hosted (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)` | Only the value cpu opens the fleet; gpu has no fleet here, so it falls back (base#2266). |
+| `select_runner.sh: a fork pull_request with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A fork must never get a self-hosted runner, even with the switch on (base#2266). |
+| `select_runner.sh: schedule with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | An unlisted event is untrusted, so the switch cannot lift it onto self-hosted (base#2266). |
+| `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
+| `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
 
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
