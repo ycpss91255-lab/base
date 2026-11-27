@@ -2487,6 +2487,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Version tags are vX.Y.Z or vX.Y.Z-rcN; any other name stops here.
+      - name: Check the tag name
+        env:
+          REF: ${{ github.ref_name }}
+        run: script/release/tag_format.sh "${REF}"
+
       # base#1143 / base#1712: the same guard release-worker.yaml runs before
       # its Release. needs: above proves the commit is green, which a PR head
       # that was never merged also is; this asks whether it is on main. The

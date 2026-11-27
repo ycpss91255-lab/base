@@ -594,6 +594,20 @@ The release steps:
    when `ci-rollup` and both of them succeeded.
 3. Tag that commit and push the tag.
 
+**Tag names.** A version tag is `vX.Y.Z` or `vX.Y.Z-rcN`: no leading zeros,
+and `N` starts at 1 (`v0.43.0`, `v0.43.0-rc9`). The release notes, the RC
+lookup and the downstream upgrade read tags in that shape. Check a name
+before you push it:
+
+```bash
+script/release/tag_format.sh v0.43.0-rc9    # exit 0; any other shape exits 1
+```
+
+The `release` job runs the same script before any other step, so a `v*` tag
+with another name (`v1.0`, `v1.2.3-rc.1`) fails the job and publishes
+nothing. A tag that does not start with `v` does not start the release at
+all. The `v*` ruleset does not check the name.
+
 Once the `v*` tag ruleset requires `release-checks` as well as `ci-rollup`,
 GitHub refuses a tag on a commit without it, rc tags included. A pull
 request, a merge group and a push to `main` never produce a check of that name,
