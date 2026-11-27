@@ -4105,6 +4105,31 @@ itself (`git check-attr`) which rule wins.
 | `_sync_gitattributes: a rewrite that cannot take the file's mode is abandoned, file unchanged (base#2246)` | A rewrite that cannot take the file's mode would land a 0600 file over the repo's own; abandoning it is the only safe answer |
 | `gitattributes: the events the sync can raise are registered (base#2246)` | _log_* is strict -- an unregistered event prints the registry's refusal instead of the message that says what is wrong with the file |
 
+### test/bats/unit/githooks_spec.bats (13)
+
+Unit tests for the local git hooks (`.githooks/pre-push`) and their
+installer (`script/githooks/install.sh`). The pre-push hook is the first,
+local gate for the workflow run-name rule and must run the same driver CI
+runs; CI stays the real gate. The installer is the one command that turns
+the hooks on for a checkout, sets only this repo's config, and refuses to
+silently disable hooks that are already in use.
+
+| Test | Description |
+|------|-------------|
+| `pre-push: blocks when a workflow lacks a dynamic run-name` | The hook blocks a push when a workflow has no dynamic run-name |
+| `pre-push: blocks when a workflow has no run-name` | The hook blocks a workflow with no run-name at all |
+| `pre-push: allows the push when every workflow has a dynamic run-name` | The hook lets a push through when every workflow passes |
+| `pre-push: blocks a pushed commit that is bad even when the working tree is fixed` | The hook checks the commit being pushed, not the working tree: a fix that is only in the working tree does not reach the remote |
+| `pre-push: allows a pushed commit that is good even when the working tree is broken` | An unstaged mistake in the working tree is not what is pushed, so it does not block a good commit |
+| `pre-push: a branch deletion is not checked` | Deleting a remote branch pushes no commit, so there is nothing to check |
+| `pre-push: is tracked as an executable file` | The hook must be executable in the index, or git skips it on Linux and macOS checkouts |
+| `install: sets core.hooksPath to .githooks in the local config` | One command turns the hooks on, in this repo's own config only |
+| `install: is idempotent` | Running the installer twice is harmless |
+| `install: refuses to replace another core.hooksPath` | A hooks path already set elsewhere is not overwritten, so hooks the contributor already relies on keep running |
+| `install: refuses when .git/hooks has an active hook, --force overrides` | Setting core.hooksPath stops .git/hooks from running, so an active hook there is a refusal unless --force says it may stop |
+| `install --check: fails before install and passes after` | The verify step says whether the hooks are active, by exit status |
+| `install: a different fresh repo stays without core.hooksPath` | Other repos, such as the ones the suite creates, never get the hooks |
+
 ### test/bats/unit/gitignore_spec.bats (55)
 
 Unit tests for `template/script/docker/lib/gitignore.sh` — the canonical
@@ -11010,6 +11035,32 @@ before reading an empty result as a clean one.
 | `workflows: no concurrency group cancels a run whose verdict is the record (#1014)` | Cancellation is only free where the cancelled run's verdict no longer matters. On a PR branch a superseded push replaces it; on a main push or a tag the run IS the record, and on the publish path a cancelled `imagetools create` is how a rolling tag loses an arch. So a group may cancel a pull_request and nothing else -- and an `if: always()` aggregator turns whatever it cancels into a red required check. |
 | `workflows: every job that runs steps bounds them (#1014)` | A hung buildx burns GitHub's six-hour default before anyone sees it. The population is every workflow file, not the reusable workers alone: the workers were bounded first because a worker spends the CALLER's minutes, but the jobs that actually run a build here are self-test's eight-shard coverage matrix and its two-arch `acceptance` matrix, both self-hosted-eligible and both unbounded -- so the hazard the rule names lived entirely outside the set the rule scanned. The bound is per job rather than per workflow because that is the only place GitHub accepts one, and the roster is derived from the directory so the ninth workflow cannot land unbounded. |
 | `workflows: every workflow a trigger can start declares its own default permission (#1116)` | The posture is correct and nothing in the tree says so. Both the repo and the org report `default_workflow_permissions: read`, so the fourteen jobs of base's own CI workflow that declare no block of their own are read-only -- held entirely by a checkbox on a settings page, which no diff, no review and no spec can see. Flip it and those jobs get write on contents, packages, actions, issues and pull-requests, on a workflow that checks out fourteen times with a persisted token and then runs the whole suite and scaffolds a repo. The caller-token question is a different one, asked of the reusable workers in reusable_worker_permissions_spec.bats over exactly the complement of this population; this is the repository default, so it is asked here, of the workflows a trigger can start. Five of the six already declare one, so the exception was a house convention nothing enforced. |
+
+### test/bats/unit/workflow_run_name_lint_spec.bats (14)
+
+Unit tests for `script/test/drivers/workflow_run_name.sh`
+(`_run_workflow_run_name`), the "every workflow has a dynamic run-name"
+lint. Without a run-name every run in the Actions list shows only the
+workflow name, so a run cannot be traced to its PR, push or tag. Each case
+plants a small `.github/workflows/` tree and checks which shapes pass and
+which fail, including the ways the lint could pass having checked nothing.
+
+| Test | Description |
+|------|-------------|
+| `_run_workflow_run_name: a one-line dynamic run-name passes` | The shape every workflow here uses passes |
+| `_run_workflow_run_name: a workflow without run-name fails and is named` | A missing run-name fails and names the file; an expression in another top-level key does not count |
+| `_run_workflow_run_name: a static run-name fails` | Static text is the default title spelled out, so it fails |
+| `_run_workflow_run_name: a dynamic run-name without merge_group.head_ref fails` | A merge queue run is traced to its PR only through merge_group.head_ref, so an expression without it fails |
+| `_run_workflow_run_name: a folded dynamic run-name passes` | A folded block scalar is read across its lines |
+| `_run_workflow_run_name: a folded static run-name fails` | A folded block with static lines only fails |
+| `_run_workflow_run_name: a commented-out run-name fails` | A commented-out run-name is not a run-name |
+| `_run_workflow_run_name: an indented run-name does not count` | Only the top-level key names the run; an indented one does not |
+| `_run_workflow_run_name: a .yml workflow is checked` | GitHub also loads .yml files, so they are checked too |
+| `_run_workflow_run_name: zero workflow files fails` | An empty or missing workflow directory must fail, not pass having checked nothing |
+| `workflow-run-name: is a member of the lint phase's tool table` | A lint nobody runs is a comment |
+| `workflow-run-name: has a lint-static CI join` | Exactly one lint-static group runs it: none gates nothing and two pay twice |
+| `workflow-run-name: its failure event id is registered` | An unregistered event id is an anonymous exit |
+| `workflow-run-name: the dispatcher has a case arm for it` | The driver must be dispatchable by the name the table carries |
 
 ### test/bats/unit/workflow_unchecked_producer_spec.bats (6)
 

@@ -1,0 +1,23 @@
+# Tracked git hooks (just). Invoked as `just githooks <recipe>` via base's
+# own root `justfile`, which `mod?`s this file as the `githooks` namespace.
+# The hooks live in .githooks/; CI runs the same checks and stays the gate.
+
+# Recipes run from the repo root. `../..` is relative to this file.
+set working-directory := '../..'
+
+# "$@" in a recipe forwards its arguments verbatim.
+set positional-arguments := true
+
+# just githooks -> list the recipes
+default:
+    @just --list githooks
+
+# just githooks install -> point this repo's core.hooksPath at .githooks
+# (local config only). Pass --force to accept that active hooks in
+# .git/hooks stop running.
+install *args:
+    ./script/githooks/install.sh "$@"
+
+# just githooks check -> exit 0 when the tracked hooks are active
+check:
+    ./script/githooks/install.sh --check

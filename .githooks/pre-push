@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# pre-push - the body is script/githooks/pre-push.sh, where shellcheck sees it.
+exec bash "$(dirname -- "${BASH_SOURCE[0]:-$0}")/../script/githooks/pre-push.sh" "$@"
