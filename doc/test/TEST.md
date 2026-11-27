@@ -576,6 +576,10 @@ with another name (`v1.0`, `v1.2.3-rc.1`) fails the job and publishes
 nothing. A tag that does not start with `v` does not start the release at
 all. The `v*` ruleset does not check the name.
 
+The `pre-push` hook (`just githooks install`) runs the same script on every
+`refs/tags/*` ref being pushed, so a badly named tag is refused before it
+reaches GitHub. Deleting a tag is not checked.
+
 Once the `v*` tag ruleset requires `release-checks` as well as `ci-rollup`,
 GitHub refuses a tag on a commit without it, rc tags included. A pull
 request, a merge group and a push to `main` never produce a check of that name,
