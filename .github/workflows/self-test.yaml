@@ -1872,14 +1872,14 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: ${{ needs.classify.outputs.runs_on_cpu }}
             hardware: amd64
             arch: amd64
           - platform: linux/arm64
-            runner: ubuntu-24.04-arm
+            runner: '["ubuntu-24.04-arm"]'
             hardware: arm64
             arch: arm64
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ fromJSON(matrix.runner) }}
     # The heaviest job here: it scaffolds a consumer repo and builds its
     # image stages, once per arch, on a runner that may be self-hosted.
     timeout-minutes: 120

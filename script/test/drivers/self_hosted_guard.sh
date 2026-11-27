@@ -344,7 +344,7 @@ _shg_split_flow() {
 # they are defined.
 _shg_eligibility_reason() {
   local -a _labels=()
-  local _label _value _key
+  local _label _value _key _item
 
   if [[ "${_SHG_GROUP}" -eq 1 ]]; then
     printf 'runs-on names a runner group\n'
@@ -373,6 +373,27 @@ _shg_eligibility_reason() {
       # base#2286: select_runner.sh hands the cpu fleet only to a trusted
       # event and ubuntu-latest otherwise, so a fork PR stays hosted.
       return 0
+    elif [[ "${_SHG_RUNSON}" =~ ^\$\{\{[[:space:]]*fromJSON\(matrix\.([A-Za-z0-9_]+)\)[[:space:]]*\}\}$ ]]; then
+      # base#2270: the matrix value is a JSON label list. The classify
+      # expression is the guarded cpu fleet; every other value must be a
+      # list of hosted labels.
+      _key="${BASH_REMATCH[1]}"
+      if [[ "${_SHG_MATRIX_DYN}" -eq 1 || -z "${_SHG_MATRIX["${_key}"]:-}" ]]; then
+        printf 'runs-on reads fromJSON(matrix.%s) and its value is not knowable here\n' "${_key}"
+        return 0
+      fi
+      _value="${_SHG_MATRIX["${_key}"]}"
+      _value="${_value//\$\{\{ needs.classify.outputs.runs_on_cpu \}\}/}"
+      for _item in ${_value}; do
+        if [[ "${_item}" != \[*\] ]]; then
+          printf "runs-on reads fromJSON(matrix.%s) with the value '%s', which is not a label list\n" \
+            "${_key}" "${_item}"
+          return 0
+        fi
+        while IFS= read -r _label; do
+          _labels+=("${_label}")
+        done < <(_shg_split_flow "${_item}")
+      done
     elif [[ "${_SHG_RUNSON}" == *"${_SHG_EXPR_OPEN}"* ]]; then
       printf "runs-on is the expression '%s', whose value is not knowable here\n" \
         "${_SHG_RUNSON}"
