@@ -7136,6 +7136,27 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
+### test/bats/unit/select_runner_spec.bats (12)
+
+A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
+`false` silently moves every run to the hosted pool. Each row of the issue's
+table is pinned so neither direction can drift (base#2265).
+
+| Test | Description |
+|------|-------------|
+| `select_runner.sh: push is trusted (base#2265)` | A tag push is a push too; answering false would move every release run to the hosted pool (base#2265). |
+| `select_runner.sh: workflow_dispatch is trusted (base#2265)` | Only someone with write access can dispatch, so the run is the owner's own code (base#2265). |
+| `select_runner.sh: a same-repository pull_request is trusted (base#2265)` | The head repository equals this one, so the code was pushed by someone with write access (base#2265). |
+| `select_runner.sh: a fork pull_request is not trusted (base#2265)` | A fork's code on a self-hosted runner is the exact hole this script closes (base#2265). |
+| `select_runner.sh: a pull_request with an empty head repository is not trusted (base#2265)` | An empty head repository proves nothing about who wrote the code, so it fails closed (base#2265). |
+| `select_runner.sh: a merge_group proven same-repository is trusted (base#2265)` | The only case that opens a self-hosted runner on a queue run (base#2265). |
+| `select_runner.sh: a merge_group proven not same-repository is not trusted (base#2265)` | A group holding a fork's pull request must stay on the hosted pool (base#2265). |
+| `select_runner.sh: a merge_group with no proof is not trusted (base#2265)` | A merge_group payload names no head repository, so no proof means false (base#2265). |
+| `select_runner.sh: schedule is not trusted (base#2265)` | A schedule is not in the listed events; the default answer is false (base#2265). |
+| `select_runner.sh: an unlisted event is not trusted (base#2265)` | An event nobody listed (issue_comment) can carry attacker text, so the default is false (base#2265). |
+| `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
+| `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
+
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
 | Test | Description |
