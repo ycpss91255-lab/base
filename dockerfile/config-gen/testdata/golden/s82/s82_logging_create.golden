@@ -1,0 +1,9 @@
+rc=0
+mode=644
+--- file
+# managed by template: [logging] local_path begin (do not remove)
+/log/a/
+/log/b/
+# managed by template: [logging] local_path end (do not remove)
+--- stdout
+--- stderr
