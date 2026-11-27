@@ -49,6 +49,7 @@ func valueJSON(v schema.Value) string {
 			parts = append(parts, quote(m.Key)+": "+valueJSON(m.Value))
 		}
 		return "{" + strings.Join(parts, ", ") + "}"
+	case schema.VScalar:
 	}
 	return quote(v.Scalar.Text)
 }
