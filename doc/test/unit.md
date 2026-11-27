@@ -2113,7 +2113,7 @@ holds the shell to that record. A golden is tab-separated lines:
 | `the s25 corpus holds its eight inputs` | a corpus input added or dropped without a golden changes what the Go reader is held to; the count makes that a visible edit. |
 | `every s25 input has a golden, and no golden is orphaned` | an input without a golden is compared against nothing, and a golden without an input is a record of nothing. |
 | `_ini_tokenize over every s25 input matches its golden byte for byte` | this is the record itself: the shell answer the Go reader must reproduce byte for byte. |
-| `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. |
+| `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. A colon in a section name is written `%3A` in the golden file name, because Windows cannot create a file whose name holds a colon. |
 
 ### test/bats/unit/conf_logging_spec.bats (12)
 
@@ -5756,6 +5756,35 @@ the outer run's value, which is the wrong mode's value.
 | `_pin_uncovered: a _pin_read failure is its failure, not masked by the pipe (base#1463)` | _pin_uncovered took `_pin_read \| awk`'s status, and pipefail is off, so a reader failure was masked by awk's 0. |
 | `_run_pin_coverage: pin-coverage is in test.sh's _LINT_TOOLS table` | Membership in that table is what gives the lint a CI job; without it the lint would gate only a local run |
 | `_run_pin_coverage: --pin-coverage-only runs it host-direct` | The host-direct entry point is how a bump proposal's author checks coverage without building the image |
+
+### test/bats/unit/portable_filename_lint_spec.bats (6)
+
+The guard that keeps every path in this tree creatable on Windows. The whole
+repository is carried into downstream repos as their `.base/` subtree, so
+one name Windows refuses makes each of those repos impossible to check out
+there. A golden named after its INI section, `stage:dev`, did exactly that:
+Linux and CI saw nothing, and a Windows checkout stopped at `error: invalid
+path`.
+
+A path is refused when any component holds one of the characters Windows
+reserves in a file name -- `<` `>` `:` `"` `|` `?` `*` and the backslash --
+or a control character, or ends in a dot or a space.
+
+The scan walks the mounted tree with `find` rather than asking git: the
+suite runs in a container that cannot always resolve the checkout's `.git`,
+and a check that passed wherever git was unreadable would pass in the place
+it runs most. The directories pruned from the walk are the derived ones
+`.gitignore` names that hold other trees or timestamped names; nothing
+tracked lives under them.
+
+| Test | Description |
+|------|-------------|
+| `a name holding any one character Windows reserves is reported` | each reserved character is its own way to break a checkout, and a rule that lost one of them would still pass on the other seven. |
+| `a file or directory name ending in a dot or a space is reported` | Windows drops a trailing dot or space when it creates a name, so the file git wrote is not the file git then looks for. |
+| `a name holding a control character is reported` | a control character in a name is refused by Windows as well, and a newline in one would otherwise split into two innocent-looking names. |
+| `names Windows accepts are not reported` | the control group -- dots and spaces inside a name, a leading dot and the percent-encoding that replaces a colon are all legal, and a rule that refused them would send people to rename files that work. |
+| `the tree walk reaches a planted name and skips the derived directories` | the walk is the half the pure rule cannot vouch for -- a planted name has to reach the rule, and the derived directories must not. |
+| `no path in this tree is one Windows cannot create (base#2226)` | this is the gate itself. The walk must have seen the tree -- this file among it -- or an empty answer would mean nothing was asked. |
 
 ### test/bats/unit/pr_template_spec.bats (2)
 

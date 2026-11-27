@@ -83,8 +83,10 @@ _tokens_of() {
 # slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below
 # are written out by hand from the corpus files, not derived by the code
 # under test; the goldens are the exact stdout bytes, one file per pair.
+# A colon in a section name is written `%3A` in the golden file name,
+# because Windows cannot create a file whose name holds a colon.
 @test "_dump_conf_section over every s25 input and section matches its golden byte for byte" {
-  local _pair _stem _sec _bad=""
+  local _pair _stem _sec _file_sec _bad=""
   local -a _pairs=(
     "s25_comments:image" "s25_comments:build"
     "s25_keys_before_header:image"
@@ -98,8 +100,9 @@ _tokens_of() {
   for _pair in "${_pairs[@]}"; do
     _stem="${_pair%%:*}"
     _sec="${_pair#*:}"
+    _file_sec="${_sec//:/%3A}"
     if ! cmp -s <(_dump_conf_section "${CORPUS}/${_stem}.ini" "${_sec}") \
-      "${GOLDEN}/${_stem}.dump.${_sec}.golden"; then
+      "${GOLDEN}/${_stem}.dump.${_file_sec}.golden"; then
       _bad+=" ${_stem}:${_sec}"
     fi
   done
