@@ -1837,13 +1837,14 @@ _sync_existing_gitignore() {
   # -- it does NOT renormalize files already committed with CRLF.
   _sync_gitattributes "${_attributes}"
 
-  [[ -f "${_gitignore}" ]]     && _git_after="$(cat -- "${_gitignore}" 2> /dev/null; printf x)"
+  [[ -f "${_gitignore}" ]] \
+    && _git_after="$(cat -- "${_gitignore}" 2> /dev/null; printf x)"
   [[ -f "${_dockerignore}" ]] \
     && _docker_after="$(cat -- "${_dockerignore}" 2> /dev/null; printf x)"
-  [[ "${_git_after}" == "${_git_before}" ]] \
-    || _init_record_write ".gitignore"
   [[ -f "${_attributes}" ]] \
     && _attr_after="$(cat -- "${_attributes}" 2> /dev/null; printf x)"
+  [[ "${_git_after}" == "${_git_before}" ]] \
+    || _init_record_write ".gitignore"
   [[ "${_docker_after}" == "${_docker_before}" ]] \
     || _init_record_write ".dockerignore"
   [[ "${_attr_after}" == "${_attr_before}" ]] \
