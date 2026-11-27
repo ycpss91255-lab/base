@@ -6525,7 +6525,7 @@ misread, so the name is refused before anything is published.
 | Test | Description |
 |------|-------------|
 | `tag_format.sh: vX.Y.Z and vX.Y.Z-rcN pass` | The accepted shapes. A check that refuses a real release tag would fail the release it exists to protect. |
-| `tag_format.sh: every other name is refused with the format printed` | Each name is one way a tag goes wrong: missing patch, no `v`, a dotted or zero RC number, a leading zero, a non-version name. |
+| `tag_format.sh: every other name is refused with the format printed` | Each name is one way a tag goes wrong: missing patch, no `v`, a dotted or zero RC number, a leading zero, a non-version name, stray whitespace. A value with a newline is refused as a whole, even when one of its lines is a valid tag. |
 | `tag_format.sh: a refs/tags/ ref is checked by its tag name` | The pre-push hook holds a full remote ref, the release job a bare tag name; both must get the same answer. |
 | `tag_format.sh: no tag or an empty tag is a usage error` | A missing name must not read as a valid one. |
 | `tag_format.sh: every published tag passes` | The format was chosen to fit every tag already published. If one failed, the rule would refuse a shape that already shipped. |
@@ -7646,7 +7646,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: the release body is assembled by a script that can refuse (#926)` | The extraction has to live somewhere a spec can drive it AND somewhere that can exit non-zero; inline in the workflow it was neither. This is what stops it drifting back into a `run:` block where a no-match is a silent success. |
 | `self-test.yaml: the release page carries the curated notes alone (#926)` | With both sources the larger drowns the smaller: the measured v0.42.0 body was 26,690 characters of which the curated part was five lines and the rest raw PR titles. The workflow input is the only place that choice is expressed, so it is the only place it can regress. |
 | `self-test.yaml: the release job verifies the tagged commit is on main before creating the Release (base#1712)` | The release job's needs: are test gates, which a green PR head also passes, so a v* tag pushed on a commit that is not on main would publish a Release. The base#1143 guard ran only in the reusable worker (release-worker.yaml); base's own tag path had none (base#1712). |
-| `self-test.yaml: the release job refuses a tag name outside vX.Y.Z / vX.Y.Z-rcN before publishing` | The release job runs on any tag push. Only a name check before the notes and the publish keeps a `v1.0` or `release-1` tag from shipping. |
+| `self-test.yaml: the release job refuses a tag name outside vX.Y.Z / vX.Y.Z-rcN before publishing` | The release job runs on every `v*` tag push and on a dispatch from any tag. Only a name check before the notes and the publish keeps a `v1.0` or `v1.2.3-rc.1` tag from shipping. |
 | `self-test.yaml: declares bats-fragile job (#677)` | - |
 | `self-test.yaml: bats-fragile is a single job (no shard matrix) (#677)` | - |
 | `self-test.yaml: bats-fragile invokes test.sh --bats-fragile (#677)` | - |

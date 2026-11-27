@@ -3846,8 +3846,9 @@ _lint_probe_fixture() {
     || fail "the verify step (${_verify}) runs after Create GitHub Release (${_publish})"
 }
 
-# why: The release job runs on any tag push. Only a name check before the
-# notes and the publish keeps a `v1.0` or `release-1` tag from shipping.
+# why: The release job runs on every `v*` tag push and on a dispatch from
+# any tag. Only a name check before the notes and the publish keeps a
+# `v1.0` or `v1.2.3-rc.1` tag from shipping.
 @test "self-test.yaml: the release job refuses a tag name outside vX.Y.Z / vX.Y.Z-rcN before publishing" {
   local _check _notes _publish _run _ref
   _check="$(yq '.jobs.release.steps | to_entries | .[] | select((.value.run // "") | test("script/release/tag_format\\.sh")) | .key' "${WF}" | head -n 1)"

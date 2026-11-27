@@ -570,9 +570,10 @@ before you push it:
 script/release/tag_format.sh v0.43.0-rc9    # exit 0; any other shape exits 1
 ```
 
-The `release` job runs the same script before any other step, so a tag with
-another name fails the job and publishes nothing. The `v*` ruleset does not
-check the name.
+The `release` job runs the same script before any other step, so a `v*` tag
+with another name (`v1.0`, `v1.2.3-rc.1`) fails the job and publishes
+nothing. A tag that does not start with `v` does not start the release at
+all. The `v*` ruleset does not check the name.
 
 Once the `v*` tag ruleset requires `release-checks` as well as `ci-rollup`,
 GitHub refuses a tag on a commit without it, rc tags included. A pull
