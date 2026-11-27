@@ -3862,9 +3862,11 @@ _lint_probe_fixture() {
   [[ "${_ref}" == '${{ github.ref_name }}' ]] \
     || fail "the check step's REF is '${_ref}', not the pushed tag's name"
   _run="$(LP_I="${_check}" yq '.jobs.release.steps[env(LP_I)].run' "${WF}")"
-  run env REF=v1.0 bash -euo pipefail -c "cd /source; ${_run}"
-  assert_failure
-  run env REF=v0.43.0-rc9 bash -euo pipefail -c "cd /source; ${_run}"
+  # Same shell flags GitHub uses for a `run:` step, from a file.
+  printf 'cd /source\n%s\n' "${_run}" > "${BATS_TEST_TMPDIR}/step.sh"
+  run env REF=v1.0 bash --noprofile --norc -eo pipefail "${BATS_TEST_TMPDIR}/step.sh"
+  assert_failure 1
+  run env REF=v0.43.0-rc9 bash --noprofile --norc -eo pipefail "${BATS_TEST_TMPDIR}/step.sh"
   assert_success
 }
 
