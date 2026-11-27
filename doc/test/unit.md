@@ -2004,7 +2004,7 @@ unreadable layer, and a directory where the layer should be.
 | `a directory in place of setup.toml is refused with its event id and path` | A directory where setup.toml should be is not an absent layer either. Measured before base#1400: apply logged conf_no_repo_conf ("using template defaults"), then conf_upsert_file_missing writing the workspace bind into it, and exited 0 with compose.yaml generated. It must be refused like any other layer that is there and cannot be read. |
 | `a FIFO in place of setup.toml is refused within a bound, with its event id and path` | A FIFO where setup.toml should be is there too, and unlike a directory it does not fail on open: open(2) on a FIFO blocks until a writer arrives, so an `-e` gate that hands it to the bridge hangs apply forever instead of refusing (review round 3 of base#1400). The bound makes the hang a failure instead of a wedged suite. |
 
-### test/bats/unit/conf_accessor_spec.bats (35)
+### test/bats/unit/conf_accessor_spec.bats (40)
 
 Unit tests for the `conf.sh` opaque accessor interface (#564 / #563):
 `_conf_load` loads a file into a named handle, `_conf_get` reads a value by
@@ -2060,8 +2060,13 @@ on hand-edited / malformed setup.conf:
 | `_conf_split_nskey: follows the registry, so a new sub-sectioned name needs no edit here (base#1185)` | base#1185 -- the set of sub-sectioned names must come from the registry, or base#1152 / base#1184 cannot add one |
 | `_conf_split_nskey: sourcing conf.sh alone carries the registry with it (base#1185)` | base#1185 -- conf.sh gains its first dependency on schema.sh, and it must declare that itself rather than trust the caller |
 | `_conf_split_nskey: refuses rather than guessing when the registry is gone (base#1185)` | base#1185 -- an unloaded registry must not read as "nothing is sub-sectioned", an answer worse than the literal it replaced |
+| `_conf_load_layers runs the bridge once for a chain loaded twice (base#2234)` | base#2234 -- the same layer chain loaded twice in one command runs the bridge once. Expected from the issue's acceptance 1: one `--merge --kv` for the two-layer chain however many times it is loaded, and both loads answer the same value. |
+| `_conf_load_layers re-runs the bridge when a layer changed in between (base#2234)` | base#2234 acceptance 2 -- the key carries the layer's content, so a layer edited between two loads is a miss. First load `wayland`, the upper layer rewritten to `x11`, second load `x11`, two bridge calls. |
+| `_conf_load_layers does not memo a failed merge (base#2234)` | base#2234 acceptance 3 -- a failed merge is not remembered. The stub exits 1 both times; each load returns 1 and logs conf_toml_merge_failed, and the bridge is called twice. |
+| `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
+| `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
 
-### test/bats/unit/conf_ini_golden_spec.bats (6)
+### test/bats/unit/conf_ini_golden_spec.bats (7)
 
 `_ini_tokenize` is the single shell INI tokenizer. The Go reader that
 replaces it (the later `ini tokens` slice) must match it byte for byte, so
@@ -2079,6 +2084,7 @@ holds the shell to that record. A golden is tab-separated lines:
 | `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. A colon in a section name is written `%3A` in the golden file name, because Windows cannot create a file whose name holds a colon. |
 | `_conf_load_layers over the base and over layers matches layers.base_over.golden` | `_conf_load_layers` over a two-layer INI chain is section-replace (base#2062, S25c): the upper layer owns section `a`, so `a\|y\|2` from the base layer must not survive. The expected bytes are in golden/s25/layers.base_over.golden; the absent third path adds nothing. |
 | `_conf_load_layers over every single s25 input matches its load golden` | `_conf_load_layers` over a single file is the tokenizer's sections with entries grouped by section; each single-file corpus input has its own <stem>.load.golden. |
+| `_setup_conf_merge_blockers over the s25 blockers trio matches blockers.golden` | `_setup_conf_merge_blockers` is the shell answer the later `ini blockers` slice must reproduce (base#2066, S25d). Over the s25_blockers_* trio the expected blockers are `a` (root differs from legacy and from the template) and `d` (only the root has it), in that order; `b` (legacy and root agree) and `c` (root equals the template) are not. The bytes are in golden/s25/blockers.golden. |
 
 ### test/bats/unit/conf_logging_spec.bats (12)
 
@@ -2466,7 +2472,7 @@ The planted copy is traced once per file and shared by every case.
 | `config_gen_readers: the run blocks are both config-gen jobs', each matrix value expanded (base#1584)` | cycle 30, review round 2. Each run block runs as the job runs it, so a `${{ matrix.<key> }}` is expanded once per value of the job's matrix: config-gen-redpath runs `just test go-redpath <n>/5` for shards 1..5 (its matrix, which self_test_yaml_spec holds to the shard table), and together the five shards run every redpath case. Both jobs' just-pin blocks are there too. |
 | `config_gen_readers: a run block with an expression it cannot evaluate is refused (base#1584)` | cycle 30, review round 2. An expression other than one matrix key is a value this script would have to guess, so the block is refused rather than run with the expression left in or dropped. |
 
-### test/bats/unit/config_gen_s32_golden_spec.bats (12)
+### test/bats/unit/config_gen_s32_golden_spec.bats (21)
 
 The Go converter that replaces `_migrate_ini_to_toml` must match the shell
 byte for byte. Each corpus/s32/<name>.ini is converted by the shell into a
@@ -2485,6 +2491,15 @@ missing or differs, so a golden can never drift from the shell.
 | `s32 a gap in numbered keys leaves an empty block (base#2082)` | A gap in the numbered keys leaves an empty block for the missing number; the golden pins the bytes. |
 | `s32 an emptied slot keeps an empty block (base#2082)` | A numbered key with an empty value still takes its slot as an empty block; the golden pins the bytes. |
 | `s32 numbered keys are ordered by numeric suffix (base#2082)` | Numbered keys are ordered by their numeric suffix, not by file order or string order; the golden pins the bytes. |
+| `s32 image rules become an array of tables (base#2087)` | The numbered-key family of image_rules converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 build args split into key and value tables (base#2087)` | The numbered-key family of build_args converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 a volume mount splits into source, target and mode (base#2087)` | The numbered-key family of volumes converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 cap_add and security_opt become arrays of tables (base#2087)` | The numbered-key family of security converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 network ports split into host and container (base#2087)` | The numbered-key family of network_ports converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 devices and cgroup rules become arrays of tables (base#2087)` | The numbered-key family of devices converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 a tmpfs entry becomes an array of tables (base#2087)` | The numbered-key family of tmpfs converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 an additional context splits into name and source (base#2087)` | The numbered-key family of contexts converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 environment numbered keys stay plain keys (base#2087)` | The numbered-key family of environment converts as the shell does; the golden pins the bytes and the single migrated event. |
 | `s32 a padded index is declined (base#2085)` | An index with leading zeros cannot be represented; the converter declines, keeps .setup.conf and logs one event id. |
 | `s32 a zero index is declined (base#2085)` | Index 0 cannot be represented; the converter declines. |
 | `s32 a duplicate index is declined (base#2085)` | The same index written twice is declined as a duplicate index. |
@@ -2564,7 +2579,7 @@ whole derivation runs inside the fixture. Unit level (ADR-00000018).
 | `config-gen: tables publishes nothing when the binary fails after a valid prefix (rc 4)` | the binary can write a valid prefix of its answer and then fail (rc 4). A shim that publishes whatever stdout carried would hand the caller a truncated table list as if it were complete. The outvar is cleared on entry (a stale value does not survive) and set only on rc 0; the refusal is the binary's own frame re-emitted. |
 | `config-gen: tables publishes the binary's table list on rc 0` | on rc 0 the outvar carries the binary's answer, byte for byte: the table list of the mounted file, `[a]` and `[b.c]` giving a, b and b.c (the binary's own output for that input, observed by running it on the file). The run gives the file on stdin as the caller's uid:gid and names it to the binary by the caller's text. |
 | `config-gen: tables runs the image CONFIG_GEN_IMAGE pins in the caller's shell` | the image resolves in the caller's shell, so the run names what resolve published there. With CONFIG_GEN_IMAGE pinned in the caller's shell, the run carries that literal and nothing is inspected; a resolve run in a subshell publishes nothing to the caller and the run would name an empty image. |
-| `config-gen: tables needs no host-visible path for the file (docker.sock caller, base#1937)` | setup also runs inside a container that talks to the host daemon through docker.sock (the ci-system service, init.sh, new-repo setup). There the caller's path (/source/dist/setup.toml) exists only inside that container, so a bind mount of it is resolved by the host daemon and refused: `invalid mount config for type "bind": bind source path does not exist` (observed on PR #2020's CI). The stand-in daemon here refuses every mount, bind or volume, with that message; it hands the container the caller's file only on stdin, as toml_bridge_parse does (`docker run -i ... < file`), through a pipe as docker's attach is. The answer must still be the table list. |
+| `config-gen: tables needs no host-visible path for the file (docker.sock caller, base#1937)` | setup also runs inside a container that talks to the host daemon through docker.sock (the ci-system service, init.sh, new-repo setup). There the caller's path (/source/dist/setup.toml) exists only inside that container, so a bind mount of it is resolved by the host daemon and refused: `invalid mount config for type "bind": bind source path does not exist` (observed on PR #2020's CI). The stand-in daemon here refuses every mount, bind or volume, with that message; it hands the container the caller's file only on stdin, as toml_bridge_parse does (`docker run -i ... < file`), through a pipe as docker's attach is. The answer must still be the table list. Like docker, the stand-in attaches stdin only when it was given `-i`; without it the binary reads an empty stdin and the list is empty, so a run that drops `-i` fails here. |
 | `config-gen: tables refuses a missing file with no_such_file and starts no container` | a name that does not exist is refused on the host by a stat alone (the host never opens the path), before any container starts: a `docker run` for it would bind-mount a src that is not there. The refusal is no_such_file naming the caller's text, and the outvar stays cleared. |
 | `config-gen: tables refuses a table list holding a NUL with config_gen_output_nul` | a quoted TOML key may hold U+0000. For `["a\u0000b"]` then `[c]` the binary exits 0 and writes `a`, NUL, `b`, newline, `c`, newline (observed by running it on that file). A bash variable cannot hold a NUL, so publishing would silently truncate the list to `a`. The shim refuses it as config_gen_output_nul and leaves the outvar cleared. |
 | `config-gen: tables refuses a docker failure with no frame as config_gen_run_failed` | when docker itself fails (rc 125/126/127) the binary never ran, so no frame names the refusal; a shim that only re-emits frames would return that status with no record of why. Such a run is refused as config_gen_run_failed carrying docker's status, docker's own message is forwarded once as config_gen_stray_stderr (it is the only account of the cause), the status is the answer, and the outvar stays cleared. |
@@ -2577,7 +2592,7 @@ whole derivation runs inside the fixture. Unit level (ADR-00000018).
 | `config-gen: tables publishes nothing when the binary writes a full list and exits 1` | the binary can also write its whole answer and then refuse (rc 1 with a frame). A shim that publishes stdout unless the status is 4 would hand the caller a list the binary disowned. Only rc 0 publishes; the refusal is the binary's frame re-emitted. |
 | `config-gen: tables re-emits the binary's parse refusal naming the caller's file` | a file the binary cannot parse -- a duplicate key, a syntax error, bytes that are not UTF-8 -- is refused by the binary itself with one conf_toml_parse_failed frame carrying the line and column it reports. The shim re-emits it naming the caller's text, never the in-container path /in/f, and the outvar stays cleared. |
 | `config-gen: tables keeps a tab in the file name intact in the refusal` | the caller's text reaches the binary as one argv word and comes back in the frame's file field; a tab in it must survive the round trip to the JSON log, not be split or dropped. |
-| `config-gen: tables refuses a directory or a FIFO as config_gen_input_not_regular` | a name that exists but is not a regular file -- a directory, a FIFO with no writer -- is refused on the host as config_gen_input_not_regular naming the caller's text, before any container starts: opening a FIFO with no writer for stdin would hold the run (the runner's timeout 10 turns a hang into rc 124). |
+| `config-gen: tables refuses a directory or a FIFO as config_gen_input_not_regular` | a name that exists but is not a regular file -- a directory, a FIFO with no writer -- is refused on the host as config_gen_input_not_regular naming the caller's text, before any container starts: opening a FIFO with no writer for stdin would hold the run (the runner's timeout turns a hang into rc 124). |
 | `config-gen: tables refuses an unreadable file as config_gen_input_unreadable` | a file the caller's uid cannot read is refused on the host as config_gen_input_unreadable naming the caller's text, before any container starts. A mode-000 file does not stop root, so the test skips when the suite runs as root. |
 | `config-gen: tables keeps the binary's own usage refusal and rc 2` | when the binary itself is called wrongly (here the run reaches it as `tables /in/f`, no --name), it exits 2 with one config_gen_usage_invalid frame; the shim keeps that status and re-emits the frame rather than folding it into run_failed. |
 | `config-gen: tables refuses with resolve's refusal and starts no container when the image cannot be provisioned` | the image resolves in the caller's shell before any run; when it cannot (the build fails, or the subtree cannot name the image) the shim answers 1 with resolve's own refusal and starts no container. |
@@ -4032,6 +4047,56 @@ could have said so: that workflow carried no spec at all.
 | `.gitattributes: the generated changelog index merges by union (#926)` | The original scope of the rule, kept rather than assumed: the index is derived and the layout lint re-derives it, so a union duplicate there is reported instead of shipped. |
 | `.gitattributes: CONVENTIONS.md is NOT union-merged (#926)` | The boundary the widened glob nearly crossed. A gitattributes `*` does not cross `/`, so `doc/changelog/*.md` would have covered hand-written prose -- where union merging keeps both copies of a rewritten paragraph in silence, and no gate in this repo reads that file outside its marker block. |
 
+### test/bats/unit/gitattributes_sync_spec.bats (34)
+
+Unit tests for `dist/script/docker/lib/gitattributes.sh`
+(`_canonical_gitattributes_block`, `_sync_gitattributes`, refs base#2246). A
+repo that vendors base had no line-ending rule, so a Windows clone on the
+default `core.autocrlf` checked scripts out with CRLF. The sync installs `*
+text=auto eol=lf` as a marker-delimited block at the TOP of
+`.gitattributes`: the last matching line decides an attribute there, so a
+block appended below a repo's own `binary` / `-text` / `eol=crlf` lines
+would override them. The cases pin each state the sync can meet -- no file,
+no marker, a current block, a stale block, a malformed block -- and ask git
+itself (`git check-attr`) which rule wins.
+
+| Test | Description |
+|------|-------------|
+| `_canonical_gitattributes_block: carries the LF rule for every text file (base#2246)` | The rule itself -- text is LF everywhere |
+| `_canonical_gitattributes_block: keeps *.bat and *.cmd CRLF on checkout (base#2246)` | The two script types a Windows shell needs with CRLF stay CRLF on checkout |
+| `_canonical_gitattributes_block: opens with the begin marker and closes with the end marker (base#2246)` | The sync finds its block by these two lines; a block that does not open and close with them cannot be rewritten later |
+| `_canonical_gitattributes_block: names each marker exactly once (base#2246)` | A marker repeated inside the block would make the sync's own output malformed on the next run |
+| `_canonical_gitattributes_block: base's own root .gitattributes opens with it byte for byte (base#2246)` | base ships this rule and must live under it -- the block at the top of base's own root file is the emitter's output, byte for byte |
+| `_sync_gitattributes: creates the file holding exactly the block when none exists (base#2246)` | A new repo gets the rule without anyone writing it |
+| `_sync_gitattributes: a created file makes git check a script out with LF and a .bat with CRLF (base#2246)` | The created file must do what it says when git reads it |
+| `_sync_gitattributes: a repo's own rules still win after the block is added (base#2246)` | THE POINT OF THE PLACEMENT -- a repo's own binary / -text / eol rules must still decide the paths they name after the sync |
+| `_sync_gitattributes: the block is placed above the existing content (base#2246)` | The block goes ABOVE the repo's lines -- below them it would be the last match and override every one |
+| `_sync_gitattributes: the existing content follows the block byte for byte (base#2246)` | The repo's half is copied, not re-emitted -- the bytes after the block and its blank separator are the original file |
+| `_sync_gitattributes: an existing file with no final newline keeps exactly that (base#2246)` | A last line with no newline is content the sync must not repair or lose |
+| `_sync_gitattributes: an empty existing file ends up holding exactly the block (base#2246)` | An empty file has no content to separate the block from |
+| `_sync_gitattributes: a second run over its own output changes nothing (base#2246)` | Running the sync twice must not stack a second block |
+| `_sync_gitattributes: a file already opening with the canonical block is left byte-identical (base#2246)` | A repo that hand-wrote the same block ahead of the upgrade must see no diff when the upgrade arrives |
+| `_sync_gitattributes: an up-to-date file is not replaced (base#2246)` | An up-to-date file must not even be rewritten -- the staging step asks whether this run wrote it |
+| `_sync_gitattributes: a stale block is rewritten in place and the lines around it are kept (base#2246)` | The upgrade path -- a block an earlier release wrote is brought to the current text, and nothing outside it moves |
+| `_sync_gitattributes: a rewritten block still carries exactly one marker pair (base#2246)` | A rewrite must not leave a file the next run reads as malformed |
+| `_sync_gitattributes: a rewrite keeps the file's mode (base#2246)` | The file's mode is the repo's, not mktemp's 0600 |
+| `_sync_gitattributes: leaves no temporary file behind (base#2246)` | No temp file may be left beside the repo's own files |
+| `_sync_gitattributes: the first rule of a file opening with a BOM still wins after the block is added (base#2246)` | THE DEFECT -- the rule on the line right after the mark must still decide its path once the block is added |
+| `_sync_gitattributes: a BOM stays at the very start, the block follows it, the content follows the block (base#2246)` | The mark stays the file's first three bytes, once, and everything the repo wrote follows the block untouched |
+| `_sync_gitattributes: a second run over a BOM file changes nothing (base#2246)` | The sync's own output for such a file opens with the mark and then the begin marker; a second run must read that as its block, not as a lone end |
+| `_sync_gitattributes: a stale block right behind a BOM is rewritten and the BOM is kept once (base#2246)` | The upgrade path for a BOM file -- a stale block right behind the mark is rewritten, with the mark kept once and the repo's rules still deciding |
+| `_sync_gitattributes: a BOM file with lines above a stale block keeps one BOM and those lines (base#2246)` | With the repo's own lines between the mark and a stale block, the mark must be neither dropped nor written a second time |
+| `_sync_gitattributes: a file holding only a BOM ends up as the BOM and the block (base#2246)` | A file that is nothing but the mark has no content to separate from the block |
+| `_sync_gitattributes: a lone begin marker behind a BOM is refused, file unchanged (base#2246)` | A malformed block is refused behind a mark exactly as without one, and the extra working file the mark needs must not be left behind |
+| `_sync_gitattributes: a begin marker with no end marker is refused, file unchanged (base#2246)` | A begin marker with no end gives no place to stop; guessing deletes somebody's rule |
+| `_sync_gitattributes: an end marker with no begin marker is refused, file unchanged (base#2246)` | An end marker with no begin is the same corruption from the other side |
+| `_sync_gitattributes: a repeated marker pair is refused, file unchanged (base#2246)` | Two blocks leave no single one to rewrite |
+| `_sync_gitattributes: an end marker above the begin marker is refused, file unchanged (base#2246)` | An end marker ABOVE the begin marker delimits nothing |
+| `_sync_gitattributes: a draft that cannot be fully written is abandoned, file unchanged (base#2246)` | A writer that fails partway leaves a truncated draft; installing it would replace the repo's file with a shorter one |
+| `_sync_gitattributes: a temp file that cannot be created is refused, file unchanged (base#2246)` | With no temp file there is nowhere to compose the rewrite; the sync must say so and leave the repo's file alone |
+| `_sync_gitattributes: a rewrite that cannot take the file's mode is abandoned, file unchanged (base#2246)` | A rewrite that cannot take the file's mode would land a 0600 file over the repo's own; abandoning it is the only safe answer |
+| `gitattributes: the events the sync can raise are registered (base#2246)` | _log_* is strict -- an unregistered event prints the registry's refusal instead of the message that says what is wrong with the file |
+
 ### test/bats/unit/gitignore_spec.bats (55)
 
 Unit tests for `template/script/docker/lib/gitignore.sh` — the canonical
@@ -4448,7 +4513,7 @@ the source INI where it was, writes no target, and says so
 | `init.sh --list-installed-paths output is sorted and free of duplicates` | - |
 | `init.sh --list-installed-paths mutates nothing and never leaves its cwd` | - |
 
-### test/bats/unit/init_spec.bats (108)
+### test/bats/unit/init_spec.bats (110)
 
 Unit coverage for `init.sh` helpers that previous rounds exercised only
 through the Level-1 integration test. Complements
@@ -4525,6 +4590,8 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `the resync: leaves a .gitignore it did not write unstaged (#1036)` | the sync writes nothing when the file already carries every canonical entry, so on the ordinary upgrade .gitignore holds only the repo's own rules and staging it commits a rule the user had not finished |
 | `the resync: leaves a .dockerignore it did not write unstaged (#1036)` | the sibling half of the same list -- .dockerignore is synced by the same mechanism, from the same canonical set, and carries the same hand-maintained build-context region the sync never touches |
 | `the resync: stages the ignore files it wrote this run (#1036)` | the half that must not regress -- the run that actually creates the ignore files wrote them, and leaving THOSE out of the commit is the tree/commit disagreement the staging step exists to close |
+| `the resync: stages the .gitattributes it wrote this run (base#2246)` | .gitattributes is the third file of the same shape -- the run that creates the line-ending block wrote it, and it must land in the commit |
+| `the resync: leaves a .gitattributes it did not write unstaged (base#2246)` | once the block is current the sync writes nothing, so what the file holds below it is the repo's own unfinished rule and must stay unstaged |
 | `the resync: stages a .gitignore whose one change is its final newline (#1036)` | the ignore-file half of the same sentinel -- the [logging] block sync re-emits the file line by line, so restoring a final newline a hand edit dropped is a real pass whose ONLY change a substitution would eat |
 | `_stage_resync_output: a dot-dot path out of the repo loses only itself (#1036)` | `git add` refuses the WHOLE batch on a path outside the repo, and a path spelled out of the repo through the repo root with a `..` segment walks straight past a prefix test -- the one input shape the fence against that failure was not written for |
 | `_stage_resync_output: drops a gitignored path git would quote (#1036)` | the ignored-path filter matches check-ignore's answer back against the strings it fed in, and under the default core.quotePath git C-quotes any path carrying a byte over 0x7F -- so the answer never equals the question, the ignored path survives the filter, and `git add` reports a failure over a batch it did stage |
@@ -5356,7 +5423,7 @@ builds nothing and pushes nothing)
 | `multi-distro-build-worker.yaml: ci-passed job has explicit name: ci-passed (matches existing multi-distro rollup contract) (#325 B-1)` | - |
 | `multi-distro-build-worker.yaml: every job's grant is pinned as an exact set (#957)` | - |
 
-### test/bats/unit/mutation_probe_spec.bats (69)
+### test/bats/unit/mutation_probe_spec.bats (70)
 
 A green suite says every assertion ran. It does not say any of them would
 have noticed a wrong answer, and the v0.43 retrospective measured how far
@@ -5463,6 +5530,7 @@ Faking that comparison would test a control this repo does not ship.
 | `_mutation_probe: --filter runs the mutated pass under the witness filter (base#1571)` | a roster row's verdict rests on a few witness tests, yet its mutated pass ran every @test in the spec -- 65 for gomod_scan, 54 for config_gen_gates (base#1571). With --filter <regex> the probe hands the filter to the runner for the mutated pass, as a third argument after the root and the spec (the default runner turns it into test.sh --filter), so only the witnesses run, and a red among them is still reported PINNED. |
 | `_mutation_probe: a --filter mutant that stays green falls back to the whole spec (base#1571)` | a witness filter can be too narrow -- the pinned witnesses come from an older run, and a mutant the named witnesses miss can still be caught by another @test in the spec. A filtered green is therefore not a verdict: the probe falls back to the whole spec, so a row is never reported as surviving only because the filter left out the test that notices (base#1571). Here the filtered pass stays green and the whole-spec pass has a red, so the answer is PINNED, the red comes from the fallback run, and the last runner call had no filter. |
 | `_mutation_probe: a --filter fall-back whose whole-spec baseline is red is refused (base#1582)` | the fall-back judges the whole-spec run against a whole-spec baseline (base#1582). A spec already red outside the filter before any mutation is red the same way under it, so that red says nothing about the mutation: the probe refuses rather than report PINNED, and puts the subject back. Here the whole spec is red both mutated and clean. |
+| `_mutation_probe: a red whole-spec baseline is refused with what each red test printed (base#2225)` | a red whole-spec baseline is a fault of the suite in the probe's sandbox, and the names of the red tests do not say what went wrong in them. The refusal quotes what bats printed under each red test, so the reader can tell a failed assertion from a test that never finished without a second run. What a passing test printed is left out. |
 | `_mutation_probe: a --filter fall-back whose whole-spec baseline has no results is refused (base#1582)` | a whole-spec baseline that printed no test result is no baseline, so the fall-back has nothing to compare its whole-spec run against and refuses (base#1582). |
 | `_mutation_probe: a --filter fall-back whose whole-spec baseline did not finish is refused (base#1582)` | a whole-spec baseline that printed only greens and then exited non-zero did not finish, so its count is not a baseline and the fall-back refuses (base#1582). |
 
