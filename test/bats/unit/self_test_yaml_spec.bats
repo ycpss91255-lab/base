@@ -5195,3 +5195,33 @@ YAML
   assert_success
   assert_output --partial 'bash script/ci/single_issue_pr.sh'
 }
+
+# why: classify is where the runner choice is made once for the whole
+# workflow. It must run script/ci/select_runner.sh in a step `runner` and
+# publish its two lines as job outputs, so later children can read them
+# without re-deriving trust (base#2268, part of base#1586).
+@test "self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)" {
+  # Expected literals are the issue's: the step id, the two output
+  # expressions, and the five env names with the payload field each maps to.
+  run _yaml_eval "${WF}" '.jobs.classify.steps[] | select(.id == "runner") | .id'
+  assert_success
+  assert_output 'runner'
+  run _yaml_eval "${WF}" '.jobs.classify.outputs.runner_trusted'
+  assert_success
+  assert_output '${{ steps.runner.outputs.trusted }}'
+  run _yaml_eval "${WF}" '.jobs.classify.outputs.runs_on_cpu'
+  assert_success
+  assert_output '${{ steps.runner.outputs.runs_on }}'
+  run _yaml_eval "${WF}" '.jobs.classify.steps[] | select(.id == "runner") | .env | to_entries | .[] | .key + "=" + .value'
+  assert_success
+  assert_output - <<'EOT'
+EVENT_NAME=${{ github.event_name }}
+HEAD_REPO=${{ github.event.pull_request.head.repo.full_name }}
+REPO=${{ github.repository }}
+MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
+CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
+EOT
+  # This child only adds outputs: no job may take its runs-on from them yet.
+  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | (.value["runs-on"] // "") | tostring')"
+  assert_failure
+}
