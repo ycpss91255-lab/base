@@ -33,7 +33,9 @@ setup() {
 
 # Golden names with no corpus input: the case calls the function on a path
 # that does not exist, or reuses another case's input (s82_sync_mode).
-_S82_INPUTLESS=(s82_prune_absent s82_sync_absent s82_sync_mode)
+_S82_INPUTLESS=(s82_prune_absent s82_sync_absent s82_sync_mode
+  s82_pathspec_log s82_pathspec_coverage s82_pathspec_env
+  s82_pathspec_deploy s82_pathspec_empty)
 
 # _partition_violations -- print one line per corpus input with no golden
 # and per golden with neither an input nor a listed inputless name.
@@ -128,6 +130,22 @@ _run_sync_case() {
   _write_actual "${_name}" "${_rc}"
 }
 
+# _run_pathspec_case <name> <entry> -- run _canonical_entry_pathspec on
+# <entry> and write the actual golden to ${S}/actual/<name>.golden, same
+# format as _run_case. No target file is involved, so mode=absent and the
+# file section is empty (base#2083).
+_run_pathspec_case() {
+  local _name="${1}" _entry="${2}" _rc=0
+  rm -rf -- "${S}/w"
+  mkdir -p "${S}/w" "${S}/actual"
+  (
+    # shellcheck source=dist/script/docker/lib/gitignore.sh
+    source /source/dist/script/docker/lib/gitignore.sh
+    _canonical_entry_pathspec "${_entry}"
+  ) > "${S}/stdout" 2> "${S}/stderr" || _rc=$?
+  _write_actual "${_name}" "${_rc}"
+}
+
 # _assert_golden <name> -- the stored golden exists and equals the actual
 # one byte for byte. cmp, never $(...), which drops trailing LFs.
 _assert_golden() {
@@ -213,4 +231,35 @@ _assert_golden() {
 @test "s82 sync: an in-place append keeps the file mode" {
   _run_sync_case s82_sync_mode s82_sync_missing_one.gitignore 640
   _assert_golden s82_sync_mode
+}
+
+# why: a trailing slash marks a directory in a pattern and means nothing in
+# a pathspec, so it is dropped (base#2083).
+@test "s82 pathspec: a trailing slash is dropped from log/" {
+  _run_pathspec_case s82_pathspec_log "log/"
+  _assert_golden s82_pathspec_log
+}
+
+@test "s82 pathspec: a trailing slash is dropped from coverage/" {
+  _run_pathspec_case s82_pathspec_coverage "coverage/"
+  _assert_golden s82_pathspec_coverage
+}
+
+# why: an entry with no slash passes through unchanged (base#2083).
+@test "s82 pathspec: a plain file entry is unchanged" {
+  _run_pathspec_case s82_pathspec_env ".env"
+  _assert_golden s82_pathspec_env
+}
+
+# why: a leading slash anchors a pattern and has no settled pathspec
+# translation, so it is refused with rc 1 and no output (base#2083).
+@test "s82 pathspec: a leading slash is refused" {
+  _run_pathspec_case s82_pathspec_deploy "/deploy/"
+  _assert_golden s82_pathspec_deploy
+}
+
+# why: an empty entry names nothing, so it is refused with rc 1 (base#2083).
+@test "s82 pathspec: an empty entry is refused" {
+  _run_pathspec_case s82_pathspec_empty ""
+  _assert_golden s82_pathspec_empty
 }

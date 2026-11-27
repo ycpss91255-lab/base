@@ -38,6 +38,7 @@ apply_repo_conf_unsettled
 compose_relocated_root_unusable
 conf_write_shadowed
 conf_toml_merge_failed
+conf_memo_unwritable
 conf_toml_parse_failed
 config_components_provisioned
 config_components_absent

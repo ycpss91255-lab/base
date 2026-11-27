@@ -2004,7 +2004,7 @@ unreadable layer, and a directory where the layer should be.
 | `a directory in place of setup.toml is refused with its event id and path` | A directory where setup.toml should be is not an absent layer either. Measured before base#1400: apply logged conf_no_repo_conf ("using template defaults"), then conf_upsert_file_missing writing the workspace bind into it, and exited 0 with compose.yaml generated. It must be refused like any other layer that is there and cannot be read. |
 | `a FIFO in place of setup.toml is refused within a bound, with its event id and path` | A FIFO where setup.toml should be is there too, and unlike a directory it does not fail on open: open(2) on a FIFO blocks until a writer arrives, so an `-e` gate that hands it to the bridge hangs apply forever instead of refusing (review round 3 of base#1400). The bound makes the hang a failure instead of a wedged suite. |
 
-### test/bats/unit/conf_accessor_spec.bats (40)
+### test/bats/unit/conf_accessor_spec.bats (43)
 
 Unit tests for the `conf.sh` opaque accessor interface (#564 / #563):
 `_conf_load` loads a file into a named handle, `_conf_get` reads a value by
@@ -2065,6 +2065,9 @@ on hand-edited / malformed setup.conf:
 | `_conf_load_layers does not memo a failed merge (base#2234)` | base#2234 acceptance 3 -- a failed merge is not remembered. The stub exits 1 both times; each load returns 1 and logs conf_toml_merge_failed, and the bridge is called twice. |
 | `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
 | `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
+| `_conf_load_layers degrades to no memo and warns once when the memo dir is unwritable (base#2235)` | base#2235 acceptance 1-4 -- an unwritable memo directory degrades to no memo. Three loads of the same two-layer chain (the middle one inside $(...)): every load returns 0 and answers `wayland`, the bridge is called 3 times (nothing to hit), and conf_memo_unwritable is logged once for the whole command with path=<memo dir>. |
+| `_conf_load_layers still fails by name when the bridge fails and the memo dir is unwritable (base#2235)` | base#2235 acceptance 5 -- the degrade does not change failure semantics: with the same unwritable memo dir and the bridge exiting 1, the load still returns 1 and logs conf_toml_merge_failed. |
+| `_conf_load_layers does not log conf_memo_unwritable when the memo dir is writable (base#2235)` | base#2235 acceptance 6 -- a writable memo dir never logs the event. |
 
 ### test/bats/unit/conf_ini_golden_spec.bats (7)
 
@@ -7132,6 +7135,27 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [deploy] keys the resolver reads (#876)` | - |
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
+
+### test/bats/unit/select_runner_spec.bats (12)
+
+A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
+`false` silently moves every run to the hosted pool. Each row of the issue's
+table is pinned so neither direction can drift (base#2265).
+
+| Test | Description |
+|------|-------------|
+| `select_runner.sh: push is trusted (base#2265)` | A tag push is a push too; answering false would move every release run to the hosted pool (base#2265). |
+| `select_runner.sh: workflow_dispatch is trusted (base#2265)` | Only someone with write access can dispatch, so the run is the owner's own code (base#2265). |
+| `select_runner.sh: a same-repository pull_request is trusted (base#2265)` | The head repository equals this one, so the code was pushed by someone with write access (base#2265). |
+| `select_runner.sh: a fork pull_request is not trusted (base#2265)` | A fork's code on a self-hosted runner is the exact hole this script closes (base#2265). |
+| `select_runner.sh: a pull_request with an empty head repository is not trusted (base#2265)` | An empty head repository proves nothing about who wrote the code, so it fails closed (base#2265). |
+| `select_runner.sh: a merge_group proven same-repository is trusted (base#2265)` | The only case that opens a self-hosted runner on a queue run (base#2265). |
+| `select_runner.sh: a merge_group proven not same-repository is not trusted (base#2265)` | A group holding a fork's pull request must stay on the hosted pool (base#2265). |
+| `select_runner.sh: a merge_group with no proof is not trusted (base#2265)` | A merge_group payload names no head repository, so no proof means false (base#2265). |
+| `select_runner.sh: schedule is not trusted (base#2265)` | A schedule is not in the listed events; the default answer is false (base#2265). |
+| `select_runner.sh: an unlisted event is not trusted (base#2265)` | An event nobody listed (issue_comment) can carry attacker text, so the default is false (base#2265). |
+| `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
+| `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
 
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
