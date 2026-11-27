@@ -141,6 +141,7 @@ _check_case() {
   assert_output $'dockerfile_migrations_reported\t  Dockerfile migrations: 0 of 16 matched (none), 0 file(s) rewritten\tmatched=0\tavailable=16\tnames=none\trewritten=0'
 }
 
+# why: nothing is rewritten, so the dockerfile golden must be the fixture bytes.
 @test "s43 wcopy golden: dist dockerfile golden equals its fixture" {
   cmp -- "${CORPUS}/s43_wcopy_dist.Dockerfile" "${GOLDEN}/s43_wcopy_dist.dockerfile"
 }

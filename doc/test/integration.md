@@ -353,7 +353,7 @@ s43_wcopy_, not s43_migrate_ (that is the base#2055 partition).
 | `s43 wcopy golden: shape B goldens are byte-identical to shape A goldens` | shape B ends in the same state as shape A (issue item 2). |
 | `s43 wcopy golden: shape A files golden is the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
 | `s43 wcopy golden: dist files golden is 0 bytes and events literal` | the fixed point is a no-op: 0-byte .files, one report event, dockerfile == fixture. |
-| `s43 wcopy golden: dist dockerfile golden equals its fixture` | - |
+| `s43 wcopy golden: dist dockerfile golden equals its fixture` | nothing is rewritten, so the dockerfile golden must be the fixture bytes. |
 | `s43 wcopy golden: every fixture has exactly its three goldens and no extra` | each wcopy fixture has exactly the three goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (17)
