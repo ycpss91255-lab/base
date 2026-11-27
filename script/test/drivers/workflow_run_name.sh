@@ -13,12 +13,15 @@
 #   - Without one, the Actions list titles every run with the workflow name
 #     or the PR title, so runs of one PR or of the merge queue look alike.
 #   - Static text is refused for the same reason.
+#   - The expression must read github.event.merge_group.head_ref: a merge
+#     queue run is traced to its PR only through that ref.
 #   - Only a column-0 key counts; a commented or indented one does not.
 #   - Zero workflow files is a failure, not a pass.
 
 readonly _WORKFLOW_RUN_NAME_DIR_REL='.github/workflows'
 # shellcheck disable=SC2016 # literal expression delimiters, not expansions.
 readonly _WORKFLOW_RUN_NAME_OPEN='${{' _WORKFLOW_RUN_NAME_CLOSE='}}'
+readonly _WORKFLOW_RUN_NAME_QUEUE_REF='github.event.merge_group.head_ref'
 
 # Prints "RUNNAME<TAB><value>" for the top-level run-name, or nothing when
 # the key is absent. A block scalar (`>-`, `|`) is joined into one line.
@@ -51,6 +54,11 @@ _workflow_run_name_finding() {
   if [[ "${_value}" != *"${_WORKFLOW_RUN_NAME_OPEN}"*"${_WORKFLOW_RUN_NAME_CLOSE}"* ]]; then
     printf 'run-name has no %s %s expression: %s' \
       "${_WORKFLOW_RUN_NAME_OPEN}" "${_WORKFLOW_RUN_NAME_CLOSE}" "${_value:-<empty>}"
+    return 0
+  fi
+  if [[ "${_value}" != *"${_WORKFLOW_RUN_NAME_QUEUE_REF}"* ]]; then
+    printf 'run-name does not name %s, so a merge queue run hides its PR: %s' \
+      "${_WORKFLOW_RUN_NAME_QUEUE_REF}" "${_value}"
   fi
 }
 
@@ -80,7 +88,7 @@ _run_workflow_run_name() {
 
   if (( _bad > 0 )); then
     _die ci_workflow_run_name \
-      "${_bad} of ${#_files[@]} workflows lack a dynamic run-name. Add a top-level 'run-name:' with a \${{ }} expression naming the trigger (event, PR number and title, or ref and SHA), each part with a '||' fallback so it never renders empty."
+      "${_bad} of ${#_files[@]} workflows lack a dynamic run-name. Add a top-level 'run-name:' with a \${{ }} expression naming the trigger (event, PR number and title, merge queue ref ${_WORKFLOW_RUN_NAME_QUEUE_REF}, or ref and SHA), each part with a '||' fallback so it never renders empty."
     return 1
   fi
 

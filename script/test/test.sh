@@ -888,7 +888,8 @@ Options:
                           `* text=auto eol=lf` covers the checkout side)
   --workflow-run-name     With --lint: run only the workflow run-name lint
                           (every .github/workflows/ file sets a top-level
-                          run-name holding a ${{ }} expression)
+                          run-name holding a ${{ }} expression that
+                          reads github.event.merge_group.head_ref)
   --just-provenance       With --lint: run only the just provenance pin
                           lint (every site under dockerfile/,
                           .github/workflows/, dist/ or script/ that
