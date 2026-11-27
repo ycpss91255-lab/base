@@ -2486,7 +2486,7 @@ The planted copy is traced once per file and shared by every case.
 | `config_gen_readers: the run blocks are both config-gen jobs', each matrix value expanded (base#1584)` | cycle 30, review round 2. Each run block runs as the job runs it, so a `${{ matrix.<key> }}` is expanded once per value of the job's matrix: config-gen-redpath runs `just test go-redpath <n>/5` for shards 1..5 (its matrix, which self_test_yaml_spec holds to the shard table), and together the five shards run every redpath case. Both jobs' just-pin blocks are there too. |
 | `config_gen_readers: a run block with an expression it cannot evaluate is refused (base#1584)` | cycle 30, review round 2. An expression other than one matrix key is a value this script would have to guess, so the block is refused rather than run with the expression left in or dropped. |
 
-### test/bats/unit/config_gen_s32_golden_spec.bats (21)
+### test/bats/unit/config_gen_s32_golden_spec.bats (22)
 
 The Go converter that replaces `_migrate_ini_to_toml` must match the shell
 byte for byte. Each corpus/s32/<name>.ini is converted by the shell into a
@@ -2518,6 +2518,7 @@ missing or differs, so a golden can never drift from the shell.
 | `s32 a zero index is declined (base#2085)` | Index 0 cannot be represented; the converter declines. |
 | `s32 a duplicate index is declined (base#2085)` | The same index written twice is declined as a duplicate index. |
 | `s32 clearing an index after filling it is declined (base#2085)` | Filling then clearing the same index is declined as a duplicate index. |
+| `s32 .env.local quoting converts to quoted TOML strings (base#2088)` | .env.local quoting converts as the shell does: paired outer quotes are stripped, only the first = splits, surrounding blanks are trimmed, comments are skipped and every value is written as a quoted string; the golden pins the bytes and the single migrated event. |
 
 ### test/bats/unit/config_gen_s7_verdicts_spec.bats (2)
 
