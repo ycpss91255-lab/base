@@ -279,6 +279,8 @@ _guard_lines() {
   [[ "${output}" == *"0 self-hosted-eligible"* ]]
 }
 
+# why: base#2286. classify 的 runs_on_cpu 已由 select_runner.sh 依事件決定
+# runner，fork PR 仍落在 hosted，所以這個 runs-on 不需要再加 guard。
 @test "self-hosted guard: PASSES an unguarded runs-on from classify runs_on_cpu (base#2286)" {
   # select_runner.sh gives the cpu fleet only to a trusted event with
   # CI_SELF_HOSTED=cpu and ubuntu-latest otherwise (base#2265, base#2266),
@@ -298,6 +300,8 @@ _guard_lines() {
   [[ "${output}" == *"0 self-hosted-eligible"* ]]
 }
 
+# why: base#2286. 只有 runs_on_cpu 被認作已守衛；其他 classify 輸出仍須 guard，
+# 否則放寬會漏掉真正未守衛的 self-hosted runs-on。
 @test "self-hosted guard: FAILS an unguarded runs-on from any other classify output (base#2286)" {
   _workflow "wf.yaml" \
     'on:' \
