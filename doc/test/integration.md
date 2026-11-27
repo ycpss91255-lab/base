@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **372 tests**.
+Integration specs under `test/bats/integration/`: **379 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -330,7 +330,7 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 hash golden: a missing Dockerfile gives empty hash and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty result and rc 0. |
 | `s43 hash golden: every hash fixture has exactly one golden and no extra` | a hash fixture with no golden, or a golden with no fixture, must fail. |
 
-### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (10)
+### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (17)
 
 Before any Go code reads `docker info` or `dpkg-query` output, the shell's
 reading of it is pinned. Each corpus file under
@@ -353,6 +353,13 @@ golden with no corpus file.
 | `s93: the seven named env corpus files exist` | base#2075 (S93c) names seven display-variable corpus files; a missing one would silently shrink what is pinned. |
 | `s93: detect_gui and _is_ssh_x11 results match every golden` | detect_gui and _is_ssh_x11 read DISPLAY, WAYLAND_DISPLAY and SSH_CONNECTION; the shell result must match every golden byte for byte. |
 | `s93: the seven env goldens hold the issue's results` | the worked results come from the issue, not from the shell. |
+| `s93: the named image-rule corpus files exist` | base#2079 (S93d) names one rule-applier corpus file and six image rule files; a missing one would silently shrink what is pinned. |
+| `s93: the rule appliers match the rules_paths golden` | _rule_prefix / _rule_suffix / _rule_basename read the last non-empty path segment; the shell result must match the golden byte for byte. |
+| `s93: the rules_paths golden holds the issue's six results` | the worked results come from the issue, not from the shell. |
+| `s93: the rules_paths corpus holds the issue's six paths` | the inputs must be the issue's own, or the goldens pin other cases (base#2079): trailing slash, root, the empty path and an empty segment. |
+| `s93: the image corpus holds the issue's six rules` | the image rules must be the issue's own (a space, @default, suffix), or the goldens pin other cases (base#2079). |
+| `s93: detect_image_name result matches every golden` | detect_image_name applies [image] rules then sanitizes the name. |
+| `s93: the six image goldens hold the issue's names` | the worked names come from the issue, not from the shell. |
 | `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)
