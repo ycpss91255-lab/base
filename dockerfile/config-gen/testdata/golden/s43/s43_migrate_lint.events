@@ -1,0 +1,2 @@
+dockerfile_patched	  Dockerfile patched: .base/downstream/ -> .base/dist/ (#714)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (downstream_to_dist), 1 file(s) rewritten	matched=1	available=16	names=downstream_to_dist	rewritten=1

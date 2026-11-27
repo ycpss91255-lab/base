@@ -1559,7 +1559,7 @@ code, base#1562.
 | `_run_via_compose: the real ids are in the environment compose interpolates (#895)` | - |
 | `_fix_permissions: refuses a non-numeric id instead of handing it to chown (#895)` | - |
 
-### test/bats/unit/classify_testtools_spec.bats (34)
+### test/bats/unit/classify_testtools_spec.bats (39)
 
 `testtools_changed` tells every image-consuming job whether to rebuild the
 tooling image from source instead of pulling the rolling `:main`. On a pull
@@ -1610,6 +1610,11 @@ reads the output the step writes.
 | `chain: a tag push and workflow_dispatch run the release-only jobs, and only the tag releases (base#2176, base#2177)` | the tag is where the release-only jobs block, and a dispatch on a branch is how they are checked before the tag exists, with nothing published. |
 | `chain: a tag on which a release-only job fails or never runs publishes no release (base#2176, base#2177)` | the rollup excuses a job classify deselected, so `release` cannot rest on the rollup: it must need each release-only job itself. |
 | `chain: the gated jobs, the map's job list, classify's loop and the release-only jobs are one set, and each selected skip fails the rollup (base#1584, base#2177)` | cycle 4. One source for every gate: the map's names, the map's --jobs and classify's loop list are the same set, and with the release-only jobs the keys the gated jobs' `if:`s read. Each gated job reads exactly one select_* key, the one its `if:` names; config-gen-gates reads select_config_gen. The rollup must resolve each gated job to that same key: its skip fails while the key is `true` and passes once that key alone is `false`. The key comes from the job's `if:`, never from a rewrite of the job's name, so a rollup that guesses the key from the name fails here. |
+| `chain: a tag push or workflow_dispatch with every job green passes release-checks (base#2205)` | the tag ruleset requires the `release-checks` check, so it must go green on a release run in which every job, both release-only ones included, succeeded. |
+| `chain: release-checks fails on a release run when a release-only job or the rollup does not pass (base#2205)` | a release run whose release-only job failed, never ran, or whose rollup failed must leave `release-checks` red, so the tag is refused. |
+| `chain: a PR, a merge group and a push to main never carry the release-checks name (base#2205)` | GitHub counts a skipped check as passed, so the name must not exist on a run that skips the release-only jobs, in any state. |
+| `chain: a run that selects only one release-only job does not carry the release-checks name (base#2205)` | both release-only jobs must be selected, not one, for the run to be a release run. |
+| `self-test.yaml: release-gate runs always, needs the rollup and both release-only jobs, and reads their keys (base#2205)` | a skipped job is shown under its id or its unexpanded name, so neither may be the required name; and only `always()` keeps a failed need from skipping it on a release run. |
 
 ### test/bats/unit/code_lines_spec.bats (46)
 
@@ -2004,7 +2009,7 @@ unreadable layer, and a directory where the layer should be.
 | `a directory in place of setup.toml is refused with its event id and path` | A directory where setup.toml should be is not an absent layer either. Measured before base#1400: apply logged conf_no_repo_conf ("using template defaults"), then conf_upsert_file_missing writing the workspace bind into it, and exited 0 with compose.yaml generated. It must be refused like any other layer that is there and cannot be read. |
 | `a FIFO in place of setup.toml is refused within a bound, with its event id and path` | A FIFO where setup.toml should be is there too, and unlike a directory it does not fail on open: open(2) on a FIFO blocks until a writer arrives, so an `-e` gate that hands it to the bridge hangs apply forever instead of refusing (review round 3 of base#1400). The bound makes the hang a failure instead of a wedged suite. |
 
-### test/bats/unit/conf_accessor_spec.bats (40)
+### test/bats/unit/conf_accessor_spec.bats (43)
 
 Unit tests for the `conf.sh` opaque accessor interface (#564 / #563):
 `_conf_load` loads a file into a named handle, `_conf_get` reads a value by
@@ -2065,6 +2070,9 @@ on hand-edited / malformed setup.conf:
 | `_conf_load_layers does not memo a failed merge (base#2234)` | base#2234 acceptance 3 -- a failed merge is not remembered. The stub exits 1 both times; each load returns 1 and logs conf_toml_merge_failed, and the bridge is called twice. |
 | `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
 | `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
+| `_conf_load_layers degrades to no memo and warns once when the memo dir is unwritable (base#2235)` | base#2235 acceptance 1-4 -- an unwritable memo directory degrades to no memo. Three loads of the same two-layer chain (the middle one inside $(...)): every load returns 0 and answers `wayland`, the bridge is called 3 times (nothing to hit), and conf_memo_unwritable is logged once for the whole command with path=<memo dir>. |
+| `_conf_load_layers still fails by name when the bridge fails and the memo dir is unwritable (base#2235)` | base#2235 acceptance 5 -- the degrade does not change failure semantics: with the same unwritable memo dir and the bridge exiting 1, the load still returns 1 and logs conf_toml_merge_failed. |
+| `_conf_load_layers does not log conf_memo_unwritable when the memo dir is writable (base#2235)` | base#2235 acceptance 6 -- a writable memo dir never logs the event. |
 
 ### test/bats/unit/conf_ini_golden_spec.bats (7)
 
@@ -2472,7 +2480,7 @@ The planted copy is traced once per file and shared by every case.
 | `config_gen_readers: the run blocks are both config-gen jobs', each matrix value expanded (base#1584)` | cycle 30, review round 2. Each run block runs as the job runs it, so a `${{ matrix.<key> }}` is expanded once per value of the job's matrix: config-gen-redpath runs `just test go-redpath <n>/5` for shards 1..5 (its matrix, which self_test_yaml_spec holds to the shard table), and together the five shards run every redpath case. Both jobs' just-pin blocks are there too. |
 | `config_gen_readers: a run block with an expression it cannot evaluate is refused (base#1584)` | cycle 30, review round 2. An expression other than one matrix key is a value this script would have to guess, so the block is refused rather than run with the expression left in or dropped. |
 
-### test/bats/unit/config_gen_s32_golden_spec.bats (12)
+### test/bats/unit/config_gen_s32_golden_spec.bats (21)
 
 The Go converter that replaces `_migrate_ini_to_toml` must match the shell
 byte for byte. Each corpus/s32/<name>.ini is converted by the shell into a
@@ -2491,6 +2499,15 @@ missing or differs, so a golden can never drift from the shell.
 | `s32 a gap in numbered keys leaves an empty block (base#2082)` | A gap in the numbered keys leaves an empty block for the missing number; the golden pins the bytes. |
 | `s32 an emptied slot keeps an empty block (base#2082)` | A numbered key with an empty value still takes its slot as an empty block; the golden pins the bytes. |
 | `s32 numbered keys are ordered by numeric suffix (base#2082)` | Numbered keys are ordered by their numeric suffix, not by file order or string order; the golden pins the bytes. |
+| `s32 image rules become an array of tables (base#2087)` | The numbered-key family of image_rules converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 build args split into key and value tables (base#2087)` | The numbered-key family of build_args converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 a volume mount splits into source, target and mode (base#2087)` | The numbered-key family of volumes converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 cap_add and security_opt become arrays of tables (base#2087)` | The numbered-key family of security converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 network ports split into host and container (base#2087)` | The numbered-key family of network_ports converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 devices and cgroup rules become arrays of tables (base#2087)` | The numbered-key family of devices converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 a tmpfs entry becomes an array of tables (base#2087)` | The numbered-key family of tmpfs converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 an additional context splits into name and source (base#2087)` | The numbered-key family of contexts converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 environment numbered keys stay plain keys (base#2087)` | The numbered-key family of environment converts as the shell does; the golden pins the bytes and the single migrated event. |
 | `s32 a padded index is declined (base#2085)` | An index with leading zeros cannot be represented; the converter declines, keeps .setup.conf and logs one event id. |
 | `s32 a zero index is declined (base#2085)` | Index 0 cannot be represented; the converter declines. |
 | `s32 a duplicate index is declined (base#2085)` | The same index written twice is declined as a duplicate index. |
@@ -7123,6 +7140,27 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [deploy] keys the resolver reads (#876)` | - |
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
+
+### test/bats/unit/select_runner_spec.bats (12)
+
+A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
+`false` silently moves every run to the hosted pool. Each row of the issue's
+table is pinned so neither direction can drift (base#2265).
+
+| Test | Description |
+|------|-------------|
+| `select_runner.sh: push is trusted (base#2265)` | A tag push is a push too; answering false would move every release run to the hosted pool (base#2265). |
+| `select_runner.sh: workflow_dispatch is trusted (base#2265)` | Only someone with write access can dispatch, so the run is the owner's own code (base#2265). |
+| `select_runner.sh: a same-repository pull_request is trusted (base#2265)` | The head repository equals this one, so the code was pushed by someone with write access (base#2265). |
+| `select_runner.sh: a fork pull_request is not trusted (base#2265)` | A fork's code on a self-hosted runner is the exact hole this script closes (base#2265). |
+| `select_runner.sh: a pull_request with an empty head repository is not trusted (base#2265)` | An empty head repository proves nothing about who wrote the code, so it fails closed (base#2265). |
+| `select_runner.sh: a merge_group proven same-repository is trusted (base#2265)` | The only case that opens a self-hosted runner on a queue run (base#2265). |
+| `select_runner.sh: a merge_group proven not same-repository is not trusted (base#2265)` | A group holding a fork's pull request must stay on the hosted pool (base#2265). |
+| `select_runner.sh: a merge_group with no proof is not trusted (base#2265)` | A merge_group payload names no head repository, so no proof means false (base#2265). |
+| `select_runner.sh: schedule is not trusted (base#2265)` | A schedule is not in the listed events; the default answer is false (base#2265). |
+| `select_runner.sh: an unlisted event is not trusted (base#2265)` | An event nobody listed (issue_comment) can carry attacker text, so the default is false (base#2265). |
+| `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
+| `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
 
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
