@@ -5221,7 +5221,39 @@ REPO=${{ github.repository }}
 MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
 CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 EOT
-  # This child only adds outputs: no job may take its runs-on from them yet.
-  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | (.value["runs-on"] // "") | tostring')"
-  assert_failure
+  # Only the jobs named here take their runs-on from runs_on_cpu (base#2272
+  # adds mutation-roster); any other job doing so is a failure.
+  run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select((.value["runs-on"] // "" | tostring) | contains("runs_on_cpu")) | .key'
+  assert_success
+  assert_output 'mutation-roster'
+}
+
+# why: the 21 mutation-roster shards take their runner from classify, so the
+# CI_SELF_HOSTED switch moves them together; nothing else about the job
+# changes (base#2272, part of base#1586).
+@test "self-test.yaml: mutation-roster runs-on comes from classify runs_on_cpu, rest unchanged (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster["timeout-minutes"]'
+  assert_success
+  assert_output '150'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.strategy.matrix.shard | length'
+  assert_success
+  assert_output '21'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.strategy.matrix.shard[0], .jobs.mutation-roster.strategy.matrix.shard[20]'
+  assert_success
+  assert_output - <<'EOT'
+1/21
+21/21
+EOT
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.strategy["fail-fast"]'
+  assert_success
+  assert_output 'false'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.if'
+  assert_success
+  assert_output "needs.classify.outputs.select_mutation_roster == 'true'"
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.needs | join(",")'
+  assert_success
+  assert_output 'actionlint,classify,test-tools-image-amd64'
 }
