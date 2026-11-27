@@ -1559,7 +1559,7 @@ code, base#1562.
 | `_run_via_compose: the real ids are in the environment compose interpolates (#895)` | - |
 | `_fix_permissions: refuses a non-numeric id instead of handing it to chown (#895)` | - |
 
-### test/bats/unit/classify_testtools_spec.bats (39)
+### test/bats/unit/classify_testtools_spec.bats (45)
 
 `testtools_changed` tells every image-consuming job whether to rebuild the
 tooling image from source instead of pulling the rolling `:main`. On a pull
@@ -1585,7 +1585,10 @@ reads the output the step writes.
 | `classify: a PR that changes a file the Dockerfile COPYs rebuilds it (#1171)` | The same miss on the arm every pull request takes, which is the expensive one: the PR arm's `false` sends `obtain_test_tools.sh` down its layer-2 path, so the whole suite runs inside the rolling `:main` -- an image built before the edit, and one nothing on the PR path refreshes. |
 | `classify: a PR that changes nothing the image reads still pulls (#1171)` | The guard that keeps the two cases above from being bought by answering `true` to everything. "Anything changed" would rebuild the tooling image on every pull request and throw away the pull path the rolling tag exists for. |
 | `classify: a PR that changes the test-tools Dockerfile rebuilds it (#1171)` | The Dockerfile's own case on the PR arm, pinned alongside the two above so a rewrite that reaches for the derivation cannot drop the one input the signal already had. |
-| `classify: a push to main or master selects every gated job but the release-only ones (base#1584, base#2177)` | a push is not narrowed by its diff; only the jobs that wait for a tag skip on it. |
+| `classify: a push to master selects every gated job but the release-only ones (base#1584, base#2177)` | a push to a branch other than main is not narrowed by its diff; only the jobs that wait for a tag skip on it. |
+| `classify: a push to main selects only the cache writers and their inputs (base#2190)` | main's commit is the tree the merge queue tested, so a push to main reruns only what writes a cache there; a diff that touches every job does not widen it. |
+| `classify: every run but a push to main is a full run (base#2190)` | fail closed: only a push to main is narrowed, so every other event and ref runs the jobs that carry no diff gate. |
+| `classify: a push to main writes each key once (base#2190)` | GitHub reads the last value a step writes for a key, so a key written twice could read differently than the first line says. |
 | `classify: a merge_group run selects every gated job but the release-only ones (base#1584, base#1587, base#2177)` | a merge group is the last run before main, so even a docs-only one is not narrowed, or the queue would land a commit its gated jobs never ran on. |
 | `classify: a tag push and workflow_dispatch select every gated job, the release-only ones included (base#2177)` | the tag's `release` job needs the release-only jobs, and workflow_dispatch gives their answer before the tag exists. |
 | `classify: a push to no known branch, or an event the step does not name, selects the release-only jobs (base#2177)` | fail closed: a trigger or a kind of ref added later runs the release-only jobs until the step names it, and cannot drop them by omission. |
@@ -1601,12 +1604,15 @@ reads the output the step writes.
 | `classify: a base map that fails or leaves a job out selects it (base#1584)` | cycle 23. A selection that exits non-zero gave no answer, and a line the selection leaves out is no `false`: classify writes `true` for both, and keeps the map's own values for every line it did print. |
 | `classify: a pull request that edits a selection file is judged by the base map (base#1584)` | cycle 26 (RR6-F1). A PR is judged by the BASE side's map, never its own: a PR whose map selects nothing for an unknown path, and which changes that map, would otherwise classify itself with it and skip every job (RR6-F1's probe printed all five false). Each selection file a PR edits is an unknown path to the base map, so every job runs. |
 | `classify: a base without the map or its deny list selects every gated job (base#1584)` | cycle 27, the bootstrap. A base with no map or no deny list (main when this change lands, and any older base) cannot judge the PR, so every job runs, naming map_missing_on_base. |
-| `classify: the diff step's only select_* false is the selection's own or a release-only job's (base#1584, base#2177)` | the step must not invent a `false` for a job the map decides: it has one selection call, and passes on only the `false` it read there. |
+| `classify: the diff step's only select_* false is the selection's own or the event's (base#1584, base#2177, base#2190)` | the step must not invent a `false` for a job the map decides: it has one selection call, and passes on only the `false` it read there; any other `false` comes from the event, through a variable. |
 | `chain: a PR changing one unit spec runs the code checks, skips the other gated jobs, and the rollup passes (base#1584, base#2177)` | cycle 1, end to end on a PR that changes one unit spec. The expected set comes from the issue and the design, not from the map: a unit spec cannot affect config-gen, acceptance, system or worker-selftest, so those skip; it is code, so shellcheck, hadolint, bats-fragile, coverage and coverage-gate run; and the release-only jobs skip. Read through classify's real step, its `outputs:` map, every job's parsed `if:` and the real rollup step, so a gate that reads the wrong output, an output classify does not export, or a classify that never carries a `false` all change the set, and the rollup must pass the run that results. |
 | `chain: a docs-only PR skips every gated job, mutation-roster included, and the rollup passes as doc-only (base#1584, base#2110)` | a docs-only PR can affect no gated job; the documentation checks still run, and the rollup says which kind of pass it is. |
 | `chain: a workflow, driver or unknown-path PR skips no gated job but the release-only ones (base#1584, base#2177)` | a workflow change, a driver change and an unknown path can each break any job, so only the jobs that wait for a release skip. |
-| `chain: a PR, a merge group and a push to main skip the release-only jobs, and the rollup passes naming them (base#2176, base#2177)` | branch protection requires the rollup, so the skips must pass it; and it must name the jobs, so that its green is not read as a full run's. |
-| `chain: config-gen-gates keeps its own selection where the redpath skips (base#2176)` | the two config-gen keys must not be crossed, or skipping the redpath would skip the gates too, or the gates' selection would run the redpath. |
+| `chain: a PR, a merge group and a push to master skip the release-only jobs, and the rollup passes naming them (base#2176, base#2177, base#2190)` | branch protection requires the rollup, so the skips must pass it; and it must name the jobs, so that its green is not read as a full run's. |
+| `chain: a push to main runs only the cache writers and their inputs, and the rollup passes naming the rest (base#2190)` | the run set on main is read end to end: classify's real step, its `outputs:` map, each job's parsed `if:` and needs, and the real rollup, which must pass and name every job it skipped. |
+| `chain: on a push to main a kept job that fails or skips fails the rollup (base#2190)` | the narrowed run must still turn red: a kept job's failure, or its skip while classify selected it, fails the rollup. |
+| `chain: a job no diff deselects runs on a PR, and its skip there fails the rollup (base#2190)` | the jobs no diff deselects run on every run but a push to main, so a skip of one anywhere else is a workflow bug the rollup must fail. |
+| `chain: config-gen-gates keeps its own selection where the redpath skips (base#2176, base#2190)` | the two config-gen keys must not be crossed, or skipping the redpath would skip the gates too, or the gates' selection would run the redpath. |
 | `chain: a tag push and workflow_dispatch run the release-only jobs, and only the tag releases (base#2176, base#2177)` | the tag is where the release-only jobs block, and a dispatch on a branch is how they are checked before the tag exists, with nothing published. |
 | `chain: a tag on which a release-only job fails or never runs publishes no release (base#2176, base#2177)` | the rollup excuses a job classify deselected, so `release` cannot rest on the rollup: it must need each release-only job itself. |
 | `chain: the gated jobs, the map's job list, classify's loop and the release-only jobs are one set, and each selected skip fails the rollup (base#1584, base#2177)` | cycle 4. One source for every gate: the map's names, the map's --jobs and classify's loop list are the same set, and with the release-only jobs the keys the gated jobs' `if:`s read. Each gated job reads exactly one select_* key, the one its `if:` names; config-gen-gates reads select_config_gen. The rollup must resolve each gated job to that same key: its skip fails while the key is `true` and passes once that key alone is `false`. The key comes from the job's `if:`, never from a rewrite of the job's name, so a rollup that guesses the key from the name fails here. |
@@ -3870,6 +3876,26 @@ exit $?`; a failing pre-exec hook aborts before `compose exec` runs).
 | `exec.sh post-exec hook failure still overrides a non-zero container rc (#956)` | - |
 | `exec.sh aborts on a failing pre-exec hook and skips compose exec (#690)` | - |
 
+### test/bats/unit/fleet_stuck_spec.bats (8)
+
+A wrong `true` moves a healthy run to the hosted pool, and a wrong `false`
+leaves a run waiting on a dead fleet. Each row of the issue's table is
+pinned so the 14/15 minute boundary cannot drift (base#2288).
+
+Time anchor: created_at 2026-11-28T10:00:00Z is epoch 1795860000 (taken from
+`date -u -d`), so +14 min is 1795860840 and +15 min is 1795860900.
+
+| Test | Description |
+|------|-------------|
+| `fleet_stuck.sh: no jobs is not stuck (base#2288)` | An empty jobs array has nothing waiting, so the fleet is not stuck (base#2288). |
+| `fleet_stuck.sh: only a hosted job queued is not stuck (base#2288)` | A queued hosted job says nothing about the self-hosted fleet (base#2288). |
+| `fleet_stuck.sh: self-hosted queued 14 minutes is not stuck (base#2288)` | 14 minutes is under the 15 minute default, so no fallback yet (base#2288). |
+| `fleet_stuck.sh: self-hosted queued 15 minutes is stuck (base#2288)` | The threshold is inclusive, so exactly 15 minutes is stuck (base#2288). |
+| `fleet_stuck.sh: self-hosted in_progress is not stuck (base#2288)` | An in_progress job was picked up by a runner, so the fleet is alive (base#2288). |
+| `fleet_stuck.sh: STUCK_MINUTES=5 makes a 5 minute wait stuck (base#2288)` | STUCK_MINUTES overrides the default, so 5 minutes of waiting is stuck at 5 (base#2288). |
+| `fleet_stuck.sh: unparseable input is not stuck and warns (base#2288)` | Unreadable input must never strand a run, so it answers false with a warning (base#2288). |
+| `fleet_stuck.sh: empty input is not stuck and warns (base#2288)` | Empty stdin is also unreadable and gets the same warning (base#2288). |
+
 ### test/bats/unit/generated_workflow_actions_lint_spec.bats (56)
 
 | Test | Description |
@@ -6011,7 +6037,7 @@ local mode with it.
 | `acceptance job: CI runs the amd64 acceptance steps through script/ci/acceptance.sh (base#1409)` | - |
 | `acceptance job: checks the just it runs against the pin in its own shell (base#1409)` | Moving every acceptance step into script/ci/acceptance.sh took the job's only `just` invocation out of its `run:` shells, which is all the tool provenance lint reads; the lint then saw no job reach any pinned tool and failed its demand floor. The job runs `just`, so its own shell asks that binary for its version and holds it to the pin. |
 | `acceptance job: just test acceptance runs the same script CI runs (base#1409)` | - |
-| `pre-PR mirror: a job if: that only contains the code gate reads as unknown (base#1462)` | A gate read by substring took `<gate> && false` -- a job that never runs -- for a gated job, so the plan check demanded a local command for it and the mirror attested a job CI never ran. |
+| `pre-PR mirror: a job if: that only contains the code gate reads as unknown (base#1462, base#2190)` | A gate read by substring took `<gate> && false` -- a job that never runs -- for a gated job, so the plan check demanded a local command for it and the mirror attested a job CI never ran. |
 | `pre-PR mirror: config-gen-gates is attested by exactly just test go-gates (base#1462, base#2176)` | the mirror runs the recipe the CI job runs; `just test go` would also run the redpath, which CI runs for no pull request. |
 | `pre-PR mirror: a config-gen diff plans just test go-gates and a docs-only diff does not (base#1462, base#2176)` | a diff in the generator's sources can break the gates and a docs-only one cannot; no diff plans the redpath, through either recipe that runs it. |
 | `pre-PR mirror: a mutation-baseline diff plans just test go-gates and just test (base#1464, base#2176)` | The mutation baseline (base#1464) is a script the 00-manifest step runs inside the gates, and its spec is integration tier. A diff that touches only one of the three must plan both, so the mirror runs the step and the spec that pins it. The mirror sets no CONFIG_GEN_MUTATION_CONTEXT, so it runs the pr default the spec proves. |
@@ -7214,7 +7240,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/select_runner_spec.bats (19)
+### test/bats/unit/select_runner_spec.bats (24)
 
 A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
 `false` silently moves every run to the hosted pool. Each row of the issue's
@@ -7235,14 +7261,19 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
 | `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
 | `select_runner.sh: trusted + CI_SELF_HOSTED=cpu selects the cpu fleet (base#2266)` | The switch on with a trusted event is the only way to reach the CPU fleet (base#2266). |
-| `select_runner.sh: trusted + CI_SELF_HOSTED unset selects ubuntu-latest (base#2266)` | An unset switch is the rollback path, so a trusted event stays on hosted (base#2266). |
-| `select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)` | Only the value cpu opens the fleet; gpu has no fleet here, so it falls back (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED empty selects the cpu fleet (base#2287)` | Default-on (owner 2026-11-28): an empty switch must reach the CPU fleet so nobody has to set a variable (base#2287). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED unset selects the cpu fleet (base#2287)` | A variable that was never defined is the normal day-to-day state and must also reach the CPU fleet (base#2287). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=off selects ubuntu-latest (base#2287)` | off is the rollback path used when every CPU host is down, so a trusted event goes to hosted (base#2287). |
+| `select_runner.sh: a fork pull_request with CI_SELF_HOSTED unset selects ubuntu-latest (base#2287)` | An untrusted event stays hosted even when the switch is unset, the new default must not open it (base#2287). |
+| `select_runner.sh: schedule with CI_SELF_HOSTED=off selects ubuntu-latest (base#2287)` | An untrusted event stays hosted with off as well, same answer as every other value (base#2287). |
+| `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED unset selects ubuntu-latest (base#2287)` | Missing inputs fail closed to hosted even though an unset switch now means on (base#2287). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)` | gpu has no fleet here, so any value other than empty or cpu falls back (base#2287). |
 | `select_runner.sh: a fork pull_request with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A fork must never get a self-hosted runner, even with the switch on (base#2266). |
 | `select_runner.sh: schedule with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | An unlisted event is untrusted, so the switch cannot lift it onto self-hosted (base#2266). |
 | `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
 | `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
 
-### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
+### test/bats/unit/self_hosted_guard_lint_spec.bats (28)
 
 | Test | Description |
 |------|-------------|
@@ -7258,6 +7289,8 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS on a bare hostname label` | - |
 | `self-hosted guard: names the exact condition to paste in the failure message` | - |
 | `self-hosted guard: PASSES a literal GitHub-hosted runs-on with no guard` | - |
+| `self-hosted guard: PASSES an unguarded runs-on from classify runs_on_cpu (base#2286)` | base#2286. classify 的 runs_on_cpu 已由 select_runner.sh 依事件決定 runner，fork PR 仍落在 hosted，所以這個 runs-on 不需要再加 guard。 |
+| `self-hosted guard: FAILS an unguarded runs-on from any other classify output (base#2286)` | base#2286. 只有 runs_on_cpu 被認作已守衛；其他 classify 輸出仍須 guard， 否則放寬會漏掉真正未守衛的 self-hosted runs-on。 |
 | `self-hosted guard: PASSES the arm + amd hosted families and a windows/macos runner` | - |
 | `self-hosted guard: PASSES a literal matrix that resolves entirely to hosted labels` | - |
 | `self-hosted guard: PASSES a LOCAL reusable-workflow call` | - |
@@ -7273,7 +7306,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (166)
+### test/bats/unit/self_test_yaml_spec.bats (167)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7560,8 +7593,8 @@ code_changed == 'true'` + runs `test.sh --lint --shellcheck` inside the
 test-tools image (#376, base#1412)
 
 - `doc-counts` job declared + `needs: [actionlint, classify]` + runs
-`test.sh --lint --doc-counts` inside the test-tools image + carries NO
-`code_changed` gate + is hard-mandatory in `ci-rollup` (#864, base#1412)
+`test.sh --lint --doc-counts` inside the test-tools image + carries no diff
+gate, only classify's full_run
 
 - `hadolint` job declared + `needs: [actionlint, classify]` + `if:
 code_changed == 'true'` + lints both template-owned Dockerfiles via
@@ -7657,7 +7690,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: ci-rollup verify step consumes every needs result incl coverage (#337 + #376 + #377 + #615)` | A need the verify step never reads is waited on and then ignored: its failure turns nothing red. |
 | `self-test.yaml: ci-rollup needs every conditionally-gated job (#337 + #377)` | The gated jobs skip on doc-only PRs by design; without skip tolerance those PRs could never merge. Since base#1584 the tolerance is the rollup's skip table, and it is proven by running the lifted step, not by matching its text: workflow_failure_surface_spec.bats skips every gated job ci-rollup needs, in turn, with the classify answer its own `if:` reads set `false` (must pass) and set `true` (must fail), and runs a doc-only run with every gated job skipped (#1014, must pass). This case keeps only the membership half: every gated job is one ci-rollup needs, so none of them can drop out of the required check unseen. |
 | `self-test.yaml: ci-rollup requires hard-mandatory jobs to be success (#337 + #377)` | The ungated jobs never skip on purpose, so a SKIPPED there is a workflow bug the strict loop must not collapse into a pass. |
-| `self-test.yaml: the amd64 test-tools-image builder always runs, the arm64 one skips only on its own key (base#1588, base#2110)` | The amd64 test-tools-image builder (base#1588) feeds doc-counts and lint-static, which carry no `if:`, so it must run on every event too -- merge_group included (base#1587) -- and its skip must fail the rollup even beside a select_* key its name could be rewritten to. The arm64 builder feeds only acceptance, so a docs-only pull request skips it on its own key (base#2110). |
+| `self-test.yaml: the amd64 test-tools-image builder always runs, the arm64 one skips only on its own key (base#1588, base#2110)` | The amd64 test-tools-image builder feeds doc-counts and lint-static on every run but a push to main, and coverage on that push, so it must run on every event -- merge_group included -- and its skip must fail the rollup even beside a select_* key its name could be rewritten to. The arm64 builder feeds only acceptance, so a docs-only pull request skips it on its own key (base#2110). |
 | `self-test.yaml: ci-rollup treats compute-shards as hard-mandatory, not SKIPPED-tolerant (#1009)` | compute-shards carries no `if:` gate, so a SKIPPED there is a workflow bug and not a conditional job declining to run. It is also the one job whose FAILURE is otherwise invisible: coverage needs it and coverage-gate needs coverage, and both of those sit in the rollup's skipped-tolerant bucket, so putting compute-shards in the tolerant bucket too leaves the required check green with the entire unit suite and the coverage floor never run. |
 | `self-test.yaml: every job the workflow declares is named directly in ci-rollup's needs (#1009)` | This is the guard that makes the merge gate's roster DERIVED rather than hand-kept, and it is the recurrence #1009 asks to close: adding a job to the workflow used to update neither ci-rollup's needs nor any assertion, so the new job gated nothing and every existing test stayed green. Directly and not transitively, because ci-rollup runs under `if: always()` and reads each upstream's `.result`: GitHub reports a job whose need failed as SKIPPED, and SKIPPED is pass-equivalent in the tolerant bucket, so a job reached only through another is invisible to it. |
 | `self-test.yaml: ci-rollup inspects every job it needs (#1009)` | Joining `needs:` is only half a gate, so the guard above is not enough on its own. A job that is needed but whose result the verify step never reads is waited for and then ignored, which is the same green as never having been needed, with a needs list that reads as correct. Since base#1584 the step walks every key of ${{ toJSON(needs) }}, so the proof is behavioural: every need's failure, cancel and unexcused skip fails the step, and an all-success run passes. |
@@ -7686,12 +7719,12 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: shellcheck job does not restate a tool version (#1080)` | One declaration, not a second copy of the number. The version lives in dockerfile/Dockerfile.test-tools and reaches this job through the image, so a version literal in the job would be a second place to forget. |
 | `self-test.yaml: declares doc-counts job (#864)` | - |
 | `self-test.yaml: doc-counts job runs test.sh --lint --doc-counts inside the test-tools image (#864, base#1412)` | - |
-| `self-test.yaml: doc-counts carries NO code_changed gate (#864)` | - |
+| `self-test.yaml: doc-counts carries no diff gate, only full_run (#864, base#2190)` | - |
 | `self-test.yaml: the jobs a docs-only pull request runs start no bats (base#2110)` | base#2110. A docs-only pull request runs the jobs that carry no classify gate, and none of them may run bats, coverage or a mutation row: those run in the merge queue, where classify selects every job. What such a job calls of the test driver is a lint. |
-| `self-test.yaml: ci-rollup treats doc-counts as hard-mandatory, not SKIPPED-tolerant (#864)` | - |
+| `self-test.yaml: ci-rollup excuses a doc-counts skip only when full_run is false (#864, base#2190)` | - |
 | `self-test.yaml: declares lint-static job (#866)` | - |
-| `self-test.yaml: lint-static carries NO code_changed gate (#866)` | - |
-| `self-test.yaml: ci-rollup treats lint-static as hard-mandatory, not SKIPPED-tolerant (#866)` | - |
+| `self-test.yaml: lint-static carries no diff gate, only full_run (#866, base#2190)` | - |
+| `self-test.yaml: ci-rollup excuses a lint-static skip only when full_run is false (#866, base#2190)` | - |
 | `self-test.yaml: every lint the just test lint phase runs has a CI join (#866)` | - |
 | `self-test.yaml: lint-static runs one job per lint GROUP, not one per lint (base#1071)` | The shape itself. One job per DRIVER spent more runner startup than the drivers spent working, and took up to twenty of the free plan's ~twenty org-wide concurrent slots in the same second the coverage shards -- the run's critical path -- asked for theirs. One job per GROUP is the trade, and it is only a trade if the job still runs the same drivers the local phase runs, in the same test-tools image (base#1412), with one failing group not cancelling its siblings. |
 | `self-test.yaml: the lint-static matrix names group positions, never drivers (base#1071)` | The anti-roster assertion, stated over the workflow rather than over the partition. A matrix entry that NAMES a driver is the roster coming back: the day a driver is added it is not in the list, and nothing says so. Every entry must therefore be a position in the partition and nothing else -- and the positions must be a partition: one total shared by all of them, each index once, as many entries as the total. A matrix of ['1/4', '2/4'] would run half the lint phase and go green over it. |
@@ -7759,6 +7792,7 @@ rolling tag itself (#697, #1010)
 | `roster probe: every spelling that runs the roster is seen, and an ungated one is caught (base#1461)` | The probe decides by execution. Each spelling that runs the driver is seen once, a step that does not run it is not seen, and the two ways a step can run it without gating -- `\|\| true` and an `if:` -- are caught. |
 | `self-test.yaml: ci-rollup needs single-issue-pr and classify never gates it (base#1629)` | Branch protection requires ci-rollup alone. A single-issue-pr job outside its needs would be a check nobody is blocked by, and a select_single_issue_pr key would let classify skip it on a doc-only PR, which is exactly where a bundled PR slips through (base#1629). |
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
+| `self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)` | classify is where the runner choice is made once for the whole workflow. It must run script/ci/select_runner.sh in a step `runner` and publish its two lines as job outputs, so later children can read them without re-deriving trust (base#2268, part of base#1586). |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 
