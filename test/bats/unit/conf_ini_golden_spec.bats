@@ -39,7 +39,7 @@ _tokens_of() {
 # why: a corpus input added or dropped without a golden changes what the
 # Go reader is held to; the count makes that a visible edit.
 @test "the s25 corpus holds its eight inputs" {
-  local -a _f=("${CORPUS}"/*.ini)
+  local -a _f=("${CORPUS}"/s25_[!l]*.ini)
   assert_equal "${#_f[@]}" "8"
 }
 
@@ -47,7 +47,7 @@ _tokens_of() {
 # without an input is a record of nothing.
 @test "every s25 input has a golden, and no golden is orphaned" {
   local _f _g _stem _missing="" _orphan=""
-  for _f in "${CORPUS}"/*.ini; do
+  for _f in "${CORPUS}"/s25_[!l]*.ini; do
     _stem="$(basename "${_f}" .ini)"
     [[ -s "${GOLDEN}/${_stem}.tokens.golden" ]] || _missing+=" ${_stem}"
   done
@@ -67,7 +67,7 @@ _tokens_of() {
 # reproduce byte for byte.
 @test "_ini_tokenize over every s25 input matches its golden byte for byte" {
   local _f _stem _bad=""
-  for _f in "${CORPUS}"/*.ini; do
+  for _f in "${CORPUS}"/s25_[!l]*.ini; do
     _stem="$(basename "${_f}" .ini)"
     if ! cmp -s <(_tokens_of "${_f}") "${GOLDEN}/${_stem}.tokens.golden"; then
       _bad+=" ${_stem}"
@@ -83,8 +83,10 @@ _tokens_of() {
 # slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below
 # are written out by hand from the corpus files, not derived by the code
 # under test; the goldens are the exact stdout bytes, one file per pair.
+# A colon in a section name is written `%3A` in the golden file name,
+# because Windows cannot create a file whose name holds a colon.
 @test "_dump_conf_section over every s25 input and section matches its golden byte for byte" {
-  local _pair _stem _sec _bad=""
+  local _pair _stem _sec _file_sec _bad=""
   local -a _pairs=(
     "s25_comments:image" "s25_comments:build"
     "s25_keys_before_header:image"
@@ -98,9 +100,56 @@ _tokens_of() {
   for _pair in "${_pairs[@]}"; do
     _stem="${_pair%%:*}"
     _sec="${_pair#*:}"
+    _file_sec="${_sec//:/%3A}"
     if ! cmp -s <(_dump_conf_section "${CORPUS}/${_stem}.ini" "${_sec}") \
-      "${GOLDEN}/${_stem}.dump.${_sec}.golden"; then
+      "${GOLDEN}/${_stem}.dump.${_file_sec}.golden"; then
       _bad+=" ${_stem}:${_sec}"
+    fi
+  done
+  [[ -z "${_bad}" ]] || {
+    echo "differs from golden:${_bad}" >&2
+    return 1
+  }
+}
+
+# _load_of <handle> -- print the golden-format rendering of the sections
+# and entries _conf_load_layers left in <handle>.
+_load_of() {
+  local -n _ls="${1}__sects" _le="${1}__es" _lk="${1}__keys" _lv="${1}__vals"
+  local _i
+  for _i in "${!_ls[@]}"; do
+    printf 'section\t%s\n' "${_ls[_i]}"
+  done
+  for _i in "${!_lk[@]}"; do
+    printf 'entry\t%s\t%s\t%s\n' "${_le[_i]}" "${_lk[_i]}" "${_lv[_i]}"
+  done
+}
+
+# why: `_conf_load_layers` over a two-layer INI chain is section-replace
+# (base#2062, S25c): the upper layer owns section `a`, so `a|y|2` from the
+# base layer must not survive. The expected bytes are in
+# golden/s25/layers.base_over.golden; the absent third path adds nothing.
+@test "_conf_load_layers over the base and over layers matches layers.base_over.golden" {
+  local _rc=0
+  _conf_load_layers H "${CORPUS}/s25_layer_base.ini" \
+    "${CORPUS}/s25_layer_over.ini" "${CORPUS}/s25_layer_absent.ini" || _rc=$?
+  assert_equal "${_rc}" "0"
+  cmp -s <(_load_of H) "${GOLDEN}/layers.base_over.golden" || {
+    echo "differs from layers.base_over.golden" >&2
+    return 1
+  }
+}
+
+# why: `_conf_load_layers` over a single file is the tokenizer's sections
+# with entries grouped by section; each single-file corpus input has its
+# own <stem>.load.golden.
+@test "_conf_load_layers over every single s25 input matches its load golden" {
+  local _f _stem _bad=""
+  for _f in "${CORPUS}"/s25_[!l]*.ini; do
+    _stem="$(basename "${_f}" .ini)"
+    _conf_load_layers H "${_f}"
+    if ! cmp -s <(_load_of H) "${GOLDEN}/${_stem}.load.golden"; then
+      _bad+=" ${_stem}"
     fi
   done
   [[ -z "${_bad}" ]] || {

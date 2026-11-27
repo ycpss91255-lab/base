@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **336 tests**.
+Integration specs under `test/bats/integration/`: **350 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -225,6 +225,37 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an aside that fails leaves the destination untouched (base#1464)` | If the first rename fails nothing has moved yet; the refusal must name that stage and leave the destination exactly as it was. |
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
+
+### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
+
+Before any Go parser exists, the shell `_dockerfile_stage_from_line`
+(dist/script/docker/lib/stage.sh) is the oracle for which FROM lines are
+accepted. Each
+dockerfile/config-gen/testdata/corpus/s43/s43_from_<case>.Dockerfile holds
+exactly one FROM-relevant line plus optional lint-allow comment lines. Its
+goldens in testdata/golden/s43/ are s43_from_<case>.stages (stdout of
+`_parse_dockerfile_stages`, empty output is a 0-byte file) and
+s43_from_<case>.hash (`_compute_dockerfile_hash` plus a trailing newline).
+The Go side must later match these byte for byte. The spec regenerates both
+from the shell and compares them with the goldens, and a partition check
+keeps fixtures and goldens one-to-one.
+
+| Test | Description |
+|------|-------------|
+| `s43 from golden: plain lists runtime` | the plain `FROM <image> AS <stage>` form is accepted. |
+| `s43 from golden: platform lists runtime` | one --flag=value before the image is accepted. |
+| `s43 from golden: multiflag lists runtime` | several flags before the image are accepted. |
+| `s43 from golden: lower rejects lowercase as` | a lowercase `as` is not accepted. |
+| `s43 from golden: comment rejects a commented FROM` | a commented FROM is not accepted. |
+| `s43 from golden: bare rejects a junk word` | an extra word between the image and AS is not accepted. |
+| `s43 from golden: inline rejects an inline comment` | an inline comment before AS is not accepted. |
+| `s43 from golden: flagimage rejects a flag as image` | a flag standing in for the image is not accepted. |
+| `s43 from golden: indented rejects leading spaces` | an indented FROM is not accepted. |
+| `s43 from golden: copyfrom rejects COPY --from` | COPY --from is not a FROM line. |
+| `s43 from golden: accepted cases carry the issue's hash literals` | the issue's table gives the expected hashes; pin them as literals so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 from golden: rejected cases hash to the empty sha256 with a 0-byte stages` | every rejected case hashes to the empty-string sha256 and lists no stage. |
+| `s43 from golden: accepted cases list runtime` | accepted cases list exactly the stage runtime. |
+| `s43 from golden: every fixture has exactly one .stages and one .hash and no extra` | a fixture missing a .stages or .hash golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
