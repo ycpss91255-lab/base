@@ -2472,7 +2472,7 @@ The planted copy is traced once per file and shared by every case.
 | `config_gen_readers: the run blocks are both config-gen jobs', each matrix value expanded (base#1584)` | cycle 30, review round 2. Each run block runs as the job runs it, so a `${{ matrix.<key> }}` is expanded once per value of the job's matrix: config-gen-redpath runs `just test go-redpath <n>/5` for shards 1..5 (its matrix, which self_test_yaml_spec holds to the shard table), and together the five shards run every redpath case. Both jobs' just-pin blocks are there too. |
 | `config_gen_readers: a run block with an expression it cannot evaluate is refused (base#1584)` | cycle 30, review round 2. An expression other than one matrix key is a value this script would have to guess, so the block is refused rather than run with the expression left in or dropped. |
 
-### test/bats/unit/config_gen_s32_golden_spec.bats (12)
+### test/bats/unit/config_gen_s32_golden_spec.bats (21)
 
 The Go converter that replaces `_migrate_ini_to_toml` must match the shell
 byte for byte. Each corpus/s32/<name>.ini is converted by the shell into a
@@ -2491,6 +2491,15 @@ missing or differs, so a golden can never drift from the shell.
 | `s32 a gap in numbered keys leaves an empty block (base#2082)` | A gap in the numbered keys leaves an empty block for the missing number; the golden pins the bytes. |
 | `s32 an emptied slot keeps an empty block (base#2082)` | A numbered key with an empty value still takes its slot as an empty block; the golden pins the bytes. |
 | `s32 numbered keys are ordered by numeric suffix (base#2082)` | Numbered keys are ordered by their numeric suffix, not by file order or string order; the golden pins the bytes. |
+| `s32 image rules become an array of tables (base#2087)` | The numbered-key family of image_rules converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 build args split into key and value tables (base#2087)` | The numbered-key family of build_args converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 a volume mount splits into source, target and mode (base#2087)` | The numbered-key family of volumes converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 cap_add and security_opt become arrays of tables (base#2087)` | The numbered-key family of security converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 network ports split into host and container (base#2087)` | The numbered-key family of network_ports converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 devices and cgroup rules become arrays of tables (base#2087)` | The numbered-key family of devices converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 a tmpfs entry becomes an array of tables (base#2087)` | The numbered-key family of tmpfs converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 an additional context splits into name and source (base#2087)` | The numbered-key family of contexts converts as the shell does; the golden pins the bytes and the single migrated event. |
+| `s32 environment numbered keys stay plain keys (base#2087)` | The numbered-key family of environment converts as the shell does; the golden pins the bytes and the single migrated event. |
 | `s32 a padded index is declined (base#2085)` | An index with leading zeros cannot be represented; the converter declines, keeps .setup.conf and logs one event id. |
 | `s32 a zero index is declined (base#2085)` | Index 0 cannot be represented; the converter declines. |
 | `s32 a duplicate index is declined (base#2085)` | The same index written twice is declined as a duplicate index. |
