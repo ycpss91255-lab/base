@@ -4698,6 +4698,39 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `_ISSUEREF_AWK: flags the 2-digit and 4-digit accept boundaries under every awk engine (#692)` | #692 boundary parity across engines |
 | `_ISSUEREF_AWK: keeps the must-keep cases clean under every awk engine` | Exemption parity across busybox-awk / mawk / gawk |
 
+### test/bats/unit/job_cleanup_spec.bats (7)
+
+| Test | Description |
+|------|-------------|
+| `job_cleanup: runs one scoped compose down, then removes TMPDIR, exit 0` | base#2275 -- the happy path removes exactly one compose project, then the job TMPDIR. |
+| `job_cleanup: nothing to remove (TMPDIR absent, stub exits 0) is not an error` | base#2275 -- a job that created nothing must still clean up quietly. |
+| `job_cleanup: docker failure still removes TMPDIR, warns once, exits 0` | base#2275 -- cleanup runs after a failed job and must not turn the step red; TMPDIR is removed regardless of the docker result. |
+| `job_cleanup: empty COMPOSE_PROJECT_NAME errors, no docker call, TMPDIR kept` | base#2275 -- without a project name the compose down would be unscoped; refuse before touching docker or TMPDIR. |
+| `job_cleanup: unset COMPOSE_PROJECT_NAME errors, no docker call, TMPDIR kept` | - |
+| `job_cleanup: TMPDIR without /job- is refused, nothing removed` | base#2275 -- a TMPDIR without the /job- prefix (e.g. the shared /tmp) must never be deleted. |
+| `job_cleanup: script text has no system prune, docker rm or network rm` | base#2275 -- scope limit: only the one project, never a global prune or an unscoped removal. |
+
+### test/bats/unit/job_env_spec.bats (11)
+
+Several cpu-runner jobs share one sibling docker daemon, so a fixed compose
+project name or /tmp path lets two jobs trample each other. The project name
+and TMPDIR must be unique per run/attempt/job, and TMPDIR must live under
+RUNNER_TEMP so sibling containers can see it, base#2274.
+
+| Test | Description |
+|------|-------------|
+| `job_env: worked example prints exactly the two documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
+| `job_env: creates the TMPDIR directory` | The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274. |
+| `job_env: different JOB_KEY values give different output` | Distinct jobs of one run must not share a compose project or TMPDIR, which is the whole reason the script exists, base#2274. |
+| `job_env: every non-alphanumeric character becomes one dash, none collapsed or trimmed` | The slug rule is one '-' per non-alphanumeric character with no collapsing or trimming; a realistic matrix JOB_KEY with multi and edge separators pins it, base#2274. |
+| `job_env: JOB_KEYs differing only in separator count give different output` | Collapsing dashes would map distinct JOB_KEYs to one project name and defeat per-job uniqueness, base#2274. |
+| `job_env: same input twice gives the same output and does not fail` | A job re-run in the same attempt hits an already-created directory; mkdir must not fail and the output must stay stable, base#2274. |
+| `job_env: missing GITHUB_RUN_ID reports it and creates nothing` | A missing input must stop before anything is created or printed, so a half-formed name never reaches GITHUB_ENV, base#2274. |
+| `job_env: empty GITHUB_RUN_ATTEMPT counts as not set` | GitHub can hand over an empty value; it must be refused like an unset one, not folded into the name as an empty segment, base#2274. |
+| `job_env: missing JOB_KEY reports it` | JOB_KEY is the only per-job part of the name; without it two jobs would collide, so it is refused, base#2274. |
+| `job_env: missing RUNNER_TEMP reports it` | Without RUNNER_TEMP the TMPDIR would fall outside the path sibling containers can see, so the script refuses rather than guessing a location, base#2274. |
+| `job_env: with several missing, only the first in check order is reported` | The error names one variable in a fixed order, so the message is deterministic and a test or a reader can predict which one is reported, base#2274. |
+
 ### test/bats/unit/just_provenance_lint_spec.bats (23)
 
 | Test | Description |
@@ -6546,6 +6579,20 @@ rule with nothing comparing them is the #1012 shape with one fewer copy.
 | `release-ref: every prerelease classifier under script/ci is one this spec can ask (#1012)` | "One home per classified thing" is only true while the homes agree wherever their inputs overlap. #1012's own reasoning is that three hand-kept copies of a rule are a defect BECAUSE nothing in the tree compared any pair of them; two hand-kept copies with nothing comparing them is the same shape with one fewer copy. The owner list is derived by the same predicate the site scan uses, so a third classifier lands here the day it lands in script/ci/ -- and it fails until someone states how to ask it, because an interface is the one thing a scan cannot derive. |
 | `release-ref: no two prerelease classifiers disagree where both answer (#1012)` | The two owners accept different grammars on purpose -- a released VERSION must carry the `v` a downstream repo pins, a git REF may be a full `refs/tags/...` -- so each refuses inputs the other reads. What must never happen is the pair ANSWERING a shared input differently: one of them would be marking a Release final or moving the org's `test-tools:latest` for a tag the other calls a release candidate. Only inputs both owners accept are compared; a refusal is not a disagreement. |
 
+### test/bats/unit/release_tag_format_spec.bats (5)
+
+Release notes, RC lookup and downstream upgrade all read a tag as `vX.Y.Z`
+or `vX.Y.Z-rcN`. A tag in any other shape publishes a release those tools
+misread, so the name is refused before anything is published.
+
+| Test | Description |
+|------|-------------|
+| `tag_format.sh: vX.Y.Z and vX.Y.Z-rcN pass` | The accepted shapes. A check that refuses a real release tag would fail the release it exists to protect. |
+| `tag_format.sh: every other name is refused with the format printed` | Each name is one way a tag goes wrong: missing patch, no `v`, a dotted or zero RC number, a leading zero, a non-version name, stray whitespace. A value with a newline is refused as a whole, even when one of its lines is a valid tag. |
+| `tag_format.sh: a refs/tags/ ref is checked by its tag name` | The pre-push hook holds a full remote ref, the release job a bare tag name; both must get the same answer. |
+| `tag_format.sh: no tag or an empty tag is a usage error` | A missing name must not read as a valid one. |
+| `tag_format.sh: every published tag passes` | The format was chosen to fit every tag already published. If one failed, the rule would refuse a shape that already shipped. |
+
 ### test/bats/unit/release_test_tools_yaml_spec.bats (64)
 
 Structural assertions for `.github/workflows/release-test-tools.yaml`. Locks
@@ -7171,7 +7218,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/select_runner_spec.bats (12)
+### test/bats/unit/select_runner_spec.bats (19)
 
 A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
 `false` silently moves every run to the hosted pool. Each row of the issue's
@@ -7191,6 +7238,13 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: an unlisted event is not trusted (base#2265)` | An event nobody listed (issue_comment) can carry attacker text, so the default is false (base#2265). |
 | `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
 | `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=cpu selects the cpu fleet (base#2266)` | The switch on with a trusted event is the only way to reach the CPU fleet (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED unset selects ubuntu-latest (base#2266)` | An unset switch is the rollback path, so a trusted event stays on hosted (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)` | Only the value cpu opens the fleet; gpu has no fleet here, so it falls back (base#2266). |
+| `select_runner.sh: a fork pull_request with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A fork must never get a self-hosted runner, even with the switch on (base#2266). |
+| `select_runner.sh: schedule with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | An unlisted event is untrusted, so the switch cannot lift it onto self-hosted (base#2266). |
+| `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
+| `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
 
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
 
@@ -7223,7 +7277,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (165)
+### test/bats/unit/self_test_yaml_spec.bats (166)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7662,6 +7716,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: the release body is assembled by a script that can refuse (#926)` | The extraction has to live somewhere a spec can drive it AND somewhere that can exit non-zero; inline in the workflow it was neither. This is what stops it drifting back into a `run:` block where a no-match is a silent success. |
 | `self-test.yaml: the release page carries the curated notes alone (#926)` | With both sources the larger drowns the smaller: the measured v0.42.0 body was 26,690 characters of which the curated part was five lines and the rest raw PR titles. The workflow input is the only place that choice is expressed, so it is the only place it can regress. |
 | `self-test.yaml: the release job verifies the tagged commit is on main before creating the Release (base#1712)` | The release job's needs: are test gates, which a green PR head also passes, so a v* tag pushed on a commit that is not on main would publish a Release. The base#1143 guard ran only in the reusable worker (release-worker.yaml); base's own tag path had none (base#1712). |
+| `self-test.yaml: the release job refuses a tag name outside vX.Y.Z / vX.Y.Z-rcN before publishing` | The release job runs on every `v*` tag push and on a dispatch from any tag. Only a name check before the notes and the publish keeps a `v1.0` or `v1.2.3-rc.1` tag from shipping. |
 | `self-test.yaml: declares bats-fragile job (#677)` | - |
 | `self-test.yaml: bats-fragile is a single job (no shard matrix) (#677)` | - |
 | `self-test.yaml: bats-fragile invokes test.sh --bats-fragile (#677)` | - |
