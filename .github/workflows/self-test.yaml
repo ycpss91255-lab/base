@@ -1631,7 +1631,7 @@ jobs:
     # rebuild (and its APT_MIRROR_DEBIAN fragility) is gone.
     needs: [actionlint, classify, compute-shards, test-tools-image-amd64]
     if: needs.classify.outputs.select_coverage == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
