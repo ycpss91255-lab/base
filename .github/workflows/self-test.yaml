@@ -926,6 +926,14 @@ jobs:
     #                     entry added to the function fails until the file
     #                     agrees. One-directional (extras allowed), which
     #                     is what _sync_dockerignore does for a consumer
+    #   tracked-crlf      no tracked file is stored with CRLF line endings
+    #                     in the git index unless .gitattributes marks its
+    #                     path `-text`. The root .gitattributes rule
+    #                     `* text=auto eol=lf` fixes the checkout side;
+    #                     this reads the index side, which is the same
+    #                     bytes on a Windows clone and on this runner, and
+    #                     which `text=auto` leaves alone for a file
+    #                     already committed with a CR
     #
     # GROUPED, not one job per driver, and not one job for the phase
     # (base#1071). One job per driver read best in the checks list -- the

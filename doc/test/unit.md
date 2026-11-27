@@ -9631,6 +9631,46 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `watch: an unreadable tracked file exits 1, not 0 (base#1463)` | An unreadable tracked file used to print `Permission denied` and leave the reader's status 0, so the watch reported the rest as a clean week (base#1463). As root the run drops to nobody, the only user a mode-000 file applies to. |
 | `watch: an unknown option is a usage error, distinct from both` | Exit 2 keeps a typo apart from 1 (nothing compared) and 10 (drift), which is what the workflow branches on |
 
+### test/bats/unit/tracked_crlf_lint_spec.bats (23)
+
+Unit tests for `script/test/drivers/tracked_crlf.sh` (`_run_tracked_crlf`,
+refs base#2246), the "no tracked text file is stored with CRLF line endings"
+lint. The root `.gitattributes` rule `* text=auto eol=lf` fixes what a
+checkout holds, but `text=auto` leaves a file alone once the copy in the
+index carries a CR, so a CRLF file committed before the rule stays CRLF with
+nothing reporting it. The lint reads the INDEX side of `git ls-files --eol`,
+which is the same bytes on a Windows clone and on a CI runner. `-text` in
+`.gitattributes` is the only exemption -- the mark this repo's deliberate
+CRLF fixtures already carry -- and `eol=crlf` is not one. Driven over
+throwaway repositories, with a case for each way the lint could go green
+having read nothing.
+
+| Test | Description |
+|------|-------------|
+| `_run_tracked_crlf: passes when every tracked file is stored with LF (base#2246)` | A tree of LF files must not be reported |
+| `_run_tracked_crlf: the clean report names how many tracked files it examined (base#2246)` | The clean report states how many files it read, so a run over nothing cannot look like a run over the tree |
+| `_run_tracked_crlf: FAILS on a tracked file stored with CRLF, naming it (base#2246)` | The defect itself -- a text file stored with CRLF |
+| `_run_tracked_crlf: FAILS on a tracked file with mixed line endings (base#2246)` | A file with only SOME lines ending in CRLF breaks the same readers |
+| `_run_tracked_crlf: names EVERY offender, not only the first (base#2246)` | Every offender is reported, so one run is the whole list |
+| `_run_tracked_crlf: a path with a space is named verbatim, unquoted (base#2246)` | The report must name a path a reader can hand straight back to git |
+| `_run_tracked_crlf: a CRLF file whose path is marked -text is exempt (base#2246)` | A byte-exact CRLF fixture marked `-text` is content, not a finding |
+| `_run_tracked_crlf: a CRLF file whose path is marked binary is exempt (base#2246)` | The `binary` macro carries -text, so it exempts the same way |
+| `_run_tracked_crlf: a -text line does not exempt a different path (base#2246)` | The exemption is per path -- one -text line must not excuse a sibling |
+| `_run_tracked_crlf: eol=crlf does NOT exempt a file already stored with CRLF (base#2246)` | `eol=crlf` is a checkout rule, not an exemption -- such a file is still stored with LF, and one that is not needs the same renormalize |
+| `_run_tracked_crlf: an eol=crlf file normalised on add passes although its working copy is CRLF (base#2246)` | The ordinary Windows-script case must stay green -- CRLF on disk, LF in the index |
+| `_run_tracked_crlf: an untracked CRLF file is not reported (base#2246)` | Only the index is judged; a stray untracked file is not this repo's content |
+| `_run_tracked_crlf: a file git detects as binary is not reported (base#2246)` | A file git detects as binary has no line ending to get wrong |
+| `_run_tracked_crlf: an empty tracked file is counted and not reported (base#2246)` | An empty tracked file is a real file with nothing to judge |
+| `_run_tracked_crlf: a tree that is not a git work tree DIES rather than passing (base#2246)` | A directory with no index has no answer, and no answer is not a pass |
+| `_run_tracked_crlf: a work tree with no tracked file DIES rather than passing (base#2246)` | A repository tracking nothing would make the loop visit nothing |
+| `_run_tracked_crlf: an unreachable worktree gitdir is reported NOT RUN, never clean (base#2246)` | A worktree checkout bind-mounted without its gitdir cannot be read at all; the driver must say it examined nothing instead of claiming clean |
+| `_run_tracked_crlf: a .git file that is not a gitdir pointer DIES rather than being skipped (base#2246)` | The NOT RUN branch is for a pointer that does not resolve; a `.git` file that is not a pointer at all must still be refused |
+| `tracked-crlf: is a member of the lint phase's tool table` | A lint nobody runs is a comment |
+| `tracked-crlf: has a lint-static CI join` | One lint group and exactly one, because none gates nothing and two pays twice |
+| `tracked-crlf: its failure event id is registered` | An unregistered event id is an anonymous exit: the log line carries no name a reader can look up |
+| `tracked-crlf: the dispatcher has a case arm for it (base#2246)` | The driver must be dispatchable by the name the table carries |
+| `tracked-crlf: base's own root .gitattributes carries the LF rule the lint cites (base#2246)` | The rule the lint cites must be the one the root .gitattributes opens with; a lint guarding a rule the file no longer carries guards nothing |
+
 ### test/bats/unit/transcript_lnav_spec.bats (8)
 
 Regex-type lnav format for the plain-text wrapper transcript
