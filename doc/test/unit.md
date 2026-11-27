@@ -4713,6 +4713,18 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `_ISSUEREF_AWK: flags the 2-digit and 4-digit accept boundaries under every awk engine (#692)` | #692 boundary parity across engines |
 | `_ISSUEREF_AWK: keeps the must-keep cases clean under every awk engine` | Exemption parity across busybox-awk / mawk / gawk |
 
+### test/bats/unit/job_cleanup_spec.bats (7)
+
+| Test | Description |
+|------|-------------|
+| `job_cleanup: runs one scoped compose down, then removes TMPDIR, exit 0` | base#2275 -- the happy path removes exactly one compose project, then the job TMPDIR. |
+| `job_cleanup: nothing to remove (TMPDIR absent, stub exits 0) is not an error` | base#2275 -- a job that created nothing must still clean up quietly. |
+| `job_cleanup: docker failure still removes TMPDIR, warns once, exits 0` | base#2275 -- cleanup runs after a failed job and must not turn the step red; TMPDIR is removed regardless of the docker result. |
+| `job_cleanup: empty COMPOSE_PROJECT_NAME errors, no docker call, TMPDIR kept` | base#2275 -- without a project name the compose down would be unscoped; refuse before touching docker or TMPDIR. |
+| `job_cleanup: unset COMPOSE_PROJECT_NAME errors, no docker call, TMPDIR kept` | - |
+| `job_cleanup: TMPDIR without /job- is refused, nothing removed` | base#2275 -- a TMPDIR without the /job- prefix (e.g. the shared /tmp) must never be deleted. |
+| `job_cleanup: script text has no system prune, docker rm or network rm` | base#2275 -- scope limit: only the one project, never a global prune or an unscoped removal. |
+
 ### test/bats/unit/job_env_spec.bats (11)
 
 Several cpu-runner jobs share one sibling docker daemon, so a fixed compose
