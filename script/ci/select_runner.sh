@@ -22,17 +22,22 @@
 # line on stderr naming the variable, answers false, and exits 0.
 set -euo pipefail
 
-if [[ -z "${EVENT_NAME:-}" ]]; then
-  printf '::error::select_runner: EVENT_NAME is not set\n' >&2
+readonly HOSTED_RUNS_ON='["ubuntu-latest"]'
+readonly CPU_RUNS_ON='["self-hosted","linux","x64","cpu"]'
+
+# _fail_closed <message>: name the missing input on stderr and answer hosted.
+_fail_closed() {
+  printf '::error::select_runner: %s\n' "$1" >&2
   printf 'trusted=false\n'
-  printf 'runs_on=["ubuntu-latest"]\n'
+  printf 'runs_on=%s\n' "${HOSTED_RUNS_ON}"
   exit 0
+}
+
+if [[ -z "${EVENT_NAME:-}" ]]; then
+  _fail_closed 'EVENT_NAME is not set'
 fi
 if [[ -z "${REPO:-}" ]]; then
-  printf '::error::select_runner: REPO is not set\n' >&2
-  printf 'trusted=false\n'
-  printf 'runs_on=["ubuntu-latest"]\n'
-  exit 0
+  _fail_closed 'REPO is not set'
 fi
 
 trusted=false
@@ -52,9 +57,9 @@ case "${EVENT_NAME}" in
     ;;
 esac
 
-runs_on='["ubuntu-latest"]'
+runs_on="${HOSTED_RUNS_ON}"
 if [[ "${trusted}" == "true" && "${CI_SELF_HOSTED:-}" == "cpu" ]]; then
-  runs_on='["self-hosted","linux","x64","cpu"]'
+  runs_on="${CPU_RUNS_ON}"
 fi
 
 printf 'trusted=%s\n' "${trusted}"
