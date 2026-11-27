@@ -1196,7 +1196,7 @@ jobs:
     # and the tag's `release` job needs it.
     needs: [actionlint, classify, test-tools-image-amd64]
     if: needs.classify.outputs.select_mutation_roster == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}
     # 150, carried over from lint-static, whose roster step it was: on PR
     # #1538's run 41736192401 shards 1/4, 2/4 and 4/4 were cancelled at 90
     # minutes with their roster step still running after 87 minutes, while
