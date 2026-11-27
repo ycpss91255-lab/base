@@ -209,6 +209,10 @@ jobs:
       testtools_changed: ${{ steps.diff.outputs.testtools_changed }}
       # A skipped trust step (push, pull_request) reads as untrusted.
       merge_group_same_repo: ${{ steps.trust.outputs.same_repo || 'false' }}
+      # The runner choice, made once here for later children (base#2268,
+      # part of base#1586). No job takes its runs-on from these yet.
+      runner_trusted: ${{ steps.runner.outputs.trusted }}
+      runs_on_cpu: ${{ steps.runner.outputs.runs_on }}
       # select_<job>: whether the diff can affect each classify-gated job
       # (base#1584). Each gated job's `if:` reads its own key, and the
       # rollup passes that job's skip only when the same key is `false`.
@@ -244,6 +248,17 @@ jobs:
           HEAD_SHA: ${{ github.event.merge_group.head_sha }}
           HEAD_REF: ${{ github.event.merge_group.head_ref }}
         run: bash ./script/ci/merge_group_trust.sh >> "${GITHUB_OUTPUT}"
+
+      # Whether this event's code is trusted enough for a self-hosted
+      # runner, and which runs-on that means (base#2268, part of base#1586).
+      - id: runner
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          MERGE_GROUP_SAME_REPO: ${{ steps.trust.outputs.same_repo }}
+          CI_SELF_HOSTED: ${{ vars.CI_SELF_HOSTED }}
+        run: bash ./script/ci/select_runner.sh >> "${GITHUB_OUTPUT}"
 
       - id: diff
         env:
