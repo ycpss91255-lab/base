@@ -2148,7 +2148,7 @@ jobs:
   config-gen-gates:
     name: Config-gen Go gates (base#1462)
     needs: [classify]
-    if: needs.classify.outputs.select_config_gen == 'true'
+    if: needs.classify.outputs.select_config_gen == 'true' && (github.event_name != 'pull_request' && github.event_name != 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository)
     # The config generator's Go gates (ADR-00000039): fmt, vet, lint, race
     # and coverage in dockerfile/Dockerfile.config-gen's test stage and the
     # binary's usage contract, as ONE command, `just test go-gates`, which
@@ -2166,7 +2166,7 @@ jobs:
     # $GITHUB_ENV -- fails that spec rather than leaving this job green
     # with the gates unrun. The map drops select_config_gen for docs, spec
     # leaves and exact config-gen deny-list paths.
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}
     # The gates' test and final stages: two docker builds and the mutation
     # gate over the changed packages. A ceiling, not a budget; not raised
     # by base#1547.
