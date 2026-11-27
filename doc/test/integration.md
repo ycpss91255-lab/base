@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **384 tests**.
+Integration specs under `test/bats/integration/`: **394 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -334,6 +334,32 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 hash golden: noise goldens are byte-identical to base3` | noise lines must not move the hash, so both noise goldens equal base3's. |
 | `s43 hash golden: a missing Dockerfile gives empty hash and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty result and rc 0. |
 | `s43 hash golden: every hash fixture has exactly one golden and no extra` | a hash fixture with no golden, or a golden with no fixture, must fail. |
+
+### test/bats/integration/config_gen_s43_wrapper_copy_golden_spec.bats (10)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_wcopy_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2055):
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> [TAB
+matched=.. TAB available=.. TAB names=.. TAB rewritten=..] The fixture is
+run as the relative path `Dockerfile` in a scratch directory. The prefix is
+s43_wcopy_, not s43_migrate_ (that is the base#2055 partition).
+
+| Test | Description |
+|------|-------------|
+| `s43 wcopy golden: shape A is rewritten` | shape A (`COPY *.sh`) is rewritten to the wrapper glob, then flat_to_dist. |
+| `s43 wcopy golden: shape B is rewritten` | shape B (`COPY .base/script/docker/*.sh`) gives the same result as A. |
+| `s43 wcopy golden: dist wrapper glob is unchanged` | the dist wrapper glob is the fixed point, nothing is rewritten. |
+| `s43 wcopy golden: shape A events golden equals the issue's literal events` | the issue gives the shape A events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 wcopy golden: shape A dockerfile golden equals the issue's literal` | the issue gives the shape A Dockerfile as a literal. |
+| `s43 wcopy golden: shape B goldens are byte-identical to shape A goldens` | shape B ends in the same state as shape A (issue item 2). |
+| `s43 wcopy golden: shape A files golden is the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 wcopy golden: dist files golden is 0 bytes and events literal` | the fixed point is a no-op: 0-byte .files, one report event, dockerfile == fixture. |
+| `s43 wcopy golden: dist dockerfile golden equals its fixture` | nothing is rewritten, so the dockerfile golden must be the fixture bytes. |
+| `s43 wcopy golden: every fixture has exactly its three goldens and no extra` | each wcopy fixture has exactly the three goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (17)
 
