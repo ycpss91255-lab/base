@@ -5356,7 +5356,7 @@ builds nothing and pushes nothing)
 | `multi-distro-build-worker.yaml: ci-passed job has explicit name: ci-passed (matches existing multi-distro rollup contract) (#325 B-1)` | - |
 | `multi-distro-build-worker.yaml: every job's grant is pinned as an exact set (#957)` | - |
 
-### test/bats/unit/mutation_probe_spec.bats (69)
+### test/bats/unit/mutation_probe_spec.bats (70)
 
 A green suite says every assertion ran. It does not say any of them would
 have noticed a wrong answer, and the v0.43 retrospective measured how far
@@ -5463,6 +5463,7 @@ Faking that comparison would test a control this repo does not ship.
 | `_mutation_probe: --filter runs the mutated pass under the witness filter (base#1571)` | a roster row's verdict rests on a few witness tests, yet its mutated pass ran every @test in the spec -- 65 for gomod_scan, 54 for config_gen_gates (base#1571). With --filter <regex> the probe hands the filter to the runner for the mutated pass, as a third argument after the root and the spec (the default runner turns it into test.sh --filter), so only the witnesses run, and a red among them is still reported PINNED. |
 | `_mutation_probe: a --filter mutant that stays green falls back to the whole spec (base#1571)` | a witness filter can be too narrow -- the pinned witnesses come from an older run, and a mutant the named witnesses miss can still be caught by another @test in the spec. A filtered green is therefore not a verdict: the probe falls back to the whole spec, so a row is never reported as surviving only because the filter left out the test that notices (base#1571). Here the filtered pass stays green and the whole-spec pass has a red, so the answer is PINNED, the red comes from the fallback run, and the last runner call had no filter. |
 | `_mutation_probe: a --filter fall-back whose whole-spec baseline is red is refused (base#1582)` | the fall-back judges the whole-spec run against a whole-spec baseline (base#1582). A spec already red outside the filter before any mutation is red the same way under it, so that red says nothing about the mutation: the probe refuses rather than report PINNED, and puts the subject back. Here the whole spec is red both mutated and clean. |
+| `_mutation_probe: a red whole-spec baseline is refused with what each red test printed (base#2225)` | a red whole-spec baseline is a fault of the suite in the probe's sandbox, and the names of the red tests do not say what went wrong in them. The refusal quotes what bats printed under each red test, so the reader can tell a failed assertion from a test that never finished without a second run. What a passing test printed is left out. |
 | `_mutation_probe: a --filter fall-back whose whole-spec baseline has no results is refused (base#1582)` | a whole-spec baseline that printed no test result is no baseline, so the fall-back has nothing to compare its whole-spec run against and refuses (base#1582). |
 | `_mutation_probe: a --filter fall-back whose whole-spec baseline did not finish is refused (base#1582)` | a whole-spec baseline that printed only greens and then exited non-zero did not finish, so its count is not a baseline and the fall-back refuses (base#1582). |
 
