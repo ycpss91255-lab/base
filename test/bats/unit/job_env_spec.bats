@@ -29,6 +29,7 @@ _run_env() {
   run --separate-stderr env -i PATH="${PATH}" "$@" bash "${JOB_ENV}"
 }
 
+# why: The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274.
 @test "job_env: worked example prints exactly the two documented lines" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
     JOB_KEY=Config-gen/Gates RUNNER_TEMP="${RT}"
@@ -38,6 +39,7 @@ _run_env() {
   [ "${lines[1]}" = "TMPDIR=${RT}/job-42-1-config-gen-gates" ]
 }
 
+# why: The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274.
 @test "job_env: creates the TMPDIR directory" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
     JOB_KEY=Config-gen/Gates RUNNER_TEMP="${RT}"
@@ -45,6 +47,7 @@ _run_env() {
   [ -d "${RT}/job-42-1-config-gen-gates" ]
 }
 
+# why: Distinct jobs of one run must not share a compose project or TMPDIR, which is the whole reason the script exists, base#2274.
 @test "job_env: different JOB_KEY values give different output" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
     JOB_KEY=Lint RUNNER_TEMP="${RT}"
@@ -58,6 +61,7 @@ _run_env() {
   [ "${output}" != "${first}" ]
 }
 
+# why: A job re-run in the same attempt hits an already-created directory; mkdir must not fail and the output must stay stable, base#2274.
 @test "job_env: same input twice gives the same output and does not fail" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
     JOB_KEY=Config-gen/Gates RUNNER_TEMP="${RT}"
@@ -71,6 +75,7 @@ _run_env() {
   [ -d "${RT}/job-42-1-config-gen-gates" ]
 }
 
+# why: A missing input must stop before anything is created or printed, so a half-formed name never reaches GITHUB_ENV, base#2274.
 @test "job_env: missing GITHUB_RUN_ID reports it and creates nothing" {
   _run_env GITHUB_RUN_ATTEMPT=1 JOB_KEY=Lint RUNNER_TEMP="${RT}"
   [ "${status}" -eq 1 ]
@@ -79,6 +84,7 @@ _run_env() {
   [ -z "$(ls -A "${RT}")" ]
 }
 
+# why: GitHub can hand over an empty value; it must be refused like an unset one, not folded into the name as an empty segment, base#2274.
 @test "job_env: empty GITHUB_RUN_ATTEMPT counts as not set" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT= JOB_KEY=Lint RUNNER_TEMP="${RT}"
   [ "${status}" -eq 1 ]
@@ -87,6 +93,7 @@ _run_env() {
   [ -z "$(ls -A "${RT}")" ]
 }
 
+# why: JOB_KEY is the only per-job part of the name; without it two jobs would collide, so it is refused, base#2274.
 @test "job_env: missing JOB_KEY reports it" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 RUNNER_TEMP="${RT}"
   [ "${status}" -eq 1 ]
@@ -95,6 +102,7 @@ _run_env() {
   [ -z "$(ls -A "${RT}")" ]
 }
 
+# why: Without RUNNER_TEMP the TMPDIR would fall outside the path sibling containers can see, so the script refuses rather than guessing a location, base#2274.
 @test "job_env: missing RUNNER_TEMP reports it" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 JOB_KEY=Lint
   [ "${status}" -eq 1 ]
@@ -102,6 +110,7 @@ _run_env() {
   [ "${stderr}" = "::error::job_env: RUNNER_TEMP is not set" ]
 }
 
+# why: The error names one variable in a fixed order, so the message is deterministic and a test or a reader can predict which one is reported, base#2274.
 @test "job_env: with several missing, only the first in check order is reported" {
   _run_env RUNNER_TEMP="${RT}"
   [ "${status}" -eq 1 ]
