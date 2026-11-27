@@ -7233,7 +7233,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/select_runner_spec.bats (19)
+### test/bats/unit/select_runner_spec.bats (24)
 
 A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
 `false` silently moves every run to the hosted pool. Each row of the issue's
@@ -7254,8 +7254,13 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)` | A missing input must be named on stderr and answered false, never read as trusted (base#2265). |
 | `select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)` | Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265). |
 | `select_runner.sh: trusted + CI_SELF_HOSTED=cpu selects the cpu fleet (base#2266)` | The switch on with a trusted event is the only way to reach the CPU fleet (base#2266). |
-| `select_runner.sh: trusted + CI_SELF_HOSTED unset selects ubuntu-latest (base#2266)` | An unset switch is the rollback path, so a trusted event stays on hosted (base#2266). |
-| `select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)` | Only the value cpu opens the fleet; gpu has no fleet here, so it falls back (base#2266). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED empty selects the cpu fleet (base#2287)` | Default-on (owner 2026-11-28): an empty switch must reach the CPU fleet so nobody has to set a variable (base#2287). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED unset selects the cpu fleet (base#2287)` | A variable that was never defined is the normal day-to-day state and must also reach the CPU fleet (base#2287). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=off selects ubuntu-latest (base#2287)` | off is the rollback path used when every CPU host is down, so a trusted event goes to hosted (base#2287). |
+| `select_runner.sh: a fork pull_request with CI_SELF_HOSTED unset selects ubuntu-latest (base#2287)` | An untrusted event stays hosted even when the switch is unset, the new default must not open it (base#2287). |
+| `select_runner.sh: schedule with CI_SELF_HOSTED=off selects ubuntu-latest (base#2287)` | An untrusted event stays hosted with off as well, same answer as every other value (base#2287). |
+| `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED unset selects ubuntu-latest (base#2287)` | Missing inputs fail closed to hosted even though an unset switch now means on (base#2287). |
+| `select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)` | gpu has no fleet here, so any value other than empty or cpu falls back (base#2287). |
 | `select_runner.sh: a fork pull_request with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A fork must never get a self-hosted runner, even with the switch on (base#2266). |
 | `select_runner.sh: schedule with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | An unlisted event is untrusted, so the switch cannot lift it onto self-hosted (base#2266). |
 | `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
