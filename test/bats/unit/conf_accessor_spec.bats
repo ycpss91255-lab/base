@@ -1066,9 +1066,10 @@ _seed_layer_memo() {
 
 # _seed_unwritable_memo
 #   _seed_layer_memo, then the memo directory is made unusable (chmod 555;
-#   as root, whose writes ignore the mode, a path under a regular file) and the shared warn flag is created in
-#   the top-level shell, outside the unwritable directory, the way
-#   setup.sh creates it next to the memo directory.
+#   as root, whose writes ignore the mode, a path under a regular file).
+#   The shared warn flag path is set in the top-level shell, outside the
+#   unwritable directory, the way setup_cmd.sh puts it next to the memo
+#   directory; the file itself is not created, so the first load creates it.
 _seed_unwritable_memo() {
   _seed_layer_memo
   if [[ "$(id -u)" == 0 ]]; then
