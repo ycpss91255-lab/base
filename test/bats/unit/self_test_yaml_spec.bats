@@ -5225,3 +5225,30 @@ EOT
   run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | (.value["runs-on"] // "") | tostring')"
   assert_failure
 }
+
+# config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED
+# switch via classify's runs_on_cpu; everything else on the job is unchanged
+# (base#2271, part of base#1586). Expected values are the issue's literals.
+@test "self-test.yaml: config-gen-redpath runs-on comes from classify runs_on_cpu, rest of the job unchanged (base#2271)" {
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].if'
+  assert_success
+  assert_output "needs.classify.outputs.select_config_gen_redpath == 'true'"
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["timeout-minutes"]'
+  assert_success
+  assert_output '120'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.shard | join(",")'
+  assert_success
+  assert_output '1,2,3,4,5'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include | length'
+  assert_success
+  assert_output '1'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include[0].shard'
+  assert_success
+  assert_output '5'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include[0].label'
+  assert_success
+  assert_output ' + rerun, the baseline'
+}
