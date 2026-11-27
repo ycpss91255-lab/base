@@ -17,14 +17,10 @@ for var in GITHUB_RUN_ID GITHUB_RUN_ATTEMPT JOB_KEY RUNNER_TEMP; do
   fi
 done
 
-# Lowercase, every run of non [a-z0-9] becomes one '-', no edge dashes.
+# Lowercase, every non [a-z0-9] character becomes one '-'; no collapsing or
+# trimming, so distinct JOB_KEYs stay distinct (a-b vs a--b), base#2274.
 slug="${JOB_KEY,,}"
 slug="${slug//[^a-z0-9]/-}"
-while [[ "${slug}" == *--* ]]; do
-  slug="${slug//--/-}"
-done
-slug="${slug#-}"
-slug="${slug%-}"
 
 id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${slug}"
 tmp="${RUNNER_TEMP}/job-${id}"
