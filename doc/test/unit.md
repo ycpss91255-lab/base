@@ -7272,7 +7272,7 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
 | `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
 
-### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
+### test/bats/unit/self_hosted_guard_lint_spec.bats (28)
 
 | Test | Description |
 |------|-------------|
@@ -7288,6 +7288,8 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS on a bare hostname label` | - |
 | `self-hosted guard: names the exact condition to paste in the failure message` | - |
 | `self-hosted guard: PASSES a literal GitHub-hosted runs-on with no guard` | - |
+| `self-hosted guard: PASSES an unguarded runs-on from classify runs_on_cpu (base#2286)` | base#2286. classify 的 runs_on_cpu 已由 select_runner.sh 依事件決定 runner，fork PR 仍落在 hosted，所以這個 runs-on 不需要再加 guard。 |
+| `self-hosted guard: FAILS an unguarded runs-on from any other classify output (base#2286)` | base#2286. 只有 runs_on_cpu 被認作已守衛；其他 classify 輸出仍須 guard， 否則放寬會漏掉真正未守衛的 self-hosted runs-on。 |
 | `self-hosted guard: PASSES the arm + amd hosted families and a windows/macos runner` | - |
 | `self-hosted guard: PASSES a literal matrix that resolves entirely to hosted labels` | - |
 | `self-hosted guard: PASSES a LOCAL reusable-workflow call` | - |
@@ -7303,7 +7305,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (166)
+### test/bats/unit/self_test_yaml_spec.bats (167)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7789,6 +7791,7 @@ rolling tag itself (#697, #1010)
 | `roster probe: every spelling that runs the roster is seen, and an ungated one is caught (base#1461)` | The probe decides by execution. Each spelling that runs the driver is seen once, a step that does not run it is not seen, and the two ways a step can run it without gating -- `\|\| true` and an `if:` -- are caught. |
 | `self-test.yaml: ci-rollup needs single-issue-pr and classify never gates it (base#1629)` | Branch protection requires ci-rollup alone. A single-issue-pr job outside its needs would be a check nobody is blocked by, and a select_single_issue_pr key would let classify skip it on a doc-only PR, which is exactly where a bundled PR slips through (base#1629). |
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
+| `self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)` | classify is where the runner choice is made once for the whole workflow. It must run script/ci/select_runner.sh in a step `runner` and publish its two lines as job outputs, so later children can read them without re-deriving trust (base#2268, part of base#1586). |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 
