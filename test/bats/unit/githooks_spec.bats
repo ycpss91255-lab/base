@@ -23,6 +23,7 @@ setup() {
   export GIT_CONFIG_NOSYSTEM=1
   unset GIT_CONFIG_GLOBAL
 
+  ZERO_SHA="0000000000000000000000000000000000000000"
   REPO="${SCRATCH}/repo"
   git init -q "${REPO}"
   mkdir -p "${REPO}/.github/workflows"
@@ -43,9 +44,24 @@ _wf() {
   } > "${REPO}/.github/workflows/${1}"
 }
 
-# _push_hook -- run the hook from the fixture repo the way git does.
+# _commit -- commit the fixture repo's tree; prints the new commit sha.
+_commit() {
+  git -C "${REPO}" add -A
+  git -C "${REPO}" -c user.name=fixture -c user.email=fixture@example.invalid \
+    commit -q --no-gpg-sign -m fixture
+  git -C "${REPO}" rev-parse HEAD
+}
+
+# _push_hook <stdin lines> -- run the hook from the fixture repo the way git
+# does: remote name and url as arguments, one ref line per pushed ref on stdin.
 _push_hook() {
-  run bash -c 'cd "$1" && "$2" origin https://example.invalid/repo.git </dev/null' _ "${REPO}" "${HOOK}"
+  run bash -c 'cd "$1" && printf "%s" "$3" | "$2" origin https://example.invalid/repo.git' \
+    _ "${REPO}" "${HOOK}" "${1}"
+}
+
+# _ref_line <local sha> -- the stdin line git writes for pushing main.
+_ref_line() {
+  printf 'refs/heads/main %s refs/heads/main %s\n' "${1}" "${ZERO_SHA}"
 }
 
 # why: The hook blocks a push when a workflow has no dynamic run-name
@@ -53,7 +69,7 @@ _push_hook() {
   assert_spec_subject "${HOOK}" "the tracked pre-push hook"
   _wf good.yaml "run-name: \${{ github.event_name }}"
   _wf bad.yaml "run-name: static"
-  _push_hook
+  _push_hook "$(_ref_line "$(_commit)")"
   assert_failure
   assert_output --partial "bad.yaml: run-name has no"
   refute_output --partial "good.yaml:"
@@ -62,7 +78,7 @@ _push_hook() {
 # why: The hook blocks a workflow with no run-name at all
 @test "pre-push: blocks when a workflow has no run-name" {
   _wf missing.yaml ""
-  _push_hook
+  _push_hook "$(_ref_line "$(_commit)")"
   assert_failure
   assert_output --partial "missing.yaml: no top-level run-name"
 }
@@ -71,7 +87,39 @@ _push_hook() {
 @test "pre-push: allows the push when every workflow has a dynamic run-name" {
   _wf a.yaml "run-name: \${{ github.event_name }}"
   _wf b.yml "run-name: \${{ github.ref_name || '?' }}"
-  _push_hook
+  _push_hook "$(_ref_line "$(_commit)")"
+  assert_success
+}
+
+# why: The hook checks the commit being pushed, not the working tree: a
+# fix that is only in the working tree does not reach the remote
+@test "pre-push: blocks a pushed commit that is bad even when the working tree is fixed" {
+  _wf a.yaml "run-name: static"
+  local _sha
+  _sha="$(_commit)"
+  _wf a.yaml "run-name: \${{ github.event_name }}"
+  _push_hook "$(_ref_line "${_sha}")"
+  assert_failure
+  assert_output --partial "a.yaml: run-name has no"
+}
+
+# why: An unstaged mistake in the working tree is not what is pushed, so it
+# does not block a good commit
+@test "pre-push: allows a pushed commit that is good even when the working tree is broken" {
+  _wf a.yaml "run-name: \${{ github.event_name }}"
+  local _sha
+  _sha="$(_commit)"
+  _wf a.yaml "run-name: static"
+  _push_hook "$(_ref_line "${_sha}")"
+  assert_success
+}
+
+# why: Deleting a remote branch pushes no commit, so there is nothing to check
+@test "pre-push: a branch deletion is not checked" {
+  _wf a.yaml "run-name: static"
+  local _sha
+  _sha="$(_commit)"
+  _push_hook "$(printf '(delete) %s refs/heads/old %s\n' "${ZERO_SHA}" "${_sha}")"
   assert_success
 }
 
