@@ -4018,6 +4018,28 @@ could have said so: that workflow carried no spec at all.
 | `.gitattributes: the generated changelog index merges by union (#926)` | The original scope of the rule, kept rather than assumed: the index is derived and the layout lint re-derives it, so a union duplicate there is reported instead of shipped. |
 | `.gitattributes: CONVENTIONS.md is NOT union-merged (#926)` | The boundary the widened glob nearly crossed. A gitattributes `*` does not cross `/`, so `doc/changelog/*.md` would have covered hand-written prose -- where union merging keeps both copies of a rewritten paragraph in silence, and no gate in this repo reads that file outside its marker block. |
 
+### test/bats/unit/githooks_spec.bats (10)
+
+Unit tests for the local git hooks (`.githooks/pre-push`) and their
+installer (`script/githooks/install.sh`). The pre-push hook is the first,
+local gate for the workflow run-name rule and must run the same driver CI
+runs; CI stays the real gate. The installer is the one command that turns
+the hooks on for a checkout, sets only this repo's config, and refuses to
+silently disable hooks that are already in use.
+
+| Test | Description |
+|------|-------------|
+| `pre-push: blocks when a workflow lacks a dynamic run-name` | The hook blocks a push when a workflow has no dynamic run-name |
+| `pre-push: blocks when a workflow has no run-name` | The hook blocks a workflow with no run-name at all |
+| `pre-push: allows the push when every workflow has a dynamic run-name` | The hook lets a push through when every workflow passes |
+| `pre-push: is tracked as an executable file` | The hook must be executable in the index, or git skips it on Linux and macOS checkouts |
+| `install: sets core.hooksPath to .githooks in the local config` | One command turns the hooks on, in this repo's own config only |
+| `install: is idempotent` | Running the installer twice is harmless |
+| `install: refuses to replace another core.hooksPath` | A hooks path already set elsewhere is not overwritten, so hooks the contributor already relies on keep running |
+| `install: refuses when .git/hooks has an active hook, --force overrides` | Setting core.hooksPath stops .git/hooks from running, so an active hook there is a refusal unless --force says it may stop |
+| `install --check: fails before install and passes after` | The verify step says whether the hooks are active, by exit status |
+| `install: a different fresh repo stays without core.hooksPath` | Other repos, such as the ones the suite creates, never get the hooks |
+
 ### test/bats/unit/gitignore_spec.bats (55)
 
 Unit tests for `template/script/docker/lib/gitignore.sh` — the canonical

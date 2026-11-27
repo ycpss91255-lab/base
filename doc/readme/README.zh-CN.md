@@ -723,7 +723,7 @@ tag 时把 Dockerfile 的某个 target stage 推到 registry；它的参数、�
 范例，以及 base release 的 source archive 与下游 release 有何不同，见
 [publish-worker.md](../guide/publish-worker.md)。
 
-<!-- sync: development-and-tests 750400f91f7b b75bafeb43e0 -->
+<!-- sync: development-and-tests c8d5580ee71c 38bba4c958b0 -->
 ## 开发与测试
 
 在 base checkout 内（`script/test/justfile.test`）：
@@ -739,7 +739,12 @@ just test system        # opt-in 的 System 层（需要 host docker）
 just test acceptance    # Acceptance 层：真的 scaffold 一个 consumer
 just test smoke         # 出货的 smoke spec
 just release coverage-badge   # 从 coverage/ 重新产生 doc/badge/coverage.svg
+just githooks install   # 启用 .githooks/ 里的 git hook（只影响这个 repo）
+just githooks check     # 确认 hook 已启用（启用时 exit 0）
 ```
+
+每个 clone 执行一次 `just githooks install`。之后 `pre-push` hook 会在每次 push
+前跑 `workflow-run-name` lint，不需要 Docker；CI 也跑同一个检查，仍是真正的关卡。
 
 覆盖率徽章是 Bats 全套对 Bash 原始码量到的 kcov 行覆盖率，每次 release 量一次；
 Go 包由各自的 per-package floor 把关（`just test go`）。量测方式见
