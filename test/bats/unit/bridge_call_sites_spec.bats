@@ -20,6 +20,8 @@ setup() {
   DOC_REL="doc/guide/bridge-call-sites.md"
   LIB_REL="dist/script/docker/lib"
   SCRATCH="$(mktemp -d)"
+  # a table row whose first cell is a `file:line` code span
+  ROW_RE='^\|[[:space:]]*`[^`]+:[0-9]+`'
 }
 
 teardown() {
@@ -41,7 +43,7 @@ _scan_sites() {
 # _doc_sites DOC -> every `file:line` first-column cell, in order (dups kept).
 _doc_sites() {
   local _doc="${1}"
-  grep -E '^\|[[:space:]]*`[^`]+:[0-9]+`' "${_doc}" \
+  grep -E "${ROW_RE}" "${_doc}" \
     | sed -E 's#^\|[[:space:]]*`([^`]+:[0-9]+)`.*#\1#'
 }
 
@@ -122,7 +124,7 @@ EOF
     _status="$(awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/,"",$6); print $6}' <<<"${_line}")"
     [ -n "${_cmd}" ] || { echo "empty command: ${_line}"; false; }
     [ -n "${_status}" ] || { echo "empty status: ${_line}"; false; }
-  done < <(grep -E '^\|[[:space:]]*`[^`]+:[0-9]+`' "${ROOT}/${DOC_REL}")
+  done < <(grep -E "${ROW_RE}" "${ROOT}/${DOC_REL}")
   [ "${_n}" -eq 10 ]
 }
 
