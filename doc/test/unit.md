@@ -7272,7 +7272,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (166)
+### test/bats/unit/self_test_yaml_spec.bats (167)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
