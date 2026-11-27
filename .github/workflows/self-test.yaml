@@ -1895,6 +1895,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Put TMPDIR under RUNNER_TEMP (job_env.sh)
+        # On the cpu fleet the scaffold under a /tmp TMPDIR failed the
+        # TOML merge (conf_toml_merge_failed, run 46080939073); TMPDIR goes
+        # under RUNNER_TEMP through job_env.sh, base#2270.
+        env:
+          JOB_KEY: acceptance-${{ matrix.arch }}
+        run: ./script/ci/job_env.sh >> "${GITHUB_ENV}"
+
       - name: Set up Docker Buildx
         # Use the docker driver (not docker-container) so the run-scoped
         # test-tools image lives in the host docker daemon's image store. The subsequent
