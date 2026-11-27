@@ -922,6 +922,14 @@ _assert_mutants_fail() {
 _tt_resolve() {
   local _t="${4}" _rt=/RT _v _new
   local _re="needs\[format\('([^']*)\{0\}', matrix\.([A-Za-z0-9_]+)\)\]"
+  local _fre='^\$\{\{[[:space:]]*fromJSON\(matrix\.([A-Za-z0-9_]+)\)[[:space:]]*\}\}$'
+  # `${{ fromJSON(matrix.K) }}` is the leg's K, a JSON list of runner labels
+  # (base#2270); it resolves to those labels, comma-joined.
+  if [[ "${_t}" =~ ${_fre} ]]; then
+    _v="$(LP_K="${BASH_REMATCH[1]}" yq -p json '.[strenv(LP_K)] // ""' <<< "${3}")"
+    yq -p json '. | join(",")' <<< "${_v}"
+    return 0
+  fi
   _t="${_t//'${{ runner.temp }}'/${_rt}}"
   while [[ "${_t}" =~ ${_re} ]]; do
     _v="$(LP_K="${BASH_REMATCH[2]}" yq -p json '.[strenv(LP_K)] // ""' <<< "${3}")"
@@ -5240,9 +5248,10 @@ REPO=${{ github.repository }}
 MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
 CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 EOT
-  # Only the switched jobs take their runs-on from the classify output;
-  # acceptance is the one switched here (base#2270).
-  run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) | .key'
+  # Only the switched jobs take their runner from the classify output, in
+  # runs-on or in a matrix leg's runner; acceptance is the one switched here
+  # (base#2270).
+  run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select(((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) or (([.value.strategy.matrix.include[]?.runner // ""] | map(tostring) | join(",")) | contains("runs_on_cpu"))) | .key'
   assert_success
   assert_output 'acceptance'
 }
