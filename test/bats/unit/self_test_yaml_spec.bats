@@ -4627,7 +4627,7 @@ _cg_expected_job() {
         '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
     self-test-redpath)
       CG_IF="${CG_REDPATH_IF}" CG_STEPS="${_steps}" CG_SHARD_LIST="[$(seq -s, 1 "${_n}")]" CG_K="${_k}" \
-        yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest",
+        yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}",
           "strategy": {"fail-fast": false, "matrix": {"shard": env(CG_SHARD_LIST),
             "include": [{"shard": env(CG_K), "label": " + rerun, the baseline"}]}},
           "steps": env(CG_STEPS)} | sort_keys(..)' ;;
@@ -5221,9 +5221,6 @@ REPO=${{ github.repository }}
 MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
 CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 EOT
-  # This child only adds outputs: no job may take its runs-on from them yet.
-  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | (.value["runs-on"] // "") | tostring')"
-  assert_failure
 }
 
 # config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED
