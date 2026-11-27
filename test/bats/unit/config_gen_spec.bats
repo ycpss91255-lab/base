@@ -492,10 +492,13 @@ _cg_poison_native() {
 #   survives a refusal shows. _cg_tables_seen prints out's final value in
 #   brackets. CONFIG_GEN_FORCE_DOCKER defaults to 1 so a docker-mock test
 #   stays on the container whatever config-gen is on PATH (base#2099); a
-#   native-path test sets it to 0.
+#   native-path test sets it to 0. The timeout only turns a call that
+#   never returns into rc 124; it is 60 s because one call takes several
+#   seconds on a loaded runner and went past 10 s in the mutation probe's
+#   whole-spec runs, which then read as a red baseline.
 _run_cg_tables() {
   _cg_poison_native
-  CGT_NAME="$2" CONFIG_GEN_FORCE_DOCKER="${CONFIG_GEN_FORCE_DOCKER:-1}" LOG_FORMAT=json run --separate-stderr timeout 10 bash -c "cd '$1' || exit 9
+  CGT_NAME="$2" CONFIG_GEN_FORCE_DOCKER="${CONFIG_GEN_FORCE_DOCKER:-1}" LOG_FORMAT=json run --separate-stderr timeout 60 bash -c "cd '$1' || exit 9
 source '${CG}'
 out=stale
 config_gen_tables \"\${CGT_NAME}\" out
@@ -646,6 +649,9 @@ _mock_docker_tables_exec() {
 #      it hands the container the caller's file only on stdin, as
 #      toml_bridge_parse does (`docker run -i ... < file`), through a pipe
 #      as docker's attach is. The answer must still be the table list.
+#      Like docker, the stand-in attaches stdin only when it was given
+#      `-i`; without it the binary reads an empty stdin and the list is
+#      empty, so a run that drops `-i` fails here.
 @test "config-gen: tables needs no host-visible path for the file (docker.sock caller, base#1937)" {
   _seed_cg_subtree
   [[ -n "${CONFIG_GEN_BIN:-}" && -x "${CONFIG_GEN_BIN}" ]] \
@@ -656,17 +662,23 @@ _mock_docker_tables_exec() {
        image) exit 0 ;;
        run)
          shift
+         attached=0
          while (($#)); do
            case "$1" in
              --mount|-v|--volume|--mount=*|--volume=*)
                printf "docker: Error response from daemon: invalid mount config for type \"bind\": bind source path does not exist: /source/dist/setup.toml\n" >&2
                exit 125 ;;
-             --rm|-i) shift ;;
+             -i) attached=1; shift ;;
+             --rm) shift ;;
              --user) shift 2 ;;
              *) shift; break ;;
            esac
          done
-         cat | "${CONFIG_GEN_BIN}" "$@" ;;
+         if ((attached)); then
+           cat | "${CONFIG_GEN_BIN}" "$@"
+         else
+           "${CONFIG_GEN_BIN}" "$@" < /dev/null
+         fi ;;
        *) exit 1 ;;
      esac'
   local _wd="${BATS_TEST_TMPDIR}/source/dist"
@@ -1012,7 +1024,7 @@ config_gen_tables layer.toml ${_name}"
 #      with no writer -- is refused on the host as
 #      config_gen_input_not_regular naming the caller's text, before any
 #      container starts: opening a FIFO with no writer for stdin would hold
-#      the run (the runner's timeout 10 turns a hang into rc 124).
+#      the run (the runner's timeout turns a hang into rc 124).
 @test "config-gen: tables refuses a directory or a FIFO as config_gen_input_not_regular" {
   _seed_cg_subtree
   _mock_docker_tables_exec
