@@ -254,7 +254,7 @@ _image_result() {
 # (base#2079): trailing slash, root, the empty path and an empty segment.
 @test "s93: the rules_paths corpus holds the issue's six paths" {
   local _want
-  _want=$'/home/u/docker_foo\n/home/u/foo_ws\n/home/u/foo/\n/\n\n/a//b/\n'
+  _want=$'/data/docker_foo\n/data/foo_ws\n/data/foo/\n/\n\n/a//b/\n'
   [[ -f "${CORPUS}/s93_rules_paths.txt" ]] || { echo "missing corpus: s93_rules_paths"; return 1; }
   [ "$(cat -- "${CORPUS}/s93_rules_paths.txt"; echo x)" = "${_want}x" ]
 }
