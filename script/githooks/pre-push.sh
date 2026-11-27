@@ -36,7 +36,10 @@ while read -r _local_ref _local_sha _remote_ref _ || [[ -n "${_local_ref:-}" ]];
   [[ "${_local_sha}" =~ ^0+$ ]] && continue
   # Before the seen-commit skip: a tag often shares its branch's commit.
   if [[ "${_remote_ref:-}" == refs/tags/* ]]; then
-    bash "${_tag_format}" "${_remote_ref}" || _rc=1
+    if ! bash "${_tag_format}" "${_remote_ref}"; then
+      printf 'pre-push: refused tag %s (pushed from %s)\n' "${_remote_ref}" "${_local_ref}" >&2
+      _rc=1
+    fi
   fi
   [[ "${_seen}" == *" ${_local_sha} "* ]] && continue
   _seen+="${_local_sha} "
