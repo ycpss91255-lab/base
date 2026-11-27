@@ -79,15 +79,18 @@ _mk_scratch() {
   cp "${ROOT}/${DOC_REL}" "${SCRATCH}/${DOC_REL}"
 }
 
+# why: the inventory is the artefact base#1939 asks for; every other case reads it, so its absence must fail on its own line.
 @test "inventory doc exists" {
   [ -f "${ROOT}/${DOC_REL}" ]
 }
 
+# why: the load-bearing case: it ties the doc to the dist/ scan so a new or removed bridge call site cannot land without a row (base#1939).
 @test "the real tree and the inventory agree" {
   run _check "${ROOT}"
   [ "${status}" -eq 0 ] || { echo "${output}"; false; }
 }
 
+# why: pins the ten call sites named in the issue to their slice, so a row cannot be dropped or re-slotted silently.
 @test "each known call site has exactly one row with its slice" {
   local _row
   while IFS='|' read -r _loc _slice; do
@@ -108,6 +111,7 @@ ini_to_toml_migrate.sh:218|#1452
 EOF
 }
 
+# why: a row without a Go command or status is an inventory that maps nothing; this stops placeholders being left blank.
 @test "config-gen command and status columns are never empty" {
   local _line _n=0
   while IFS= read -r _line; do
@@ -122,6 +126,7 @@ EOF
   [ "${_n}" -eq 10 ]
 }
 
+# why: proves the scan detects an unlisted site and tells the author where, not just that something is wrong.
 @test "an unlisted call site fails the spec and names its file:line" {
   _mk_scratch
   run _check "${SCRATCH}"
@@ -134,6 +139,7 @@ EOF
   [[ "${output}" == *"conf.sh:${_n}"* ]]
 }
 
+# why: proves a row whose call site is gone is reported, so the doc cannot rot after a refactor.
 @test "a stale row fails the spec and names its file:line" {
   _mk_scratch
   run _check "${SCRATCH}"
@@ -145,6 +151,7 @@ EOF
   [[ "${output}" == *"conf.sh:189"* ]]
 }
 
+# why: proves one site cannot be listed twice, which would hide a missing neighbour behind a matching count.
 @test "a duplicate row fails the spec" {
   _mk_scratch
   run _check "${SCRATCH}"

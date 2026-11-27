@@ -437,6 +437,25 @@ empty API answer).
 | `name_host_groups: a nameless gid triggers sudo groupadd hostgrp<gid>` | #589 behaviour (mocked) |
 | `name_host_groups: a named gid does not trigger groupadd` | #589 idempotent skip (mocked) |
 
+### test/bats/unit/bridge_call_sites_spec.bats (7)
+
+the Go config-gen path replaces bridge call sites one by one while both
+paths coexist; without an inventory, progress is only answerable by grep.
+The spec scans dist/ for non-comment call sites outside toml_bridge.sh and
+compares the `file:line` set with the first column of the inventory table.
+Expected rows below are the worked literals from the issue, not recomputed
+from the scan.
+
+| Test | Description |
+|------|-------------|
+| `inventory doc exists` | the inventory is the artefact base#1939 asks for; every other case reads it, so its absence must fail on its own line. |
+| `the real tree and the inventory agree` | the load-bearing case: it ties the doc to the dist/ scan so a new or removed bridge call site cannot land without a row (base#1939). |
+| `each known call site has exactly one row with its slice` | pins the ten call sites named in the issue to their slice, so a row cannot be dropped or re-slotted silently. |
+| `config-gen command and status columns are never empty` | a row without a Go command or status is an inventory that maps nothing; this stops placeholders being left blank. |
+| `an unlisted call site fails the spec and names its file:line` | proves the scan detects an unlisted site and tells the author where, not just that something is wrong. |
+| `a stale row fails the spec and names its file:line` | proves a row whose call site is gone is reported, so the doc cannot rot after a refactor. |
+| `a duplicate row fails the spec` | proves one site cannot be listed twice, which would hide a missing neighbour behind a matching count. |
+
 ### test/bats/unit/build_sh_base_self_spec.bats (2)
 
 build.sh in the base self-use topology (#713): base is the template SOURCE,
