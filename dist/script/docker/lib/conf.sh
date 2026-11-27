@@ -574,7 +574,17 @@ _conf_load_layers() {
     # but regular files skips the memo and reaches the bridge, which refuses
     # it by name. A failed merge is never written (base#2234).
     local _cll_memo="" _cll_f _cll_key
-    if [[ -n "${_CONF_LAYERS_MEMO_DIR:-}" && -d "${_CONF_LAYERS_MEMO_DIR}" ]]; then
+    # A memo directory the command cannot write to degrades to no memo, and
+    # says so once per command: the shared flag file is created exclusively,
+    # so only the first load (even from a subshell) logs (base#2235).
+    if [[ -n "${_CONF_LAYERS_MEMO_DIR:-}" && ! ( -d "${_CONF_LAYERS_MEMO_DIR}" && -w "${_CONF_LAYERS_MEMO_DIR}" ) ]]; then
+      if [[ -z "${_CONF_LAYERS_MEMO_WARN_FLAG:-}" ]] \
+        || ( set -C; : > "${_CONF_LAYERS_MEMO_WARN_FLAG}" ) 2>/dev/null; then
+        _log_warn conf conf_memo_unwritable \
+          "path=${_CONF_LAYERS_MEMO_DIR}" \
+          "display=_conf_load_layers: the memo directory is not writable (path=${_CONF_LAYERS_MEMO_DIR}); continuing without the layer memo"
+      fi
+    elif [[ -n "${_CONF_LAYERS_MEMO_DIR:-}" ]]; then
       local _cll_regular=1
       for _cll_f in "${_cll_existing[@]}"; do
         [[ -f "${_cll_f}" ]] || _cll_regular=0
