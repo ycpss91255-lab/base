@@ -194,6 +194,7 @@ _tag_line() {
   _push_hook "$(printf 'refs/tags/v1.2.3 %s refs/tags/v1.0 %s\n' "${_sha}" "${ZERO_SHA}")"
   assert_failure
   assert_output --partial "'v1.0' is not a version tag"
+  assert_output --partial "pre-push: refused tag refs/tags/v1.0 (pushed from refs/tags/v1.2.3)"
   _push_hook "$(printf 'refs/tags/v1.0 %s refs/tags/v1.2.3 %s\n' "${_sha}" "${ZERO_SHA}")"
   assert_success
 }
