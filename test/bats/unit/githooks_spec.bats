@@ -123,6 +123,65 @@ _ref_line() {
   assert_success
 }
 
+_good_commit() {
+  _wf a.yaml "run-name: \${{ github.event.merge_group.head_ref || github.event_name }}"
+  _commit
+}
+
+_tag_line() {
+  printf 'refs/tags/%s %s refs/tags/%s %s\n' "${1}" "${2}" "${1}" "${ZERO_SHA}"
+}
+
+# why: A tag outside vX.Y.Z / vX.Y.Z-rcN is stopped before it reaches the
+# remote, with the format printed, instead of failing the release later.
+@test "pre-push: blocks a tag whose name is not vX.Y.Z or vX.Y.Z-rcN" {
+  local _t _sha
+  _sha="$(_good_commit)"
+  for _t in v1.0 release-1 v1.2.3-rc.1; do
+    _push_hook "$(_tag_line "${_t}" "${_sha}")"
+    assert_failure
+    assert_output --partial "'${_t}' is not a version tag"
+    assert_output --partial "vX.Y.Z-rcN"
+  done
+}
+
+# why: The accepted shapes must still push.
+@test "pre-push: allows a tag named vX.Y.Z or vX.Y.Z-rcN" {
+  local _sha
+  _sha="$(_good_commit)"
+  _push_hook "$(_tag_line v1.2.3-rc1 "${_sha}")"
+  assert_success
+  _push_hook "$(_tag_line v1.2.3 "${_sha}")"
+  assert_success
+}
+
+# why: Deleting a badly named tag is how it gets cleaned up, so it is never
+# blocked.
+@test "pre-push: a tag deletion is not checked" {
+  local _sha
+  _sha="$(_good_commit)"
+  _push_hook "$(printf '(delete) %s refs/tags/v1.0 %s\n' "${ZERO_SHA}" "${_sha}")"
+  assert_success
+}
+
+# why: The name rule is for tags; a branch called v1.0 is not a release.
+@test "pre-push: a branch named like a bad tag is not checked as a tag" {
+  local _sha
+  _sha="$(_good_commit)"
+  _push_hook "$(printf 'refs/heads/v1.0 %s refs/heads/v1.0 %s\n' "${_sha}" "${ZERO_SHA}")"
+  assert_success
+}
+
+# why: `git push --follow-tags` sends the branch and its tag on one commit;
+# skipping a commit already checked must not skip the tag's name.
+@test "pre-push: a bad tag on a commit already pushed in the same push is still blocked" {
+  local _sha
+  _sha="$(_good_commit)"
+  _push_hook "$(_ref_line "${_sha}"; _tag_line release-1 "${_sha}")"
+  assert_failure
+  assert_output --partial "'release-1' is not a version tag"
+}
+
 # why: The hook must be executable in the index, or git skips it on Linux
 # and macOS checkouts
 @test "pre-push: is tracked as an executable file" {
