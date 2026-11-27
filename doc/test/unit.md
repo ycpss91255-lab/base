@@ -2098,7 +2098,7 @@ on hand-edited / malformed setup.conf:
 | `_conf_split_nskey: sourcing conf.sh alone carries the registry with it (base#1185)` | base#1185 -- conf.sh gains its first dependency on schema.sh, and it must declare that itself rather than trust the caller |
 | `_conf_split_nskey: refuses rather than guessing when the registry is gone (base#1185)` | base#1185 -- an unloaded registry must not read as "nothing is sub-sectioned", an answer worse than the literal it replaced |
 
-### test/bats/unit/conf_ini_golden_spec.bats (4)
+### test/bats/unit/conf_ini_golden_spec.bats (6)
 
 `_ini_tokenize` is the single shell INI tokenizer. The Go reader that
 replaces it (the later `ini tokens` slice) must match it byte for byte, so
@@ -2114,6 +2114,8 @@ holds the shell to that record. A golden is tab-separated lines:
 | `every s25 input has a golden, and no golden is orphaned` | an input without a golden is compared against nothing, and a golden without an input is a record of nothing. |
 | `_ini_tokenize over every s25 input matches its golden byte for byte` | this is the record itself: the shell answer the Go reader must reproduce byte for byte. |
 | `_dump_conf_section over every s25 input and section matches its golden byte for byte` | `_dump_conf_section` is the shell answer the later `ini dump-section` slice must reproduce (base#2058, S25b). The <stem>:<section> pairs below are written out by hand from the corpus files, not derived by the code under test; the goldens are the exact stdout bytes, one file per pair. |
+| `_conf_load_layers over the base and over layers matches layers.base_over.golden` | `_conf_load_layers` over a two-layer INI chain is section-replace (base#2062, S25c): the upper layer owns section `a`, so `a\|y\|2` from the base layer must not survive. The expected bytes are in golden/s25/layers.base_over.golden; the absent third path adds nothing. |
+| `_conf_load_layers over every single s25 input matches its load golden` | `_conf_load_layers` over a single file is the tokenizer's sections with entries grouped by section; each single-file corpus input has its own <stem>.load.golden. |
 
 ### test/bats/unit/conf_logging_spec.bats (12)
 
@@ -5550,7 +5552,7 @@ Every refusal holds assert_refusal's five points.
 | `--apply: a subject that carries a NUL byte is left unchanged and fails (base#1461)` | --apply is the one edit path; it refuses a NUL-bearing subject itself rather than rewriting it without the NUL. |
 | `--apply: the replacement is byte-exact and keeps the mode (base#1461)` | The edit is byte-exact -- quotes, $( ), backslashes and a missing final newline survive -- and the file keeps its mode. |
 
-### test/bats/unit/mutation_roster_spec.bats (8)
+### test/bats/unit/mutation_roster_rows_spec.bats (4)
 
 | Test | Description |
 |------|-------------|
@@ -5558,10 +5560,15 @@ Every refusal holds assert_refusal's five points.
 | `roster: each S1a seed row disables the guard it is named for (base#1461)` | A seed row names its subject, but what it must disable is one guard: setup_cmd.sh's refusal of a non-regular-file apply output and setup_conf.sh's refusal of a local layer not named *.toml. A row that mutated any other line of either file would still go red somewhere in the spec and read PINNED. So each seed's decoded <old> must be the `if` whose body logs that guard's refusal event, holding the guard's own test, and its decoded <new> must be the same `if` made never-true. |
 | `roster: the runner's validation pass accepts every committed row (base#1461)` | The runner's own validation over the committed roster, not the spec's re-reading of it: a contract the runner reads differently from the documented one (a lost empty <new>, a decoder that is not the three escapes) refuses a committed row here. |
 | `roster: every committed row carries a witness that selects some but not all of its spec's tests (base#1582)` | A row with a witness runs its unmutated baseline and its mutated pass under that filter alone, so its cost is its own tests and no other row's (base#1582). That holds only if every committed row has a witness, and a witness that selects all of its spec's tests (empty, '.*') or none of them (a renamed @test) brings the whole-spec pass back. So every row's sixth column, read as the bats name regex it is, matches at least one and fewer than all of the @test names grepped from its spec's own lines. |
+
+### test/bats/unit/mutation_roster_spec.bats (4)
+
+| Test | Description |
+|------|-------------|
 | `shards: over the committed roster the mutation-roster shards' row lists are every row, each once (base#1571)` | The roster leaves lint-static for the mutation-roster matrix, and its rows are dealt by recorded seconds, not by index (base#1571). The set of rows a PR run probes must still be the whole roster, each row once, and a spec has to compare the union of the shard row lists with the full roster to show it. `--check --shard <n>/<total>` validates every row, probes nothing, and logs one mutation_required_row_dealt line per row of shard <n> (row=<file>:<line>). Over the committed roster, with the shard count of self-test.yaml's mutation-roster matrix, the union of those lists is every non-blank, non-`#` line of every roster file, read here straight from the TSVs, and no row is in two shards. |
 | `shards: the committed seconds.txt weighs every committed roster row once, each with positive seconds (base#1571)` | --shard deals by script/test/mutation_required/seconds.txt, and a row the file does not name weighs 0 (base#1571), so a shard balanced on a file that misses rows is balanced on a guess, not on a measurement. The committed file must name every committed roster row -- the pair <roster file basename> TAB <id>, read here straight from the TSVs -- exactly once, each with a positive number of seconds, and no row that the roster does not hold. |
 | `shards: every mutation-roster leg's list-scheduling bound over its worker slots fits 240 s (base#1582)` | The owner's target is at most 5 minutes per CI job (base#1582). With a witness on every row (base#1582) a row waits on no other row's baseline, so its measured seconds are its own work: two filtered runs, or those plus the whole spec mutated and unmutated when the filtered pass stays green. Row seconds therefore add up, and the list-scheduling bound sum/J + max*(1-1/J) turns them into a wall-time bound for J worker slots whatever order the rows are dispatched in; sum/J alone is not one (worked literal: J=4, rows 100,10,10,10 -> sum/J = 32.5, but the 4-slot wall is 100; the bound is 32.5 + 75 = 107.5). For every leg k/N of self-test.yaml's mutation-roster matrix, the rows `--check --shard k/N` deals are looked up in the committed seconds.txt (each row=<file>:<line> read back from its TSV line to its <file> TAB <id>) and bounded over the leg's worker slots (MUTATION_REQUIRED_JOBS on the job, else the driver's default of 4). That bound must be at most 240 s: 300 s less the measured 25 s fixed cost per job (before the first row, after the last) and a 35 s margin. |
-| `roster: no committed row names this spec, which reads every row against its subject (base#1571)` | A row's spec is what the probe runs against that row's mutant, and every other case in this file reads the committed roster against its subject's bytes, so a row naming this file would read PINNED from those cases whatever its own test does. Read straight from the TSVs. |
+| `roster: no committed row names this spec, which reads every row against its subject (base#1571)` | A row's spec is what the probe runs against that row's mutant, and the other cases in this file and in mutation_roster_rows_spec.bats read the committed roster against its subject's bytes, so a row naming either file would read PINNED from those cases whatever its own test does. Read straight from the TSVs. |
 
 ### test/bats/unit/network_ports_inert_spec.bats (16)
 
@@ -7538,7 +7545,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: ci-rollup needs single-issue-pr and classify never gates it (base#1629)` | Branch protection requires ci-rollup alone. A single-issue-pr job outside its needs would be a check nobody is blocked by, and a select_single_issue_pr key would let classify skip it on a doc-only PR, which is exactly where a bundled PR slips through (base#1629). |
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
 
-### test/bats/unit/setup_cmd_spec.bats (227)
+### test/bats/unit/setup_cmd_spec.bats (228)
 
 Mirrors `lib/setup_cmd.sh`. The git-style subcommand dispatcher and its
 mutating verbs (#49): dispatch (Phase B-1), `set` / `show` / `list` (Phase
@@ -7782,6 +7789,7 @@ isolated `_setup_known_section` / `SCHEMA_SECTIONS` (#561) unit checks.
 | `apply preserves an interpolation configured in [logging] local_path (base#1087)` | Escaping the whole assembled logging mount was a regression on the PLAIN apply too: a `${LOG_INSTANCE}` the operator put in `[logging] local_path` became the literal `$${LOG_INSTANCE}`, so compose stopped substituting it and the logs mounted a directory named after the variable. Only the filesystem-derived prefix is a literal that needs escaping; what the operator configured is an interpolation they meant. |
 | `show tells a dotless spec from a split it could not make (base#1185)` | base#1185 -- the splitter gained a second way to answer non-zero, and `show` was reading both as "this spec names a whole section" |
 | `_setup_conf_check_known reads a layer's tables through config-gen, one run (base#1937)` | base#1937 -- the per-layer declared-table read of _setup_conf_check_known goes through config_gen_tables (the config-gen image's `tables` command), not the bridge's `--tables` view. A docker shim records every argv; one layer check must record one config-gen run whose arguments end `tables --name <layer> -`, and no run carrying `--tables`. |
+| `setup apply resolves each tool image once, before any run (base#1844)` | base#1844 -- each tool image is resolved once per top-level `setup apply`, in the top-level shell, before any $(...) that runs it. toml_bridge_parse / toml_bridge_merge run inside command substitutions, so a memo written there is lost and every call inspected the image again. Expected, from the issue's acceptance: 2 inspects (one per image, 12 hex tag each), both before the first `docker run`; the run counts do not move (measured on main after #1937: 13 inspects, 12 bridge runs, 2 config-gen runs on this two-layer layout, not the 15 / 14 / 2 the issue assumed). |
 
 ### test/bats/unit/setup_conf_migrate_spec.bats (15)
 
@@ -10511,7 +10519,34 @@ back is in upgrade_migration_reachability_spec.bats.
 | `check-base-version.sh still resolves its default with no override set (#895)` | - |
 | `a caller's TEMPLATE_REMOTE still wins over the shared default (#895)` | - |
 
-### test/bats/unit/validated_key_reach_spec.bats (29)
+### test/bats/unit/validated_key_explicit_spec.bats (18)
+
+a reachability check cannot see a value that reaches one tier and not the
+other, or one another key silently overrules; each case below pins one such
+key on the dev compose and the field-deploy bundle.
+
+| Test | Description |
+|------|-------------|
+| `pid = container:<name> reaches the dev compose, and private still does not (base#1094)` | base#1094 item 1 -- `_validate_pid_mode` accepts `container:<name>` and the TUI offers it, while both emitters wrote `pid:` only when the value was exactly `host`. A user who set `container:foo` got a green config and a compose file with no `pid:` line at all. `private` stays omitted on purpose: Docker rejects it as a literal and omitting the key gives the same private namespace. |
+| `pid = container:<name> reaches the field bundle as a literal (base#1094)` | base#1094 item 1, field tier. The bundle writes literals rather than `${PID_MODE}`, so the value itself has to arrive -- a bundle that merely carried the key would be no use to the device. |
+| `a shm_size dropped under ipc = host is reported by the dev emitter (base#1094)` | base#1094 item 2 -- the shipped template sets `ipc = "host"`, and both emitters drop `shm_size` unless ipc is something else. So the DEFAULT configuration makes the only key in `[resources]` do nothing. `ports` has the identical situation under `mode = host` and has printed a diagnostic for it since base#879; this one printed nothing. The fix is the same diagnostic, not a default change (ADR-00000019 chose the host defaults deliberately). |
+| `a shm_size that is emitted under a non-host ipc is not reported (base#1094)` | - |
+| `setting resources.shm_size under the shipped ipc = host warns at store time (base#1094)` | base#1094 item 2 -- the diagnostic has to fire where the user can act on it, which is also when the value is stored. The ports precedent (base#879) fires at both points and so does this. |
+| `setting resources.shm_size under a non-host ipc stays quiet (base#1094)` | - |
+| `mode = host beside a network_name keeps host networking in the dev compose (base#1094)` | base#1094 item 3 -- two keys answered one question and the loser was silent. Three of the five emission sites already agreed that mode decides and `network_name` only applies under bridge (the per-stage service emitter, and both branches of the field bundle); the devel service and the top-level `networks:` declaration consulted only `network_name`. So one setup.toml produced bridge networking in development and host networking on the device, with nothing said. The devel service now follows the same rule as its own siblings. |
+| `mode = bridge beside a network_name still joins the named network (base#1094)` | - |
+| `a stage overriding mode to bridge still gets its named network declared (base#1094)` | base#1094 item 3, the case a global-mode reading gets wrong. A `[stage:<name>]` override can set network.mode = "bridge" while the global mode is host: that stage joins the inherited name, so the top-level declaration has to be there or compose refuses the whole project for referencing an undeclared network. The declaration is therefore driven by what the service blocks EMITTED, not by re-deriving the condition from the global mode -- a second derivation of one question being the family base#1094 belongs to. |
+| `a network_name under a non-bridge mode is reported, naming both keys (base#1094)` | base#1094 item 3 -- the issue's words: "Silence is the one option that is not available." The precedence is now stated in the template beside both keys, and warned about when it applies. |
+| `a network_name under mode = bridge is not reported (base#1094)` | - |
+| `setting network.network_name under the shipped host default warns at store time (base#1094)` | - |
+| `dri_groups carrying an explicit GID list reaches group_add without the env var (base#1094)` | base#1094 item 4 -- the key looked like a setting and was a switch: the validator took only `auto` / `off`, and the GIDs themselves were reachable only through the `SETUP_DETECT_DRI_GROUPS` environment variable -- the mechanism ADR-00000025 section 9 removed everywhere else ("no ambient environment variable can steer the chain"). The key now carries the list, with `auto` still the default and the env var still honoured for the auto path. |
+| `dri_groups = off still grants nothing (base#1094)` | - |
+| `a configured [logging] reaches the field bundle, matching the dev compose (base#1094)` | base#1094 item 5 -- `_emit_logging_block` was called by the dev emitter and never by `deploy.sh`, so a repo configuring a driver, max_size, max_file and compress got all four in development and none of them in the artifact shipped to a device. That is the one place where an unbounded log actually fills a disk. `local_path` stays out of the bundle on purpose: it is a host bind, not a Docker logging option, and the block has never emitted it. |
+| `a [logging.<stage>] override reaches the field bundle for that stage (base#1094)` | base#1094 item 5 -- `[logging.<svc>]` is the per-service override layer, and the bundle's service is the deployed stage. A bundle that took only the global block would drop exactly the override an operator wrote for that stage. |
+| `the shipped [logging] defaults reach a bundle that configures nothing (base#1094)` | base#1094 item 5 -- the shipped template sets driver / max_size / max_file / compress, so "configure nothing" is not "no logging options": it is the template's bounds. Those are the ones that matter, because the repo that never thought about logging is the one whose device disk fills. This asserts the DEFAULT reaches the bundle, not just an explicitly configured value. |
+| `the bundle's logging block is the same block the dev compose emits (base#1094)` | base#1094 item 5 -- the defect was two emitters over one config disagreeing, so the assertion that holds the fix is agreement, not presence. Both tiers are handed the same _collect_logging result and their `logging:` blocks are compared line for line; a future change to one emitter's block that the other does not get fails here. |
+
+### test/bats/unit/validated_key_reach_spec.bats (11)
 
 Covers base#1094 -- the keys that validate and then never reach the emitted
 artifact. The DERIVED gate here is the one that matters:
@@ -10519,9 +10554,10 @@ artifact. The DERIVED gate here is the one that matters:
 values the field bundle is built from, so its populated record IS the
 population, and every field of it has to be able to change the generated
 bundle under SOME configuration. A per-key assertion naming today's five
-would stay green while the sixth grew. The explicit tests below it cover the
-three defects a reachability check cannot see: a value that reaches one tier
-and not the other, and a value another key silently overrules.
+would stay green while the sixth grew. The explicit tests in
+validated_key_explicit_spec.bats cover the three defects a reachability
+check cannot see: a value that reaches one tier and not the other, and a
+value another key silently overrules.
 
 The two tiers are the dev compose (`generate_compose_yaml`) and the
 field-deploy bundle (`_generate_resolved_compose`). They are separate
@@ -10542,24 +10578,6 @@ never heard of it.
 | `the four reach parts together select every non-exempt field once (base#2003)` | base#2003 -- the 4 parts together have to check every non-exempt field exactly once. Each part's fields come from `_reach_part_fields` under that part's own title, the same call the part @tests make, so a selection that hands every part the same index repeats one part and drops the other three, and the sorted union differs from the field list. |
 | `a reach part fails when its field selection fails or selects nothing (base#2003)` | base#2003 -- a part whose field selection fails, or selects nothing, has checked nothing, so it has to fail rather than report a pass over zero fields. The selection's last stage is replaced here by one that prints a valid field and then fails -- so only its exit status can fail the part -- and by one that prints nothing. |
 | `every reach exemption names a deploy-context field and carries a reason (base#1094)` | base#1094 -- an exemption is a claim about where the value goes, and an unexplained one is the hole this gate exists to close. Mirrors schema.sh's SCHEMA_FREEFORM reason rule. |
-| `pid = container:<name> reaches the dev compose, and private still does not (base#1094)` | base#1094 item 1 -- `_validate_pid_mode` accepts `container:<name>` and the TUI offers it, while both emitters wrote `pid:` only when the value was exactly `host`. A user who set `container:foo` got a green config and a compose file with no `pid:` line at all. `private` stays omitted on purpose: Docker rejects it as a literal and omitting the key gives the same private namespace. |
-| `pid = container:<name> reaches the field bundle as a literal (base#1094)` | base#1094 item 1, field tier. The bundle writes literals rather than `${PID_MODE}`, so the value itself has to arrive -- a bundle that merely carried the key would be no use to the device. |
-| `a shm_size dropped under ipc = host is reported by the dev emitter (base#1094)` | base#1094 item 2 -- the shipped template sets `ipc = "host"`, and both emitters drop `shm_size` unless ipc is something else. So the DEFAULT configuration makes the only key in `[resources]` do nothing. `ports` has the identical situation under `mode = host` and has printed a diagnostic for it since base#879; this one printed nothing. The fix is the same diagnostic, not a default change (ADR-00000019 chose the host defaults deliberately). |
-| `a shm_size that is emitted under a non-host ipc is not reported (base#1094)` | - |
-| `setting resources.shm_size under the shipped ipc = host warns at store time (base#1094)` | base#1094 item 2 -- the diagnostic has to fire where the user can act on it, which is also when the value is stored. The ports precedent (base#879) fires at both points and so does this. |
-| `setting resources.shm_size under a non-host ipc stays quiet (base#1094)` | - |
-| `mode = host beside a network_name keeps host networking in the dev compose (base#1094)` | base#1094 item 3 -- two keys answered one question and the loser was silent. Three of the five emission sites already agreed that mode decides and `network_name` only applies under bridge (the per-stage service emitter, and both branches of the field bundle); the devel service and the top-level `networks:` declaration consulted only `network_name`. So one setup.toml produced bridge networking in development and host networking on the device, with nothing said. The devel service now follows the same rule as its own siblings. |
-| `mode = bridge beside a network_name still joins the named network (base#1094)` | - |
-| `a stage overriding mode to bridge still gets its named network declared (base#1094)` | base#1094 item 3, the case a global-mode reading gets wrong. A `[stage:<name>]` override can set network.mode = "bridge" while the global mode is host: that stage joins the inherited name, so the top-level declaration has to be there or compose refuses the whole project for referencing an undeclared network. The declaration is therefore driven by what the service blocks EMITTED, not by re-deriving the condition from the global mode -- a second derivation of one question being the family base#1094 belongs to. |
-| `a network_name under a non-bridge mode is reported, naming both keys (base#1094)` | base#1094 item 3 -- the issue's words: "Silence is the one option that is not available." The precedence is now stated in the template beside both keys, and warned about when it applies. |
-| `a network_name under mode = bridge is not reported (base#1094)` | - |
-| `setting network.network_name under the shipped host default warns at store time (base#1094)` | - |
-| `dri_groups carrying an explicit GID list reaches group_add without the env var (base#1094)` | base#1094 item 4 -- the key looked like a setting and was a switch: the validator took only `auto` / `off`, and the GIDs themselves were reachable only through the `SETUP_DETECT_DRI_GROUPS` environment variable -- the mechanism ADR-00000025 section 9 removed everywhere else ("no ambient environment variable can steer the chain"). The key now carries the list, with `auto` still the default and the env var still honoured for the auto path. |
-| `dri_groups = off still grants nothing (base#1094)` | - |
-| `a configured [logging] reaches the field bundle, matching the dev compose (base#1094)` | base#1094 item 5 -- `_emit_logging_block` was called by the dev emitter and never by `deploy.sh`, so a repo configuring a driver, max_size, max_file and compress got all four in development and none of them in the artifact shipped to a device. That is the one place where an unbounded log actually fills a disk. `local_path` stays out of the bundle on purpose: it is a host bind, not a Docker logging option, and the block has never emitted it. |
-| `a [logging.<stage>] override reaches the field bundle for that stage (base#1094)` | base#1094 item 5 -- `[logging.<svc>]` is the per-service override layer, and the bundle's service is the deployed stage. A bundle that took only the global block would drop exactly the override an operator wrote for that stage. |
-| `the shipped [logging] defaults reach a bundle that configures nothing (base#1094)` | base#1094 item 5 -- the shipped template sets driver / max_size / max_file / compress, so "configure nothing" is not "no logging options": it is the template's bounds. Those are the ones that matter, because the repo that never thought about logging is the one whose device disk fills. This asserts the DEFAULT reaches the bundle, not just an explicitly configured value. |
-| `the bundle's logging block is the same block the dev compose emits (base#1094)` | base#1094 item 5 -- the defect was two emitters over one config disagreeing, so the assertion that holds the fix is agreement, not presence. Both tiers are handed the same _collect_logging result and their `logging:` blocks are compared line for line; a future change to one emitter's block that the other does not get fails here. |
 
 ### test/bats/unit/verify_extract_spec.bats (9)
 
