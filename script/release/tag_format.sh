@@ -8,8 +8,7 @@
 #   <tag>   a tag name (v0.43.0) or a full ref (refs/tags/v0.43.0-rc9)
 #
 # Exit 0 = valid; 1 = not a version tag, the format on stderr; 2 = no tag.
-# Pure bash, no repo state: the release job and the pre-push hook both
-# call it.
+# Pure bash, no repo state. Called by the release job in self-test.yaml.
 
 # Strict mode only when run directly; a sourcing caller keeps its own.
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
