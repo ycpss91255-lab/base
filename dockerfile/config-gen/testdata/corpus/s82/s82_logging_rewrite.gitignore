@@ -1,0 +1,5 @@
+user_above
+# managed by template: [logging] local_path begin (do not remove)
+/log/stale/
+# managed by template: [logging] local_path end (do not remove)
+user_below
