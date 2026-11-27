@@ -2004,7 +2004,7 @@ unreadable layer, and a directory where the layer should be.
 | `a directory in place of setup.toml is refused with its event id and path` | A directory where setup.toml should be is not an absent layer either. Measured before base#1400: apply logged conf_no_repo_conf ("using template defaults"), then conf_upsert_file_missing writing the workspace bind into it, and exited 0 with compose.yaml generated. It must be refused like any other layer that is there and cannot be read. |
 | `a FIFO in place of setup.toml is refused within a bound, with its event id and path` | A FIFO where setup.toml should be is there too, and unlike a directory it does not fail on open: open(2) on a FIFO blocks until a writer arrives, so an `-e` gate that hands it to the bridge hangs apply forever instead of refusing (review round 3 of base#1400). The bound makes the hang a failure instead of a wedged suite. |
 
-### test/bats/unit/conf_accessor_spec.bats (35)
+### test/bats/unit/conf_accessor_spec.bats (40)
 
 Unit tests for the `conf.sh` opaque accessor interface (#564 / #563):
 `_conf_load` loads a file into a named handle, `_conf_get` reads a value by
@@ -2060,6 +2060,11 @@ on hand-edited / malformed setup.conf:
 | `_conf_split_nskey: follows the registry, so a new sub-sectioned name needs no edit here (base#1185)` | base#1185 -- the set of sub-sectioned names must come from the registry, or base#1152 / base#1184 cannot add one |
 | `_conf_split_nskey: sourcing conf.sh alone carries the registry with it (base#1185)` | base#1185 -- conf.sh gains its first dependency on schema.sh, and it must declare that itself rather than trust the caller |
 | `_conf_split_nskey: refuses rather than guessing when the registry is gone (base#1185)` | base#1185 -- an unloaded registry must not read as "nothing is sub-sectioned", an answer worse than the literal it replaced |
+| `_conf_load_layers runs the bridge once for a chain loaded twice (base#2234)` | base#2234 -- the same layer chain loaded twice in one command runs the bridge once. Expected from the issue's acceptance 1: one `--merge --kv` for the two-layer chain however many times it is loaded, and both loads answer the same value. |
+| `_conf_load_layers re-runs the bridge when a layer changed in between (base#2234)` | base#2234 acceptance 2 -- the key carries the layer's content, so a layer edited between two loads is a miss. First load `wayland`, the upper layer rewritten to `x11`, second load `x11`, two bridge calls. |
+| `_conf_load_layers does not memo a failed merge (base#2234)` | base#2234 acceptance 3 -- a failed merge is not remembered. The stub exits 1 both times; each load returns 1 and logs conf_toml_merge_failed, and the bridge is called twice. |
+| `_conf_load_layers reads a layer that appears after the first load (base#2234)` | base#2234 acceptance 4 -- the key holds only the layers that exist, so a layer that shows up mid-command changes the key. First load sees the dist layer alone (`wayland`), then the repo layer appears with `x11`; the second load reads it and the bridge ran twice. |
+| `a directory layer is still refused by name with a memo directory present (base#2234)` | base#2234 acceptance 5 -- a directory in a layer's place is still refused by name with the real toml_bridge_merge, on every load, memo directory present or not: merge_layer_not_regular, status 1. |
 
 ### test/bats/unit/conf_ini_golden_spec.bats (6)
 
