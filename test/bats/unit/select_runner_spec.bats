@@ -28,66 +28,77 @@ _run_row() {
     run --separate-stderr bash "${SELECT}"
 }
 
+# why: A tag push is a push too; answering false would move every release run to the hosted pool (base#2265).
 @test "select_runner.sh: push is trusted (base#2265)" {
   _run_row push "" o/r ""
   assert_success
   assert_output "trusted=true"
 }
 
+# why: Only someone with write access can dispatch, so the run is the owner's own code (base#2265).
 @test "select_runner.sh: workflow_dispatch is trusted (base#2265)" {
   _run_row workflow_dispatch "" o/r ""
   assert_success
   assert_output "trusted=true"
 }
 
+# why: The head repository equals this one, so the code was pushed by someone with write access (base#2265).
 @test "select_runner.sh: a same-repository pull_request is trusted (base#2265)" {
   _run_row pull_request o/r o/r ""
   assert_success
   assert_output "trusted=true"
 }
 
+# why: A fork's code on a self-hosted runner is the exact hole this script closes (base#2265).
 @test "select_runner.sh: a fork pull_request is not trusted (base#2265)" {
   _run_row pull_request fork/r o/r ""
   assert_success
   assert_output "trusted=false"
 }
 
+# why: An empty head repository proves nothing about who wrote the code, so it fails closed (base#2265).
 @test "select_runner.sh: a pull_request with an empty head repository is not trusted (base#2265)" {
   _run_row pull_request "" o/r ""
   assert_success
   assert_output "trusted=false"
 }
 
+# why: The only case that opens a self-hosted runner on a queue run (base#2265).
 @test "select_runner.sh: a merge_group proven same-repository is trusted (base#2265)" {
   _run_row merge_group "" o/r true
   assert_success
   assert_output "trusted=true"
 }
 
+# why: A group holding a fork's pull request must stay on the hosted pool (base#2265).
 @test "select_runner.sh: a merge_group proven not same-repository is not trusted (base#2265)" {
   _run_row merge_group "" o/r false
   assert_success
   assert_output "trusted=false"
 }
 
+# why: A merge_group payload names no head repository, so no proof means false (base#2265).
 @test "select_runner.sh: a merge_group with no proof is not trusted (base#2265)" {
   _run_row merge_group "" o/r ""
   assert_success
   assert_output "trusted=false"
 }
 
+# why: A schedule is not in the listed events; the default answer is false (base#2265).
 @test "select_runner.sh: schedule is not trusted (base#2265)" {
   _run_row schedule "" o/r ""
   assert_success
   assert_output "trusted=false"
 }
 
+# why: An event nobody listed (issue_comment) can carry attacker text, so the default is false (base#2265).
 @test "select_runner.sh: an unlisted event is not trusted (base#2265)" {
   _run_row issue_comment "" o/r ""
   assert_success
   assert_output "trusted=false"
 }
 
+# why: A missing input must be named on stderr and answered false, never read as trusted (base#2265).
 @test "select_runner.sh: unset EVENT_NAME reports it on stderr and is not trusted (base#2265)" {
   REPO=o/r run --separate-stderr bash "${SELECT}"
   assert_success
@@ -95,6 +106,7 @@ _run_row() {
   [[ "${stderr}" == "::error::select_runner: EVENT_NAME is not set" ]]
 }
 
+# why: Without REPO a same-repository comparison is meaningless, so it names the variable and answers false (base#2265).
 @test "select_runner.sh: unset REPO reports it on stderr and is not trusted (base#2265)" {
   EVENT_NAME=push run --separate-stderr bash "${SELECT}"
   assert_success
