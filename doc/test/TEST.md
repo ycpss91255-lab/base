@@ -310,6 +310,10 @@ wrote their key `false`: the select_* keys of the diff-gated jobs
 (`doc-counts`, `lint-static`, `single-issue-pr`, `commit-attribution`).
 `config-gen-gates` repeats nothing either: the `merge_group` run's mutation
 base is `main` before the group, which covers every file `HEAD^1` would.
+`worker-selftest` skips too, so a push to `main` no longer refreshes its
+buildx cache (the `worker-selftest-*` GHA scopes `build-worker.yaml` writes);
+a pull request reads what `main` last wrote. Its fixture is a minimal alpine
+image, so a stale cache costs little.
 
 Only `push` to `refs/heads/main` is narrowed. A pull request, a merge group, a
 push to `master`, a tag and `workflow_dispatch` run what they ran before, and
