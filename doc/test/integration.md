@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **379 tests**.
+Integration specs under `test/bats/integration/`: **384 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -361,6 +361,24 @@ golden with no corpus file.
 | `s93: detect_image_name result matches every golden` | detect_image_name applies [image] rules then sanitizes the name. |
 | `s93: the six image goldens hold the issue's names` | the worked names come from the issue, not from the shell. |
 | `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
+
+### test/bats/integration/config_gen_s93_mount_golden_spec.bats (5)
+
+Before any Go code takes the host path out of a mount spec, the shell's
+reading is pinned. testdata/corpus/s93/s93_mount_specs.txt holds one spec
+per line; testdata/golden/s93/s93_mount_specs.golden holds, per spec, the
+line `_mount_host_path` (dist/script/docker/lib/_tui_conf.sh) leaves in its
+outvar. The spec regenerates the golden from the shell and fails on any byte
+difference, on a missing corpus or golden, and on a line count that differs
+between the two.
+
+| Test | Description |
+|------|-------------|
+| `s93: the mount spec corpus and golden exist` | a missing corpus or golden would silently pin nothing. |
+| `s93: the mount spec corpus holds the issue's six specs` | the inputs must be the issue's own, in the issue's order, or the golden pins other cases (base#2081): ro option, no colon, leading colon, empty line, an unexpanded ${HOME}, and extra colons. |
+| `s93: _mount_host_path result matches the golden` | _mount_host_path keeps the text before the first colon; the shell result must match the golden byte for byte. |
+| `s93: the mount golden holds the issue's six results` | the worked results come from the issue, not from the shell. |
+| `s93: the mount golden has as many lines as the corpus` | one golden line per corpus line, or a spec is unpinned. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)
 
