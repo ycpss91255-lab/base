@@ -31,15 +31,17 @@ _nonportable_names() {
   LC_ALL=C grep -z -E '[<>:"|?*\\[:cntrl:]]|[. ](/|$)' | tr '\0' '\n' || true
 }
 
-# _tree_names <root> -- the NUL-separated relative paths under <root>,
-# files and directories both, minus the derived directories.
+# _tree_names <root> -- the NUL-separated paths under <root>, files and
+# directories both, minus the derived directories. Each path keeps its
+# <root> prefix: the suite image carries the busybox find, which has no
+# `-printf` to cut it off.
 _tree_names() {
   local _root="${1}"
   find "${_root}" -mindepth 1 \
     \( -path "${_root}/.git" -o -path "${_root}/.prev-release" \
     -o -path "${_root}/.claude" -o -path "${_root}/coverage" \
     -o -path "${_root}/coverage-shards" -o -type d -name log \) -prune \
-    -o -printf '%P\0'
+    -o -print0
 }
 
 # why: each reserved character is its own way to break a checkout, and a
@@ -58,10 +60,10 @@ _tree_names() {
 @test "a file or directory name ending in a dot or a space is reported" {
   run _nonportable_names < <(printf '%s\0' \
     "dir/ends." "dir/ends " "ends./file" "ends /file" "dir/fine")
-  assert_equal "${output}" "dir/ends.
-dir/ends
+  assert_equal "${output}" $'dir/ends.
+dir/ends 
 ends./file
-ends /file"
+ends /file'
 }
 
 # why: a control character in a name is refused by Windows as well, and
@@ -93,7 +95,7 @@ ends /file"
   : > "${_root}/.prev-release/v1/x:y"
   : > "${_root}/sub/log/12:00:00.log"
   run _nonportable_names < <(_tree_names "${_root}")
-  assert_equal "${output}" "sub/deep/a:b"
+  assert_equal "${output}" "${_root}/sub/deep/a:b"
 }
 
 # why: this is the gate itself. The walk must have seen the tree -- this
@@ -101,7 +103,7 @@ ends /file"
 @test "no path in this tree is one Windows cannot create (base#2226)" {
   local _n
   _n="$(_tree_names /source | tr '\0' '\n' \
-    | grep -c -x 'test/bats/unit/portable_filename_lint_spec.bats' || true)"
+    | grep -c -x '/source/test/bats/unit/portable_filename_lint_spec.bats' || true)"
   assert_equal "${_n}" "1"
   run _nonportable_names < <(_tree_names /source)
   [[ -z "${output}" ]] || fail "paths Windows cannot create (rename them; a reserved character can be percent-encoded, as golden/s25 does for ':'):
