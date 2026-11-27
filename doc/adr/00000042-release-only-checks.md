@@ -76,7 +76,8 @@ longer block every change and block a release instead.
 5. **Before a release**, run it on the commit to be tagged: the local
    command in the table, or a `workflow_dispatch` of `self-test.yaml`, which
    is kept for this. `doc/test/TEST.md` has the commands and what to check
-   on the hosted run. Nothing enforces this step.
+   on the hosted run. The amendment below makes the tag ruleset enforce the
+   hosted run.
 
 No roster row is removed or changed, and the specs that read the roster as
 data (every row still applies to its subject, has a witness, and fits its
@@ -109,6 +110,27 @@ recipe runs the Go gates in every environment stands: that recipe is
     GitHub Release.
   - The tag also starts `release-test-tools.yaml`, which publishes the
     test-tools images without waiting for them.
+
+## Amendment: a tag needs the release checks first (2026-11-27, #2205)
+
+The owner decided that the release-only checks pass before a release tag
+can be pushed, not after.
+
+- `self-test.yaml` has a `release-gate` job. Its check is named
+  `release-checks` only on a run that selected both release-only jobs, and
+  it passes only when `ci-rollup` and both of them succeeded. It runs under
+  `always()`, so a failed need fails it instead of skipping it.
+- A pull request, a merge group and a push to `main` never produce that
+  name, not even as a skip. GitHub counts a skipped check as passed, so a
+  job that skipped under that name would satisfy the rule.
+- The `v*` tag ruleset is to require `release-checks` beside `ci-rollup`;
+  it checks it when the tag is created. The release step is then: dispatch
+  `self-test.yaml` on `main`, wait for `release-checks`, then tag.
+- rc tags match `v*` and need it too. Exempting them would take a second
+  ruleset; that is the owner's call.
+
+This replaces the Consequences bullet above on a red release-only check
+after the tag: with the ruleset in place, that tag is refused.
 
 ## Alternatives
 

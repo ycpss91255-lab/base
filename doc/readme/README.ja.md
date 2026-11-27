@@ -769,7 +769,7 @@ jobs:
 複数バリアントの呼び出し例、base のリリースの source archive が下流のリリースと
 どう違うかは [publish-worker.md](../guide/publish-worker.md) を参照。
 
-<!-- sync: development-and-tests 750400f91f7b 03ee83a59fb0 -->
+<!-- sync: development-and-tests c8d5580ee71c e475ad766f64 -->
 ## 開発とテスト
 
 base の checkout 内で（`script/test/justfile.test`）：
@@ -785,7 +785,13 @@ just test system        # opt-in の System レベル（host docker が必要）
 just test acceptance    # Acceptance レベル：実際に consumer を scaffold
 just test smoke         # 出荷される smoke spec
 just release coverage-badge   # coverage/ から doc/badge/coverage.svg を再生成
+just githooks install   # .githooks/ の git hook を有効化（この repo のみ）
+just githooks check     # hook が有効か確認（有効なら exit 0）
 ```
+
+clone ごとに 1 回 `just githooks install` を実行します。以降、`pre-push` hook が
+push の前に `workflow-run-name` lint を実行します（Docker 不要）。CI も同じ検査を
+実行し、こちらが本当のゲートです。
 
 カバレッジバッジは Bats 全体が Bash ソースに対して計測した kcov の行カバレッジ
 で、リリースごとに 1 回計測します。Go パッケージはパッケージごとの floor で

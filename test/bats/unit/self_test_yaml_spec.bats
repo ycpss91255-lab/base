@@ -1997,9 +1997,9 @@ _job_names() {
   # coverage-gate skipped, required check green, unit suite and coverage
   # floor never run.
   #
-  # ci-rollup and release are the two SINKS and so are exempt: nothing
-  # aggregates the aggregator, and the tag path is checked separately
-  # below.
+  # ci-rollup, release-gate and release are the SINKS and so are exempt:
+  # nothing aggregates the aggregator, release-gate reads ci-rollup itself,
+  # and the tag path is checked separately below.
   local -a _jobs=()
   mapfile -t _jobs < <(_job_names)
   [ "${#_jobs[@]}" -ge 14 ] \
@@ -2012,7 +2012,7 @@ _job_names() {
   local _job
   for _job in "${_jobs[@]}"; do
     case "${_job}" in
-      ci-rollup | release) continue ;;
+      ci-rollup | release-gate | release) continue ;;
     esac
     grep -qxF -- "${_job}" <<<"${_needs}" \
       || fail "job '${_job}' is declared in self-test.yaml but ci-rollup does not name it in needs: -- its failure cannot reach the required check"
@@ -4471,9 +4471,9 @@ CG_GATES_JOB='config-gen-gates'
 CG_REDPATH_JOB='config-gen-redpath'
 CG_GATES_RUN='just test go-gates'
 CG_SHARDS_TSV='/source/script/test/config_gen_redpath_shards.tsv'
-CG_SELF_TEST_TOP='["concurrency","env","jobs","name","on","permissions"]'
+CG_SELF_TEST_TOP='["concurrency","env","jobs","name","on","permissions","run-name"]'
 CG_SELF_TEST_ENV='["CI_RUN_KEY","COMPOSE_PROJECT_NAME","TEST_TOOLS_ARTIFACT_TAG","TEST_TOOLS_IMAGE"]'
-CG_COV_LOCAL_TOP='["concurrency","jobs","name","on","permissions"]'
+CG_COV_LOCAL_TOP='["concurrency","jobs","name","on","permissions","run-name"]'
 CG_COV_LOCAL_ENV='[]'
 COV_LOCAL_WF="/source/.github/workflows/coverage-local.yaml"
 

@@ -370,6 +370,7 @@ config-gen-gates
 config-gen-redpath
 commit-attribution
 ci-rollup
+release-gate
 release"
 }
 
@@ -936,4 +937,183 @@ _chain_config_gen() {
     [[ "${status}" -eq 0 ]] || _bad+="${_j}: a skip with ${_k}=false exited ${status}"$'\n'
   done <<< "${_jobs12}"
   [[ -z "${_bad}" ]] || fail "${_bad}"
+}
+
+# _gate_name <classify-output>
+#   The name GitHub gives release-gate's check run, read from the job's
+#   `name:` expression with classify's outputs from <classify-output>. Only
+#   the shape `${{ <key> == 'true' && ... && '<a>' || '<b>' }}` is read;
+#   any other returns 2.
+_gate_name() {
+  local _expr _cond _a _b _t
+  local -A _cls=()
+  _chain_classify_outputs "${1}" _cls
+  _expr="$(yq '.jobs."release-gate".name // ""' "${SELF_WF}")"
+  [[ "${_expr}" =~ ^\$\{\{\ (.+)\ \&\&\ \'([^\']+)\'\ \|\|\ \'([^\']+)\'\ \}\}$ ]] \
+    || { echo "BUG: release-gate name: is not a shape this reader knows: ${_expr}"; return 2; }
+  _cond="${BASH_REMATCH[1]}" _a="${BASH_REMATCH[2]}" _b="${BASH_REMATCH[3]}"
+  while IFS= read -r _t; do
+    [[ "${_t}" =~ ^needs\.classify\.outputs\.([a-z0-9_]+)\ ==\ \'true\'$ ]] \
+      || { echo "BUG: release-gate name: term not read: ${_t}"; return 2; }
+    [[ "${_cls[${BASH_REMATCH[1]}]:-}" == "true" ]] || { echo "${_b}"; return 0; }
+  done < <(sed 's/ && /\n/g' <<< "${_cond}")
+  echo "${_a}"
+}
+
+# _gate_keys -- the classify keys release-gate's `name:` reads, one per line.
+_gate_keys() {
+  yq '.jobs."release-gate".name // ""' "${SELF_WF}" \
+    | grep -oE 'needs\.classify\.outputs\.[a-z0-9_]+' | sed 's/.*\.//' | LC_ALL=C sort
+}
+
+# _chain_gate <classify-output> <chain-results>
+#   Runs release-gate's OWN step, lifted from the YAML, with
+#   `toJSON(needs)` built from <chain-results> and classify's outputs.
+#   ci-rollup's result is not taken from <chain-results>: the real rollup
+#   step runs on the same input, and its exit status is the result. Any
+#   other env binding returns 2.
+_chain_gate() {
+  local _results="${2}" _k _v _j _o _json="" _rollup=success
+  local -A _cls=() _res=()
+  local -a _env=()
+  _chain_classify_outputs "${1}" _cls
+  while read -r _j _v; do
+    [[ -n "${_j}" ]] && _res["${_j}"]="${_v}"
+  done <<< "${_results}"
+  _chain_rollup "${1}" "${_results}" >/dev/null 2>&1 || _rollup=failure
+  _res[ci-rollup]="${_rollup}"
+  while IFS= read -r _j; do
+    [[ -n "${_j}" ]] || continue
+    _o="{}"
+    if [[ "${_j}" == "classify" ]]; then
+      _o=""
+      for _k in "${!_cls[@]}"; do
+        _o+="${_o:+,}\"${_k}\":\"${_cls[${_k}]}\""
+      done
+      _o="{${_o}}"
+    fi
+    _json+="${_json:+,}\"${_j}\":{\"result\":\"${_res[${_j}]:-}\",\"outputs\":${_o}}"
+  done < <(yq '.jobs."release-gate".needs[]' "${SELF_WF}")
+  _json="{${_json}}"
+  while read -r _k _v; do
+    [[ -n "${_k}" ]] || continue
+    if [[ "${_v}" =~ ^\$\{\{\ toJSON\(needs\)\ \}\}$ ]]; then
+      _env+=("${_k}=${_json}")
+    else
+      echo "BUG: release-gate env ${_k} is bound in a way this reader does not know: ${_v}"
+      return 2
+    fi
+  done < <(yq '.jobs."release-gate".steps[0].env // {} | to_entries[] | .key + " " + .value' "${SELF_WF}")
+  yaml_step_run "${SELF_WF}" release-gate 'Verify the release run' \
+      > "${BATS_TEST_TMPDIR}/chain-gate.sh"
+  [ -s "${BATS_TEST_TMPDIR}/chain-gate.sh" ] || { echo "BUG: release-gate has no 'Verify the release run' step"; return 2; }
+  env "${_env[@]}" bash "${BATS_TEST_TMPDIR}/chain-gate.sh"
+}
+
+# _release_outputs <run> -- classify's real output for a tag push or a
+# workflow_dispatch on main.
+_release_outputs() {
+  case "${1}" in
+    tag) CLASSIFY_REF=refs/tags/v1.2.3 _classify_push zz-new/thing.txt ;;
+    dispatch) _classify_event workflow_dispatch zz-new/thing.txt ;;
+  esac
+}
+
+# why: the tag ruleset requires the `release-checks` check, so it must go
+# green on a release run in which every job, both release-only ones
+# included, succeeded.
+@test "chain: a tag push or workflow_dispatch with every job green passes release-checks (base#2205)" {
+  local _run _out _results
+  for _run in tag dispatch; do
+    _out="$(_release_outputs "${_run}")"
+    CHAIN_REF="$([[ "${_run}" == tag ]] && echo refs/tags/v1.2.3 || echo refs/heads/main)" \
+      run _chain_results "${_out}"
+    assert_success
+    _results="${output}"
+    _chain_gated "${_results}" success
+    _chain_check "${_results}" release-gate=success
+    run _gate_name "${_out}"
+    assert_success
+    assert_output release-checks
+    run _chain_gate "${_out}" "${_results}"
+    assert_success
+  done
+}
+
+# why: a release run whose release-only job failed, never ran, or whose
+# rollup failed must leave `release-checks` red, so the tag is refused.
+@test "chain: release-checks fails on a release run when a release-only job or the rollup does not pass (base#2205)" {
+  local _run _out _results _j
+  for _run in tag dispatch; do
+    _out="$(_release_outputs "${_run}")"
+    for _j in ${RELEASE_JOBS} shellcheck; do
+      CHAIN_REF=refs/heads/main CHAIN_FAIL="${_j}" run _chain_results "${_out}"
+      assert_success
+      _results="${output}"
+      _chain_check "${_results}" "${_j}=failure" release-gate=success
+      run _gate_name "${_out}"
+      assert_output release-checks
+      run _chain_gate "${_out}" "${_results}"
+      assert_failure 1
+    done
+    for _j in ${RELEASE_JOBS}; do
+      CHAIN_REF=refs/heads/main run _chain_results "${_out}"
+      _results="$(sed -E "s/^${_j} .*/${_j} skipped/" <<< "${output}")"
+      run _chain_gate "${_out}" "${_results}"
+      assert_failure 1
+    done
+  done
+}
+
+# why: GitHub counts a skipped check as passed, so the name must not exist
+# on a run that skips the release-only jobs, in any state.
+@test "chain: a PR, a merge group and a push to main never carry the release-checks name (base#2205)" {
+  local _run _out _results
+  for _run in pull_request merge_group push; do
+    case "${_run}" in
+      pull_request) _out="$(_classify_pr zz-new/thing.txt)" ;;
+      merge_group) _out="$(CLASSIFY_REF="${MERGE_GROUP_REF}" _classify_event merge_group zz-new/thing.txt)" ;;
+      push) _out="$(_classify_push zz-new/thing.txt)" ;;
+    esac
+    run _chain_results "${_out}"
+    assert_success
+    _results="${output}"
+    _chain_check "${_results}" release-gate=success
+    run _gate_name "${_out}"
+    assert_success
+    refute_output release-checks
+    run _chain_gate "${_out}" "${_results}"
+    assert_success
+  done
+}
+
+# why: both release-only jobs must be selected, not one, for the run to be a
+# release run.
+@test "chain: a run that selects only one release-only job does not carry the release-checks name (base#2205)" {
+  local _out _j
+  _out="$(_release_outputs tag)"
+  for _j in ${RELEASE_JOBS}; do
+    run _gate_name "${_out}"$'
+'"select_${_j//-/_}=false"
+    assert_success
+    refute_output release-checks
+  done
+}
+
+# why: a skipped job is shown under its id or its unexpanded name, so
+# neither may be the required name; and only `always()` keeps a failed
+# need from skipping it on a release run.
+@test "self-test.yaml: release-gate runs always, needs the rollup and both release-only jobs, and reads their keys (base#2205)" {
+  local _needs _j _keys
+  run yq '.jobs."release-gate".if // ""' "${SELF_WF}"
+  assert_output 'always()'
+  _needs="$(yaml_job_needs "${SELF_WF}" release-gate)"
+  for _j in classify ci-rollup ${RELEASE_JOBS}; do
+    grep -qxF -- "${_j}" <<< "${_needs}" || fail "release-gate does not need ${_j}"
+  done
+  run yq '.jobs."release-gate".name // ""' "${SELF_WF}"
+  [[ "${output}" == *'${{'* ]] || fail "release-gate name: is not an expression: ${output}"
+  refute_output release-checks
+  _keys="$(for _j in ${RELEASE_JOBS}; do echo "select_${_j//-/_}"; done | LC_ALL=C sort)"
+  assert_equal "$(_gate_keys)" "${_keys}"
 }

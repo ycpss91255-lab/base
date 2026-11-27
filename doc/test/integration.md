@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **361 tests**.
+Integration specs under `test/bats/integration/`: **379 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -265,6 +265,37 @@ keeps fixtures and goldens one-to-one.
 | `s43 from golden: accepted cases list runtime` | accepted cases list exactly the stage runtime. |
 | `s43 from golden: every fixture has exactly one .stages and one .hash and no extra` | a fixture missing a .stages or .hash golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
 
+### test/bats/integration/config_gen_s43_harness_golden_spec.bats (11)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) with migration 0
+(downstream_to_dist) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_migrate_<case>.Dockerfile has
+three goldens under testdata/golden/s43/: .dockerfile the Dockerfile bytes
+after apply_migrations .files `migrated_files` stdout (one path per line; 0
+bytes when nothing was rewritten) .events one projected event per line, tab
+separated: <body> TAB <display> [TAB matched=.. TAB available=.. TAB
+names=.. TAB rewritten=..]; no timestamp, code.filepath, code.lineno or
+thread.id (they change on every run) The spec regenerates all three from the
+shell under LOG_FORMAT=json and compares them byte for byte. The fixture is
+run as the relative path `Dockerfile` inside a scratch directory, so the
+path in `.files` is stable. A partition check keeps fixtures and goldens
+one-to-one-to-one.
+
+| Test | Description |
+|------|-------------|
+| `s43 migrate golden: lint rewrites both COPY sources` | two lint COPY lines are rewritten, the rest of the file is untouched. |
+| `s43 migrate golden: run rewrites COPY and RUN lines` | sed is global, so a RUN line is rewritten too, not only COPY. |
+| `s43 migrate golden: current is unchanged and reports 0 matched` | an already-current Dockerfile is left byte for byte and nothing is reported rewritten. |
+| `s43 migrate golden: lint events golden equals the issue's literal events` | the issue's table gives the lint events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 migrate golden: run events golden is byte-identical to lint events` | the run fixture shares the lint events (issue table). |
+| `s43 migrate golden: lint and run files goldens are the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 migrate golden: current files golden is 0 bytes and events literal` | a no-op run is a 0-byte .files and a single report event. |
+| `s43 migrate golden: current dockerfile golden equals its fixture` | the current fixture is the idempotent end state, so its golden equals the fixture. |
+| `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
+| `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
+| `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
 Before any Go parser exists, the shell `_parse_dockerfile_stages`
@@ -299,7 +330,7 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 hash golden: a missing Dockerfile gives empty hash and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty result and rc 0. |
 | `s43 hash golden: every hash fixture has exactly one golden and no extra` | a hash fixture with no golden, or a golden with no fixture, must fail. |
 
-### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (10)
+### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (17)
 
 Before any Go code reads `docker info` or `dpkg-query` output, the shell's
 reading of it is pinned. Each corpus file under
@@ -322,6 +353,13 @@ golden with no corpus file.
 | `s93: the seven named env corpus files exist` | base#2075 (S93c) names seven display-variable corpus files; a missing one would silently shrink what is pinned. |
 | `s93: detect_gui and _is_ssh_x11 results match every golden` | detect_gui and _is_ssh_x11 read DISPLAY, WAYLAND_DISPLAY and SSH_CONNECTION; the shell result must match every golden byte for byte. |
 | `s93: the seven env goldens hold the issue's results` | the worked results come from the issue, not from the shell. |
+| `s93: the named image-rule corpus files exist` | base#2079 (S93d) names one rule-applier corpus file and six image rule files; a missing one would silently shrink what is pinned. |
+| `s93: the rule appliers match the rules_paths golden` | _rule_prefix / _rule_suffix / _rule_basename read the last non-empty path segment; the shell result must match the golden byte for byte. |
+| `s93: the rules_paths golden holds the issue's six results` | the worked results come from the issue, not from the shell. |
+| `s93: the rules_paths corpus holds the issue's six paths` | the inputs must be the issue's own, or the goldens pin other cases (base#2079): trailing slash, root, the empty path and an empty segment. |
+| `s93: the image corpus holds the issue's six rules` | the image rules must be the issue's own (a space, @default, suffix), or the goldens pin other cases (base#2079). |
+| `s93: detect_image_name result matches every golden` | detect_image_name applies [image] rules then sanitizes the name. |
+| `s93: the six image goldens hold the issue's names` | the worked names come from the issue, not from the shell. |
 | `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)
