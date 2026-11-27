@@ -149,7 +149,10 @@ EOF
   _mk_scratch
   run _check "${SCRATCH}"
   [ "${status}" -eq 0 ] || { echo "precondition: ${output}"; false; }
-  grep -E '^\|[[:space:]]*`setup_cmd.sh:164`' "${SCRATCH}/${DOC_REL}" >> "${SCRATCH}/${DOC_REL}"
+  local _row
+  _row="$(grep -E '^\|[[:space:]]*`setup_cmd.sh:164`' "${SCRATCH}/${DOC_REL}")"
+  [ -n "${_row}" ] || { echo "precondition: no setup_cmd.sh:164 row"; false; }
+  printf '%s\n' "${_row}" >> "${SCRATCH}/${DOC_REL}"
   run _check "${SCRATCH}"
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"setup_cmd.sh:164"* ]]
