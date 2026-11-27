@@ -750,7 +750,7 @@ _acceptance_code() {
 @test "self-test.yaml: each config-gen job's job-level if: gates on a classify key of its own (base#1584, base#2176)" {
   run yq '.jobs["config-gen-gates"].if' "${WF}"
   assert_success
-  assert_output "needs.classify.outputs.select_config_gen == 'true' && (github.event_name != 'pull_request' && github.event_name != 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository)"
+  assert_output "${CG_GATES_IF}"
   run yq '.jobs["config-gen-redpath"].if' "${WF}"
   assert_success
   assert_output "needs.classify.outputs.select_config_gen_redpath == 'true'"
@@ -5244,5 +5244,5 @@ EOT
 @test "self-test.yaml: config-gen-gates if: ANDs the canonical same-repo guard onto its gate (base#2269)" {
   run _yaml_eval "${WF}" '.jobs["config-gen-gates"].if'
   assert_success
-  assert_output "needs.classify.outputs.select_config_gen == 'true' && (github.event_name != 'pull_request' && github.event_name != 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository)"
+  assert_output "${CG_GATES_IF}"
 }
