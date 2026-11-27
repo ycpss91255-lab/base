@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **347 tests**.
+Integration specs under `test/bats/integration/`: **356 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -380,6 +380,29 @@ invocation — `build.sh --dry-run`).
 | `fresh clone with stale absolute mount_1: setup.conf is regenerated, no path leak (#174)` | - |
 | `fresh clone with portable ${WS_PATH} mount_1: no warning, .env gets local path` | Happy path round-trip |
 
+### test/bats/integration/gitattributes_init_spec.bats (8)
+
+End-to-end coverage that wires `lib/gitattributes.sh` through `init.sh`'s
+new-repo and existing-repo paths (base#2246). A consumer had no line-ending
+rule, so a Windows clone on the default `core.autocrlf` checked scripts out
+with CRLF. The existing-repo cases start from a `.gitattributes` a repo
+already wrote -- binary asset types, a `-text` fixture, a CRLF script type
+-- because the block must land ABOVE those lines: in `.gitattributes` the
+last match wins, and a block appended below would override every one of
+them. Standalone fixture, as `gitignore_sync_spec.bats` is, because the sync
+needs the real `init.sh`.
+
+| Test | Description |
+|------|-------------|
+| `init.sh new-repo: .gitattributes is created holding exactly the canonical block (base#2246)` | A new repo starts with the rule, without anyone writing it |
+| `init.sh new-repo: git resolves LF for a script and CRLF for a .bat (base#2246)` | The file init.sh wrote must make git do what the block says |
+| `init.sh existing-repo: creates .gitattributes when the repo has none (base#2246)` | A repo with no .gitattributes at all is the common case -- the resync must give it one |
+| `init.sh existing-repo: the repo's own attribute rules still win after the resync (base#2246)` | THE POINT -- an asset repo's own binary / -text / CRLF rules must still decide the paths they name after the resync adds the block |
+| `init.sh existing-repo: the repo's own lines survive verbatim below the block (base#2246)` | The repo's lines are copied, never re-emitted or reordered |
+| `init.sh existing-repo: a .gitattributes already opening with the canonical block is left byte-identical (base#2246)` | A repo that hand-wrote the block ahead of the upgrade must see no diff when the upgrade's resync arrives |
+| `init.sh existing-repo: a second run produces no .gitattributes change (base#2246)` | Re-running the resync must not stack a second block |
+| `init.sh existing-repo: the resync does not renormalize files already committed (base#2246)` | The resync changes the RULE, not the repository's content -- a file already committed with CRLF is the repo's to renormalize, in its own commit |
+
 ### test/bats/integration/gitignore_sync_spec.bats (13)
 
 End-to-end coverage that wires `lib/gitignore.sh` through `init.sh`'s
@@ -420,7 +443,7 @@ gitignore sync requires the **real** `init.sh` to run during Step 3 of
 |------|-------------|
 | `the printed manifest equals what the resync installs (refs #927)` | - |
 
-### test/bats/integration/init_new_repo_spec.bats (63)
+### test/bats/integration/init_new_repo_spec.bats (64)
 
 End-to-end verification that `init.sh` produces a complete repo skeleton in
 an empty directory. **Level 1** (file generation only, no Docker). The
@@ -453,6 +476,7 @@ the unit `tui_spec`.
 | `new repo: .gitignore exists` | gitignore |
 | `new repo: .dockerignore exists (#604)` | - |
 | `new repo: .dockerignore contains compose.yaml (derived artifact) (#604)` | - |
+| `new repo: .gitattributes exists and carries the LF rule (base#2246)` | a new repo's text files are LF in every checkout from its first commit, whatever core.autocrlf a contributor's machine carries |
 | `new repo: doc/ tree exists with README translations` | i18n docs |
 | `new repo: doc/test/TEST.md exists` | TEST.md gen |
 | `new repo: TEST.md total matches the actual generated @test count (no stale 1 test) (S4 item 6)` | - |
