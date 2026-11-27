@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **330 tests**.
+Integration specs under `test/bats/integration/`: **347 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -132,7 +132,7 @@ stated expectation and a stale row can never stand for a deleted one.
 | `config-gen binary on a size-limited stdout exits 4 with one frame and a golden prefix` | the Go fault writer covers a write that fails at byte N in-process; this is the same contract on the built binary against a real file whose size limit (RLIMIT_FSIZE via prlimit) lets it take some bytes and then refuse with EFBIG, which /dev/full (0 bytes, ENOSPC) can not show. The answer is exit 4, exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations), and a non-empty stdout that is a strict prefix of the bridge golden (base#1469 I/O contract). SIGXFSZ is ignored so the write returns EFBIG instead of killing the process. prlimit must be on PATH in every environment the spec runs in (test-tools installs util-linux-misc); a missing prlimit fails here, it is never skipped. The same /dev/full and prlimit cases also run under `go test` in Dockerfile.config-gen's test stage (TestTablesDevFullStdoutIsExit4AndOneFrame, TestTablesSizeLimitedStdoutIsExit4AndAGoldenPrefix); this leg holds the shipped static binary to them. |
 | `config-gen binary on a closed stdout pipe exits 4 with one frame, not SIGPIPE` | prlimit and /dev/full fail the write on a file; a reader that is gone is the fourth way the single answer write fails, and the only one a signal can end first: a pipe whose read end is closed before the binary starts, as in `config-gen tables ... \| true`. The binary must not be killed by SIGPIPE (rc 141 from the shell, nothing on stderr); it exits 4 with exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations; stdout is the failing sink, so `-`) (base#1469 I/O contract). The golden is more than 65536 bytes, the default pipe buffer, so the case can not pass by the answer fitting into the buffer before the reader goes. |
 
-### test/bats/integration/config_gen_gitignore_golden_spec.bats (8)
+### test/bats/integration/config_gen_gitignore_golden_spec.bats (11)
 
 Before any Go code replaces the gitignore parsing, today's shell behaviour
 is pinned as goldens. The shell function is the oracle: this spec re-runs it
@@ -159,6 +159,9 @@ that pin events add that normalisation.
 | `s82 sync: a first sync terminates the last line and adds marker and entries` | first sync of a file whose last line has no newline: the newline is added, then the marker and all 18 canonical entries follow (base#2213). |
 | `s82 sync: an absent target is created with marker and entries` | an absent target is created holding the marker and all 18 entries (base#2213). |
 | `s82 sync: a lone trailing newline gets the marker with no extra blank line` | a file already ending in a lone blank line gets the marker right after it, with no extra blank line (base#2213). |
+| `s82 sync: an existing marker gets only the missing entry appended` | a file that already has the marker gets only the missing canonical entry (compose.yaml) appended at the end; every other line stays (base#2215). |
+| `s82 sync: a complete file is left unchanged` | a file with the marker and all 18 entries is left byte for byte (base#2215). |
+| `s82 sync: an in-place append keeps the file mode` | the missing entry is appended in place, so the file keeps mode 640 (base#2215). |
 
 ### test/bats/integration/config_gen_mutation_targets_spec.bats (40)
 
@@ -225,6 +228,37 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an aside that fails leaves the destination untouched (base#1464)` | If the first rename fails nothing has moved yet; the refusal must name that stage and leave the destination exactly as it was. |
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
+
+### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
+
+Before any Go parser exists, the shell `_dockerfile_stage_from_line`
+(dist/script/docker/lib/stage.sh) is the oracle for which FROM lines are
+accepted. Each
+dockerfile/config-gen/testdata/corpus/s43/s43_from_<case>.Dockerfile holds
+exactly one FROM-relevant line plus optional lint-allow comment lines. Its
+goldens in testdata/golden/s43/ are s43_from_<case>.stages (stdout of
+`_parse_dockerfile_stages`, empty output is a 0-byte file) and
+s43_from_<case>.hash (`_compute_dockerfile_hash` plus a trailing newline).
+The Go side must later match these byte for byte. The spec regenerates both
+from the shell and compares them with the goldens, and a partition check
+keeps fixtures and goldens one-to-one.
+
+| Test | Description |
+|------|-------------|
+| `s43 from golden: plain lists runtime` | the plain `FROM <image> AS <stage>` form is accepted. |
+| `s43 from golden: platform lists runtime` | one --flag=value before the image is accepted. |
+| `s43 from golden: multiflag lists runtime` | several flags before the image are accepted. |
+| `s43 from golden: lower rejects lowercase as` | a lowercase `as` is not accepted. |
+| `s43 from golden: comment rejects a commented FROM` | a commented FROM is not accepted. |
+| `s43 from golden: bare rejects a junk word` | an extra word between the image and AS is not accepted. |
+| `s43 from golden: inline rejects an inline comment` | an inline comment before AS is not accepted. |
+| `s43 from golden: flagimage rejects a flag as image` | a flag standing in for the image is not accepted. |
+| `s43 from golden: indented rejects leading spaces` | an indented FROM is not accepted. |
+| `s43 from golden: copyfrom rejects COPY --from` | COPY --from is not a FROM line. |
+| `s43 from golden: accepted cases carry the issue's hash literals` | the issue's table gives the expected hashes; pin them as literals so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 from golden: rejected cases hash to the empty sha256 with a 0-byte stages` | every rejected case hashes to the empty-string sha256 and lists no stage. |
+| `s43 from golden: accepted cases list runtime` | accepted cases list exactly the stage runtime. |
+| `s43 from golden: every fixture has exactly one .stages and one .hash and no extra` | a fixture missing a .stages or .hash golden, or a golden with no fixture, must fail the spec so the corpus cannot drift from its goldens. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
