@@ -78,8 +78,12 @@ func resultJSON(r Result) string {
 	return nodeJSON(r, 0)
 }
 
-// Each expected value below is the JSON `toml_bridge.py --merge` printed
-// for the same layers, low to high (base#1855).
+// The layers have the shape of the issue's bridge table rows, spelled with
+// keys and values the schema accepts: the schema refuses a free-form
+// [environment] key, `src`, `gpu_mode = "all"`, `runtime = "runc"` and a
+// free-form stage key, so env_N, `source`, `force`, `off` and
+// `network.*` stand in for them (base#1855). The merge outcome of each
+// row does not depend on the key or value spelled.
 func TestMergeMatchesBridge(t *testing.T) {
 	cases := []struct {
 		name string
@@ -87,45 +91,45 @@ func TestMergeMatchesBridge(t *testing.T) {
 		want string
 	}{
 		{"table key-level merge",
-			[]string{"[environment]\nA = \"1\"\n", "[environment]\nB = \"2\"\n"},
-			`{"environment": {"A": "1", "B": "2"}}`},
+			[]string{"[environment]\nenv_1 = \"A=1\"\n", "[environment]\nenv_2 = \"B=2\"\n"},
+			`{"environment": {"env_1": "A=1", "env_2": "B=2"}}`},
 		{"array replaces whole",
-			[]string{"[[volumes]]\nsrc = \"a\"\n", "[[volumes]]\nsrc = \"b\"\n"},
-			`{"volumes": [{"src": "b"}]}`},
+			[]string{"[[volumes]]\nsource = \"a\"\n", "[[volumes]]\nsource = \"b\"\n"},
+			`{"volumes": [{"source": "b"}]}`},
 		{"empty array replaces",
-			[]string{"[[volumes]]\nsrc = \"a\"\n", "volumes = []\n"},
+			[]string{"[[volumes]]\nsource = \"a\"\n", "volumes = []\n"},
 			`{"volumes": []}`},
 		{"absent array inherits",
-			[]string{"[[volumes]]\nsrc = \"a\"\n", "[deploy]\ngpu_mode = \"all\"\n"},
-			`{"volumes": [{"src": "a"}], "deploy": {"gpu_mode": "all"}}`},
+			[]string{"[[volumes]]\nsource = \"a\"\n", "[deploy]\ngpu_mode = \"force\"\n"},
+			`{"volumes": [{"source": "a"}], "deploy": {"gpu_mode": "force"}}`},
 		{"empty table exists",
 			[]string{"[environment]\n"},
 			`{"environment": {}}`},
 		{"empty table after a table",
-			[]string{"[deploy]\ngpu_mode = \"all\"\n", "[environment]\n"},
-			`{"deploy": {"gpu_mode": "all"}, "environment": {}}`},
+			[]string{"[deploy]\ngpu_mode = \"force\"\n", "[environment]\n"},
+			`{"deploy": {"gpu_mode": "force"}, "environment": {}}`},
 		{"empty upper table keeps lower keys",
-			[]string{"[environment]\nA = \"1\"\n", "[environment]\n"},
-			`{"environment": {"A": "1"}}`},
+			[]string{"[environment]\nenv_1 = \"A=1\"\n", "[environment]\n"},
+			`{"environment": {"env_1": "A=1"}}`},
 		{"alias un-inherit",
-			[]string{"[deploy]\ngpu_runtime = \"nvidia\"\nruntime = \"runc\"\n", "[deploy]\nruntime = \"runc\"\n"},
-			`{"deploy": {"runtime": "runc"}}`},
+			[]string{"[deploy]\ngpu_runtime = \"nvidia\"\nruntime = \"off\"\n", "[deploy]\nruntime = \"off\"\n"},
+			`{"deploy": {"runtime": "off"}}`},
 		{"alias canonical in the same layer stays",
-			[]string{"[deploy]\nruntime = \"runc\"\n", "[deploy]\ngpu_runtime = \"nvidia\"\nruntime = \"runc\"\n"},
-			`{"deploy": {"runtime": "runc", "gpu_runtime": "nvidia"}}`},
+			[]string{"[deploy]\nruntime = \"off\"\n", "[deploy]\ngpu_runtime = \"nvidia\"\nruntime = \"off\"\n"},
+			`{"deploy": {"runtime": "off", "gpu_runtime": "nvidia"}}`},
 		{"stage alias un-inherit",
-			[]string{"[\"stage:x\"]\n\"deploy.gpu_runtime\" = \"nvidia\"\nk = \"v\"\n", "[\"stage:x\"]\n\"deploy.runtime\" = \"runc\"\n"},
-			`{"stage:x": {"k": "v", "deploy.runtime": "runc"}}`},
+			[]string{"[\"stage:x\"]\n\"deploy.gpu_runtime\" = \"nvidia\"\n\"network.mode\" = \"host\"\n", "[\"stage:x\"]\n\"deploy.runtime\" = \"off\"\n"},
+			`{"stage:x": {"network.mode": "host", "deploy.runtime": "off"}}`},
 		{"stage table key-level merge",
-			[]string{"[\"stage:x\"]\nk = \"v\"\n", "[\"stage:x\"]\nj = \"w\"\n"},
-			`{"stage:x": {"k": "v", "j": "w"}}`},
+			[]string{"[\"stage:x\"]\n\"network.mode\" = \"host\"\n", "[\"stage:x\"]\n\"network.ipc\" = \"host\"\n"},
+			`{"stage:x": {"network.mode": "host", "network.ipc": "host"}}`},
 		{"three layers",
 			[]string{
-				"[deploy]\ngpu_mode = \"all\"\n",
-				"[environment]\nA = \"1\"\n[[volumes]]\nsrc = \"a\"\n[deploy]\ngpu_runtime = \"auto\"\n[\"stage:x\"]\n\"deploy.gpu_runtime\" = \"nvidia\"\nk = \"v\"\n",
-				"volumes = []\n[environment]\n[\"stage:x\"]\n\"deploy.runtime\" = \"runc\"\n[deploy]\nruntime = \"runc\"\n",
+				"[deploy]\ngpu_mode = \"force\"\n",
+				"[environment]\nenv_1 = \"A=1\"\n[[volumes]]\nsource = \"a\"\n[deploy]\ngpu_runtime = \"auto\"\n[\"stage:x\"]\n\"deploy.gpu_runtime\" = \"nvidia\"\n\"network.mode\" = \"host\"\n",
+				"volumes = []\n[environment]\n[\"stage:x\"]\n\"deploy.runtime\" = \"off\"\n[deploy]\nruntime = \"off\"\n",
 			},
-			`{"deploy": {"gpu_mode": "all", "runtime": "runc"}, "environment": {"A": "1"}, "volumes": [], "stage:x": {"k": "v", "deploy.runtime": "runc"}}`},
+			`{"deploy": {"gpu_mode": "force", "runtime": "off"}, "environment": {"env_1": "A=1"}, "volumes": [], "stage:x": {"network.mode": "host", "deploy.runtime": "off"}}`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -145,9 +149,9 @@ func TestMergeNilIsEmpty(t *testing.T) {
 
 func TestMergeIsDeterministic(t *testing.T) {
 	in := layers(t,
-		"[deploy]\ngpu_mode = \"all\"\n",
-		"[environment]\nA = \"1\"\nB = \"2\"\nC = \"3\"\n[\"stage:x\"]\nk = \"v\"\nj = \"w\"\n",
-		"[environment]\nD = \"4\"\n[\"stage:x\"]\ni = \"u\"\n",
+		"[deploy]\ngpu_mode = \"force\"\n",
+		"[environment]\nenv_1 = \"A=1\"\nenv_2 = \"B=2\"\nenv_3 = \"C=3\"\n[\"stage:x\"]\n\"network.mode\" = \"host\"\n\"network.ipc\" = \"host\"\n",
+		"[environment]\nenv_4 = \"D=4\"\n[\"stage:x\"]\n\"network.pid\" = \"host\"\n",
 	)
 	first := resultJSON(Merge(in))
 	for i := 0; i < 50; i++ {
