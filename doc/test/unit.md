@@ -7272,7 +7272,7 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
 | `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
 
-### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
+### test/bats/unit/self_hosted_guard_lint_spec.bats (28)
 
 | Test | Description |
 |------|-------------|
@@ -7288,6 +7288,8 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS on a bare hostname label` | - |
 | `self-hosted guard: names the exact condition to paste in the failure message` | - |
 | `self-hosted guard: PASSES a literal GitHub-hosted runs-on with no guard` | - |
+| `self-hosted guard: PASSES an unguarded runs-on from classify runs_on_cpu (base#2286)` | base#2286. classify 的 runs_on_cpu 已由 select_runner.sh 依事件決定 runner，fork PR 仍落在 hosted，所以這個 runs-on 不需要再加 guard。 |
+| `self-hosted guard: FAILS an unguarded runs-on from any other classify output (base#2286)` | base#2286. 只有 runs_on_cpu 被認作已守衛；其他 classify 輸出仍須 guard， 否則放寬會漏掉真正未守衛的 self-hosted runs-on。 |
 | `self-hosted guard: PASSES the arm + amd hosted families and a windows/macos runner` | - |
 | `self-hosted guard: PASSES a literal matrix that resolves entirely to hosted labels` | - |
 | `self-hosted guard: PASSES a LOCAL reusable-workflow call` | - |
