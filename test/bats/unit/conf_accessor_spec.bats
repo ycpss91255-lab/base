@@ -1059,3 +1059,71 @@ _seed_layer_memo() {
     assert_refusal 1 merge_layer_not_regular "path=${TEMP_DIR}/layer.toml"
   done
 }
+
+# ════════════════════════════════════════════════════════════════════
+# _conf_load_layers: memo 目錄不可寫時降級 (base#2235)
+# ════════════════════════════════════════════════════════════════════
+
+# _seed_unwritable_memo
+#   _seed_layer_memo, then the memo directory is made unusable (chmod 555;
+#   as root, whose writes ignore the mode, a path under a regular file) and the shared warn flag is created in
+#   the top-level shell, outside the unwritable directory, the way
+#   setup.sh creates it next to the memo directory.
+_seed_unwritable_memo() {
+  _seed_layer_memo
+  if [[ "$(id -u)" == 0 ]]; then
+    # root ignores mode bits: put a regular file where the parent should be
+    : > "${TEMP_DIR}/memo-parent"
+    _CONF_LAYERS_MEMO_DIR="${TEMP_DIR}/memo-parent/memo"
+  else
+    chmod 555 "${_CONF_LAYERS_MEMO_DIR}"
+  fi
+  _CONF_LAYERS_MEMO_WARN_FLAG="$(mktemp "${TEMP_DIR}/memo-warn.XXXXXX")"
+  rm -f "${_CONF_LAYERS_MEMO_WARN_FLAG}"
+}
+
+# why: base#2235 acceptance 1-4 -- an unwritable memo directory degrades to
+# no memo. Three loads of the same two-layer chain (the middle one inside
+# $(...)): every load returns 0 and answers `wayland`, the bridge is called
+# 3 times (nothing to hit), and conf_memo_unwritable is logged once for the
+# whole command with path=<memo dir>.
+@test "_conf_load_layers degrades to no memo and warns once when the memo dir is unwritable (base#2235)" {
+  _seed_unwritable_memo
+  local _err="${TEMP_DIR}/load.err"
+  LOG_FORMAT=json
+  export LOG_FORMAT
+  : > "${_err}"
+  _conf_load_layers A "${_LM_DIST}" "${_LM_REPO}" 2>> "${_err}"
+  assert_equal "$?" 0
+  assert_equal "$(_conf_get A gui mode)" "wayland"
+  (_conf_load_layers B "${_LM_DIST}" "${_LM_REPO}" 2>> "${_err}"; exit "$?")
+  assert_equal "$?" 0
+  _conf_load_layers C "${_LM_DIST}" "${_LM_REPO}" 2>> "${_err}"
+  assert_equal "$?" 0
+  assert_equal "$(_conf_get C gui mode)" "wayland"
+  run grep -c . "${_LM_CALLS}"
+  assert_output 3
+  run grep -c conf_memo_unwritable "${_err}"
+  assert_output 1
+  run grep conf_memo_unwritable "${_err}"
+  assert_output --partial "path=${_CONF_LAYERS_MEMO_DIR}"
+}
+
+# why: base#2235 acceptance 5 -- the degrade does not change failure
+# semantics: with the same unwritable memo dir and the bridge exiting 1,
+# the load still returns 1 and logs conf_toml_merge_failed.
+@test "_conf_load_layers still fails by name when the bridge fails and the memo dir is unwritable (base#2235)" {
+  _seed_unwritable_memo
+  : > "${_LM_FAIL}"
+  LOG_FORMAT=json run --separate-stderr _conf_load_layers A "${_LM_DIST}" "${_LM_REPO}"
+  assert_equal "${status}" 1
+  assert_logged_event conf_toml_merge_failed
+}
+
+# why: base#2235 acceptance 6 -- a writable memo dir never logs the event.
+@test "_conf_load_layers does not log conf_memo_unwritable when the memo dir is writable (base#2235)" {
+  _seed_layer_memo
+  LOG_FORMAT=json run --separate-stderr _conf_load_layers A "${_LM_DIST}" "${_LM_REPO}"
+  assert_equal "${status}" 0
+  [[ "${stderr}" != *conf_memo_unwritable* ]]
+}
