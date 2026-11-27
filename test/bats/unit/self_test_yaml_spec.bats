@@ -3846,6 +3846,28 @@ _lint_probe_fixture() {
     || fail "the verify step (${_verify}) runs after Create GitHub Release (${_publish})"
 }
 
+# why: The release job runs on any tag push. Only a name check before the
+# notes and the publish keeps a `v1.0` or `release-1` tag from shipping.
+@test "self-test.yaml: the release job refuses a tag name outside vX.Y.Z / vX.Y.Z-rcN before publishing" {
+  local _check _notes _publish _run _ref
+  _check="$(yq '.jobs.release.steps | to_entries | .[] | select((.value.run // "") | test("script/release/tag_format\\.sh")) | .key' "${WF}" | head -n 1)"
+  _notes="$(yq '.jobs.release.steps | to_entries | .[] | select((.value.run // "") | test("script/release/release_notes\\.sh")) | .key' "${WF}" | head -n 1)"
+  _publish="$(yq '.jobs.release.steps | to_entries | .[] | select((.value.uses // "") | test("^softprops/action-gh-release@")) | .key' "${WF}" | head -n 1)"
+  [ -n "${_publish}" ] || fail "no softprops/action-gh-release step in the release job"
+  [ -n "${_notes}" ] || fail "no release step runs script/release/release_notes.sh"
+  [ -n "${_check}" ] || fail "no release step runs script/release/tag_format.sh"
+  (( _check < _notes && _check < _publish )) \
+    || fail "the tag name check (${_check}) runs after the notes (${_notes}) or the publish (${_publish})"
+  _ref="$(LP_I="${_check}" yq '.jobs.release.steps[env(LP_I)].env.REF' "${WF}")"
+  [[ "${_ref}" == '${{ github.ref_name }}' ]] \
+    || fail "the check step's REF is '${_ref}', not the pushed tag's name"
+  _run="$(LP_I="${_check}" yq '.jobs.release.steps[env(LP_I)].run' "${WF}")"
+  run env REF=v1.0 bash -euo pipefail -c "cd /source; ${_run}"
+  assert_failure
+  run env REF=v0.43.0-rc9 bash -euo pipefail -c "cd /source; ${_run}"
+  assert_success
+}
+
 # ── bats-unit + bats-integration + coverage jobs ───────────────
 
 @test "self-test.yaml: declares bats-fragile job (#677)" {
