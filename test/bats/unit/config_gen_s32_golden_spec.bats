@@ -91,6 +91,60 @@ _check_s32() {
   _check_s32 s32_suffix_order "ini_to_toml_migrated"
 }
 
+# why: The numbered-key family of image_rules converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 image rules become an array of tables (base#2087)" {
+  _check_s32 s32_image_rules "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of build_args converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 build args split into key and value tables (base#2087)" {
+  _check_s32 s32_build_args "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of volumes converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 a volume mount splits into source, target and mode (base#2087)" {
+  _check_s32 s32_volumes "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of security converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 cap_add and security_opt become arrays of tables (base#2087)" {
+  _check_s32 s32_security "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of network_ports converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 network ports split into host and container (base#2087)" {
+  _check_s32 s32_network_ports "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of devices converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 devices and cgroup rules become arrays of tables (base#2087)" {
+  _check_s32 s32_devices "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of tmpfs converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 a tmpfs entry becomes an array of tables (base#2087)" {
+  _check_s32 s32_tmpfs "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of contexts converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 an additional context splits into name and source (base#2087)" {
+  _check_s32 s32_contexts "ini_to_toml_migrated"
+}
+
+# why: The numbered-key family of environment converts as the shell does; the golden
+# pins the bytes and the single migrated event.
+@test "s32 environment numbered keys stay plain keys (base#2087)" {
+  _check_s32 s32_environment "ini_to_toml_migrated"
+}
+
 # _check_s32_declined <name>
 #   Convert corpus/s32/<name>.ini with the shell. A declined input writes no
 #   setup.toml, keeps .setup.conf unchanged, logs exactly one event id and
