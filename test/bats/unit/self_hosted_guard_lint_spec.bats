@@ -279,6 +279,41 @@ _guard_lines() {
   [[ "${output}" == *"0 self-hosted-eligible"* ]]
 }
 
+@test "self-hosted guard: PASSES an unguarded runs-on from classify runs_on_cpu (base#2286)" {
+  # select_runner.sh gives the cpu fleet only to a trusted event with
+  # CI_SELF_HOSTED=cpu and ubuntu-latest otherwise (base#2265, base#2266),
+  # so a fork PR still runs on a hosted runner. Guarding the job would skip
+  # it for forks, so the lint must not demand the guard here.
+  _workflow "wf.yaml" \
+    'on:' \
+    '  pull_request:' \
+    'jobs:' \
+    '  build:' \
+    '    needs: classify' \
+    '    runs-on: ${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}' \
+    '    steps:' \
+    '      - run: make'
+  run _run_self_hosted_guard
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"0 self-hosted-eligible"* ]]
+}
+
+@test "self-hosted guard: FAILS an unguarded runs-on from any other classify output (base#2286)" {
+  _workflow "wf.yaml" \
+    'on:' \
+    '  pull_request:' \
+    'jobs:' \
+    '  build:' \
+    '    needs: classify' \
+    '    runs-on: ${{ fromJSON(needs.classify.outputs.runs_on_gpu) }}' \
+    '    steps:' \
+    '      - run: make'
+  run _run_self_hosted_guard
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"job build"* ]]
+  [[ "${output}" == *"is the expression"* ]]
+}
+
 @test "self-hosted guard: PASSES the arm + amd hosted families and a windows/macos runner" {
   _workflow "wf.yaml" \
     'on:' \
