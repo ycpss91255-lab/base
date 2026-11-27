@@ -5221,7 +5221,35 @@ REPO=${{ github.repository }}
 MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
 CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 EOT
-  # This child only adds outputs: no job may take its runs-on from them yet.
-  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | (.value["runs-on"] // "") | tostring')"
-  assert_failure
+  # Only the switched jobs take their runs-on from the classify output;
+  # coverage is the one switched here (base#2273).
+  run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) | .key'
+  assert_success
+  assert_output 'coverage'
+}
+
+# why: coverage is the kcov shard PRIMARY gate; its runner now comes from
+# classify's runs_on_cpu (ubuntu-latest when the switch is off, a fork or an
+# untrusted event), and nothing else about the job may move (base#2273,
+# part of base#1586).
+@test "self-test.yaml: coverage runs-on comes from classify runs_on_cpu and the rest of the job is unchanged (base#2273)" {
+  # Expected literals are the issue's acceptance criteria.
+  run _yaml_eval "${WF}" '.jobs.coverage["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs.coverage["timeout-minutes"]'
+  assert_success
+  assert_output '60'
+  run _yaml_eval "${WF}" '.jobs.coverage.needs | join(",")'
+  assert_success
+  assert_output 'actionlint,classify,compute-shards,test-tools-image-amd64'
+  run _yaml_eval "${WF}" '.jobs.coverage.if'
+  assert_success
+  assert_output "needs.classify.outputs.select_coverage == 'true'"
+  run _yaml_eval "${WF}" '.jobs.coverage.strategy["fail-fast"]'
+  assert_success
+  assert_output 'false'
+  run _yaml_eval "${WF}" '.jobs.coverage.strategy.matrix.shard'
+  assert_success
+  assert_output '${{ fromJSON(needs.compute-shards.outputs.shards) }}'
 }
