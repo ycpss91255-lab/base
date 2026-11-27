@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **353 tests**.
+Integration specs under `test/bats/integration/`: **361 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -132,7 +132,7 @@ stated expectation and a stale row can never stand for a deleted one.
 | `config-gen binary on a size-limited stdout exits 4 with one frame and a golden prefix` | the Go fault writer covers a write that fails at byte N in-process; this is the same contract on the built binary against a real file whose size limit (RLIMIT_FSIZE via prlimit) lets it take some bytes and then refuse with EFBIG, which /dev/full (0 bytes, ENOSPC) can not show. The answer is exit 4, exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations), and a non-empty stdout that is a strict prefix of the bridge golden (base#1469 I/O contract). SIGXFSZ is ignored so the write returns EFBIG instead of killing the process. prlimit must be on PATH in every environment the spec runs in (test-tools installs util-linux-misc); a missing prlimit fails here, it is never skipped. The same /dev/full and prlimit cases also run under `go test` in Dockerfile.config-gen's test stage (TestTablesDevFullStdoutIsExit4AndOneFrame, TestTablesSizeLimitedStdoutIsExit4AndAGoldenPrefix); this leg holds the shipped static binary to them. |
 | `config-gen binary on a closed stdout pipe exits 4 with one frame, not SIGPIPE` | prlimit and /dev/full fail the write on a file; a reader that is gone is the fourth way the single answer write fails, and the only one a signal can end first: a pipe whose read end is closed before the binary starts, as in `config-gen tables ... \| true`. The binary must not be killed by SIGPIPE (rc 141 from the shell, nothing on stderr); it exits 4 with exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations; stdout is the failing sink, so `-`) (base#1469 I/O contract). The golden is more than 65536 bytes, the default pipe buffer, so the case can not pass by the answer fitting into the buffer before the reader goes. |
 
-### test/bats/integration/config_gen_gitignore_golden_spec.bats (11)
+### test/bats/integration/config_gen_gitignore_golden_spec.bats (16)
 
 Before any Go code replaces the gitignore parsing, today's shell behaviour
 is pinned as goldens. The shell function is the oracle: this spec re-runs it
@@ -162,6 +162,11 @@ that pin events add that normalisation.
 | `s82 sync: an existing marker gets only the missing entry appended` | a file that already has the marker gets only the missing canonical entry (compose.yaml) appended at the end; every other line stays (base#2215). |
 | `s82 sync: a complete file is left unchanged` | a file with the marker and all 18 entries is left byte for byte (base#2215). |
 | `s82 sync: an in-place append keeps the file mode` | the missing entry is appended in place, so the file keeps mode 640 (base#2215). |
+| `s82 pathspec: a trailing slash is dropped from log/` | a trailing slash marks a directory in a pattern and means nothing in a pathspec, so it is dropped (base#2083). |
+| `s82 pathspec: a trailing slash is dropped from coverage/` | - |
+| `s82 pathspec: a plain file entry is unchanged` | an entry with no slash passes through unchanged (base#2083). |
+| `s82 pathspec: a leading slash is refused` | a leading slash anchors a pattern and has no settled pathspec translation, so it is refused with rc 1 and no output (base#2083). |
+| `s82 pathspec: an empty entry is refused` | an empty entry names nothing, so it is refused with rc 1 (base#2083). |
 
 ### test/bats/integration/config_gen_mutation_targets_spec.bats (40)
 
@@ -294,7 +299,7 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 hash golden: a missing Dockerfile gives empty hash and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty result and rc 0. |
 | `s43 hash golden: every hash fixture has exactly one golden and no extra` | a hash fixture with no golden, or a golden with no fixture, must fail. |
 
-### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (7)
+### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (10)
 
 Before any Go code reads `docker info` or `dpkg-query` output, the shell's
 reading of it is pinned. Each corpus file under
@@ -314,6 +319,9 @@ golden with no corpus file.
 | `s93: the four named nvidia-smi corpus files exist` | base#2072 (S93b) names four nvidia-smi -L corpus files; a missing one would silently shrink what is pinned. |
 | `s93: detect_gpu_count result matches every golden` | detect_gpu_count counts only lines starting with "GPU "; indented MIG lines and "No devices were found" do not count. |
 | `s93: the four gpu goldens hold the issue's counts` | the worked counts come from the issue, not from the shell. |
+| `s93: the seven named env corpus files exist` | base#2075 (S93c) names seven display-variable corpus files; a missing one would silently shrink what is pinned. |
+| `s93: detect_gui and _is_ssh_x11 results match every golden` | detect_gui and _is_ssh_x11 read DISPLAY, WAYLAND_DISPLAY and SSH_CONNECTION; the shell result must match every golden byte for byte. |
+| `s93: the seven env goldens hold the issue's results` | the worked results come from the issue, not from the shell. |
 | `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)

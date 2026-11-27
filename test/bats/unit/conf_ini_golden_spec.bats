@@ -39,7 +39,7 @@ _tokens_of() {
 # why: a corpus input added or dropped without a golden changes what the
 # Go reader is held to; the count makes that a visible edit.
 @test "the s25 corpus holds its eight inputs" {
-  local -a _f=("${CORPUS}"/s25_[!l]*.ini)
+  local -a _f=("${CORPUS}"/s25_[!lb]*.ini)
   assert_equal "${#_f[@]}" "8"
 }
 
@@ -47,7 +47,7 @@ _tokens_of() {
 # without an input is a record of nothing.
 @test "every s25 input has a golden, and no golden is orphaned" {
   local _f _g _stem _missing="" _orphan=""
-  for _f in "${CORPUS}"/s25_[!l]*.ini; do
+  for _f in "${CORPUS}"/s25_[!lb]*.ini; do
     _stem="$(basename "${_f}" .ini)"
     [[ -s "${GOLDEN}/${_stem}.tokens.golden" ]] || _missing+=" ${_stem}"
   done
@@ -67,7 +67,7 @@ _tokens_of() {
 # reproduce byte for byte.
 @test "_ini_tokenize over every s25 input matches its golden byte for byte" {
   local _f _stem _bad=""
-  for _f in "${CORPUS}"/s25_[!l]*.ini; do
+  for _f in "${CORPUS}"/s25_[!lb]*.ini; do
     _stem="$(basename "${_f}" .ini)"
     if ! cmp -s <(_tokens_of "${_f}") "${GOLDEN}/${_stem}.tokens.golden"; then
       _bad+=" ${_stem}"
@@ -145,7 +145,7 @@ _load_of() {
 # own <stem>.load.golden.
 @test "_conf_load_layers over every single s25 input matches its load golden" {
   local _f _stem _bad=""
-  for _f in "${CORPUS}"/s25_[!l]*.ini; do
+  for _f in "${CORPUS}"/s25_[!lb]*.ini; do
     _stem="$(basename "${_f}" .ini)"
     _conf_load_layers H "${_f}"
     if ! cmp -s <(_load_of H) "${GOLDEN}/${_stem}.load.golden"; then
@@ -154,6 +154,29 @@ _load_of() {
   done
   [[ -z "${_bad}" ]] || {
     echo "differs from golden:${_bad}" >&2
+    return 1
+  }
+}
+
+# why: `_setup_conf_merge_blockers` is the shell answer the later
+# `ini blockers` slice must reproduce (base#2066, S25d). Over the
+# s25_blockers_* trio the expected blockers are `a` (root differs from
+# legacy and from the template) and `d` (only the root has it), in that
+# order; `b` (legacy and root agree) and `c` (root equals the template)
+# are not. The bytes are in golden/s25/blockers.golden.
+@test "_setup_conf_merge_blockers over the s25 blockers trio matches blockers.golden" {
+  # shellcheck source=dist/script/docker/lib/setup_conf_migrate.sh
+  # shellcheck disable=SC1091
+  source /source/dist/script/docker/lib/setup_conf_migrate.sh
+  local -a _out=()
+  local _rc=0
+  _conf_load_layers L "${CORPUS}/s25_blockers_legacy.ini"
+  _conf_load_layers R "${CORPUS}/s25_blockers_root.ini"
+  _conf_load_layers T "${CORPUS}/s25_blockers_tmpl.ini"
+  _setup_conf_merge_blockers L R T _out || _rc=$?
+  assert_equal "${_rc}" "0"
+  cmp -s <(printf '%s\n' ${_out[@]+"${_out[@]}"}) "${GOLDEN}/blockers.golden" || {
+    echo "differs from blockers.golden" >&2
     return 1
   }
 }
