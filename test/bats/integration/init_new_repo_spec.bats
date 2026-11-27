@@ -276,6 +276,14 @@ call-release: contents: write'
   assert_success
 }
 
+# why: a new repo's text files are LF in every checkout from its first
+# commit, whatever core.autocrlf a contributor's machine carries
+@test "new repo: .gitattributes exists and carries the LF rule (base#2246)" {
+  bash .base/dist/script/base/init.sh
+  run grep -xF '* text=auto eol=lf' "${REPO_DIR}/.gitattributes"
+  assert_success
+}
+
 # why: i18n docs
 @test "new repo: doc/ tree exists with README translations" {
   bash .base/dist/script/base/init.sh
