@@ -67,7 +67,7 @@ _ref_line() {
 # why: The hook blocks a push when a workflow has no dynamic run-name
 @test "pre-push: blocks when a workflow lacks a dynamic run-name" {
   assert_spec_subject "${HOOK}" "the tracked pre-push hook"
-  _wf good.yaml "run-name: \${{ github.event_name }}"
+  _wf good.yaml "run-name: \${{ github.event.merge_group.head_ref || github.event_name }}"
   _wf bad.yaml "run-name: static"
   _push_hook "$(_ref_line "$(_commit)")"
   assert_failure
@@ -85,8 +85,8 @@ _ref_line() {
 
 # why: The hook lets a push through when every workflow passes
 @test "pre-push: allows the push when every workflow has a dynamic run-name" {
-  _wf a.yaml "run-name: \${{ github.event_name }}"
-  _wf b.yml "run-name: \${{ github.ref_name || '?' }}"
+  _wf a.yaml "run-name: \${{ github.event.merge_group.head_ref || github.event_name }}"
+  _wf b.yml "run-name: \${{ github.event.merge_group.head_ref || github.ref_name || '?' }}"
   _push_hook "$(_ref_line "$(_commit)")"
   assert_success
 }
@@ -97,7 +97,7 @@ _ref_line() {
   _wf a.yaml "run-name: static"
   local _sha
   _sha="$(_commit)"
-  _wf a.yaml "run-name: \${{ github.event_name }}"
+  _wf a.yaml "run-name: \${{ github.event.merge_group.head_ref || github.event_name }}"
   _push_hook "$(_ref_line "${_sha}")"
   assert_failure
   assert_output --partial "a.yaml: run-name has no"
@@ -106,7 +106,7 @@ _ref_line() {
 # why: An unstaged mistake in the working tree is not what is pushed, so it
 # does not block a good commit
 @test "pre-push: allows a pushed commit that is good even when the working tree is broken" {
-  _wf a.yaml "run-name: \${{ github.event_name }}"
+  _wf a.yaml "run-name: \${{ github.event.merge_group.head_ref || github.event_name }}"
   local _sha
   _sha="$(_commit)"
   _wf a.yaml "run-name: static"

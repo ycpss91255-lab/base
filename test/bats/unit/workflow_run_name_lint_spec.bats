@@ -44,7 +44,7 @@ _write_wf() {
 _good_wf() {
   _write_wf "${1}" <<'EOF'
 name: Good
-run-name: "${{ github.event_name }} · ${{ github.ref_name || '?' }}"
+run-name: "${{ github.event_name }} · ${{ github.event.merge_group.head_ref || github.ref_name || '?' }}"
 
 on:
   push:
@@ -110,13 +110,34 @@ EOF
   assert_output --partial "static.yaml: run-name has no"
 }
 
+# why: A merge queue run is traced to its PR only through
+# merge_group.head_ref, so an expression without it fails
+@test "_run_workflow_run_name: a dynamic run-name without merge_group.head_ref fails" {
+  _write_wf noqueue.yaml <<'EOF'
+name: NoQueue
+run-name: ${{ github.workflow }}
+
+on:
+  merge_group:
+
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+EOF
+  run _run_workflow_run_name
+  assert_failure
+  assert_output --partial "noqueue.yaml: run-name does not name github.event.merge_group.head_ref"
+}
+
 # why: A folded block scalar is read across its lines
 @test "_run_workflow_run_name: a folded dynamic run-name passes" {
   _write_wf folded.yaml <<'EOF'
 name: Folded
 run-name: >-
   ${{ github.event_name }} ·
-  ${{ github.sha || '?' }}
+  ${{ github.event.merge_group.head_ref || github.sha || '?' }}
 
 on:
   push:
