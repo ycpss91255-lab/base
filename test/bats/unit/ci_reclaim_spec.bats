@@ -202,6 +202,20 @@ _removed() {
   refute_line "container theirc"
 }
 
+@test "reclaim.sh --run with a per-job key spares sibling jobs on the same host" {
+  # why: Jobs of one run share a docker host. With a per-job key (<run>-<attempt>-<slug>) a finishing job removes only its own containers; coverage-3 must not match coverage-4 or coverage-30 (digit boundary), base#2328.
+  _state container mine  "ci-42-1-coverage-3"  "" 60
+  _state container other "ci-42-1-coverage-4"  "" 60
+  _state container ten   "ci-42-1-coverage-30" "" 60
+
+  run bash "${RECLAIM}" --run 42-1-coverage-3
+  assert_success
+  run _removed
+  assert_line "container mine"
+  refute_line "container other"
+  refute_line "container ten"
+}
+
 @test "reclaim.sh --run does not mistake attempt 10 for attempt 1" {
   # `ci-1001-1` is a string prefix of `ci-1001-10`; a substring match
   # would let a re-running job delete the attempt that is still live.
