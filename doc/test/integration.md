@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **433 tests**.
+Integration specs under `test/bats/integration/`: **439 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -290,6 +290,21 @@ byte. Shared generator: s43_arg_user_helper.bash.
 | `s43 arg_user golden: unrelated` | ARG USERLAND / ARG USER_NAME are not ARG USER; no warning. |
 | `s43 arg_user golden: bare events golden equals the issue's literal events` | the issue gives the bare events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
 | `s43 arg_user golden: unrelated events golden is the single none-matched report` | the unrelated case has no warning, only the report event. |
+| `s43 arg_user golden: dockerfile goldens equal their fixtures and files goldens are 0 bytes` | arg_user only reports, never rewrites: dockerfile golden == fixture, .files empty. |
+| `s43 arg_user golden: every case has one fixture and exactly its three goldens` | each case has exactly one fixture and exactly three goldens. |
+
+### test/bats/integration/config_gen_s43_arg_user_continuation_golden_spec.bats (6)
+
+before any Go migration exists, the shell apply_migrations with
+_MIGRATIONS=( arg_user ) is the oracle; the Go side must match byte for
+byte. Shared generator: s43_arg_user_helper.bash.
+
+| Test | Description |
+|------|-------------|
+| `s43 arg_user golden: continuation` | a backslash continuation around ARG USER warns at lines 4 (bare) and 7 (root). |
+| `s43 arg_user golden: multiname` | continued declarations and USER as a later name in a multi-name ARG each warn at the line the ARG instruction starts on. |
+| `s43 arg_user golden: escape_directive` | a "# escape=`" directive moves the continuation character; an unclosed quote in the default is unreadable and gets the may-run-as-root notice. |
+| `s43 arg_user golden: continuation events golden equals the issue's literal events` | the issue gives the continuation events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
 | `s43 arg_user golden: dockerfile goldens equal their fixtures and files goldens are 0 bytes` | arg_user only reports, never rewrites: dockerfile golden == fixture, .files empty. |
 | `s43 arg_user golden: every case has one fixture and exactly its three goldens` | each case has exactly one fixture and exactly three goldens. |
 
