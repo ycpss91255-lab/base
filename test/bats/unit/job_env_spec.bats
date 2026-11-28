@@ -4,7 +4,7 @@
 # project name and TMPDIR, base#2274 (part of base#1586).
 #
 # The script is pure bash: inputs are GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT,
-# JOB_KEY and RUNNER_TEMP, output is exactly three KEY=value lines on stdout.
+# JOB_KEY and RUNNER_TEMP, output is exactly four KEY=value lines on stdout.
 # Expected values are the literals worked out in the issue's acceptance
 # criteria, not recomputed here.
 #
@@ -30,14 +30,15 @@ _run_env() {
 }
 
 # why: The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274.
-@test "job_env: worked example prints exactly the three documented lines" {
+@test "job_env: worked example prints exactly the four documented lines" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
     JOB_KEY=Config-gen/Gates RUNNER_TEMP="${RT}"
   [ "${status}" -eq 0 ]
-  [ "${#lines[@]}" -eq 3 ]
+  [ "${#lines[@]}" -eq 4 ]
   [ "${lines[0]}" = "COMPOSE_PROJECT_NAME=ci-42-1-config-gen-gates" ]
   [ "${lines[1]}" = "TMPDIR=${RT}/job-42-1-config-gen-gates" ]
   [ "${lines[2]}" = "TEST_TOOLS_IMAGE=test-tools:ci-42-1-config-gen-gates" ]
+  [ "${lines[3]}" = "CI_RUN_KEY=42-1-config-gen-gates" ]
 }
 
 # why: Jobs on one host share one docker daemon, so a shared test-tools image tag makes concurrent builds fail with "already exists"; each job needs its own tag, base#2321.
@@ -63,6 +64,15 @@ _run_env() {
   [ "${lines[0]}" = "COMPOSE_PROJECT_NAME=ci-42-3-lint--ubuntu--22-04-" ]
   [ "${lines[2]}" = "TEST_TOOLS_IMAGE=test-tools:ci-42-3-lint--ubuntu--22-04-" ]
   [ "${lines[2]#TEST_TOOLS_IMAGE=test-tools:}" = "${lines[0]#COMPOSE_PROJECT_NAME=}" ]
+}
+
+# why: reclaim.sh claims resources by this key; a key shared by the whole run lets the first job to finish remove containers of sibling jobs on the same host (run 46112164146, exit 137), so the key must carry the same per-job id as the compose project, base#2328.
+@test "job_env: CI_RUN_KEY is the COMPOSE_PROJECT_NAME id without the ci- prefix" {
+  _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=3 \
+    "JOB_KEY=Lint (ubuntu, 22.04)" RUNNER_TEMP="${RT}"
+  [ "${status}" -eq 0 ]
+  [ "${lines[3]}" = "CI_RUN_KEY=42-3-lint--ubuntu--22-04-" ]
+  [ "${lines[3]#CI_RUN_KEY=}" = "${lines[0]#COMPOSE_PROJECT_NAME=ci-}" ]
 }
 
 # why: The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274.
