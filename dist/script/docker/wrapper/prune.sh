@@ -399,7 +399,24 @@ _run_prune() {
     # Skipping the flag avoids a "filter until is unsupported" warning.
     cmd+=(--filter "until=${until_val}")
   fi
-  _dry_run_cmd "${cmd[@]}"
+  if [[ "${DRY_RUN:-false}" == true ]]; then
+    _dry_run_cmd "${cmd[@]}"
+    return $?
+  fi
+  # Shared CPU-host daemon: docker allows one prune at a time, so a prune
+  # run by another job makes ours fail with "a prune operation is already
+  # running". That is not this job's failure: log it, skip the kind, go on
+  # (base#2329). Any other error keeps failing as before.
+  local _err_file _rc=0
+  _err_file="$(mktemp)"
+  "${cmd[@]}" 2>"${_err_file}" || _rc=$?
+  cat "${_err_file}" >&2
+  if [[ "${_rc}" -ne 0 ]] && grep -q 'a prune operation is already running' "${_err_file}"; then
+    _log_warn prune prune_skipped_concurrent "display=another prune is running on this daemon, skipped ${kind}" "kind=${kind}"
+    _rc=0
+  fi
+  rm -f "${_err_file}"
+  return "${_rc}"
 }
 
 # ── worktree-orphans prune ───────────────────────────────────────────

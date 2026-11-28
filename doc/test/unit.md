@@ -6241,7 +6241,7 @@ here with no daemon.
 | `test.sh --await-project refuses when the project is still held` | the flag is only worth having if its verdict reaches the caller; a query that always exits 0 would let system and smoke run into the wedge. |
 | `system, smoke and acceptance all ask before they build` | none of them goes through the dispatcher, so none inherits the question. They are the flows most likely to leave a container behind; acceptance joined them when it became a local recipe (base#1409). |
 
-### test/bats/unit/prune_sh_spec.bats (41)
+### test/bats/unit/prune_sh_spec.bats (43)
 
 Unit tests for the new `script/docker/prune.sh` wrapper (#319) — atomic
 docker garbage cleanup with conservative per-target `--filter until=`
@@ -6340,6 +6340,8 @@ fallback is present.
 | `prune.sh --worktree-orphans without -y on closed stdin aborts cleanly, no set-e crash (#699)` | - |
 | `prune.sh --help mentions --worktree-orphans (#388)` | - |
 | `prune.sh aborts on a failing pre-prune hook and skips docker prune (#690)` | - |
+| `prune.sh --all skips a kind whose prune is already running and continues (base#2329)` | CPU 主機上同一個 docker daemon 被多個 job 共用，docker 同一時間只 允許一個 prune；另一個 job 正在 prune 時，這個 job 的 prune 會回 `a prune operation is already running` 並 exit 1。這不是本 job 的失敗， prune.sh 要印 notice、略過該類別、繼續下一個類別，結束碼與沒有錯誤時 相同。假 docker 把每次呼叫記到 DOCKER_CALLS，讓測試能斷言「其餘類別仍 然被呼叫」。 |
+| `prune.sh --all still fails on any other prune error (base#2329)` | 只有 `a prune operation is already running` 是「別人正在 prune」； 其他錯誤（這裡是 daemon 連不上）仍然是真的失敗，行為維持原樣：結束碼 非 0、不印 skipped notice、錯誤訊息照常出現在 stderr。 |
 
 ### test/bats/unit/publish_worker_yaml_spec.bats (40)
 
