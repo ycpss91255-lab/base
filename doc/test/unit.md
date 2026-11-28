@@ -9600,12 +9600,6 @@ directions, so the derivation cannot drift away from the tree it is about.
 | `_is_self_managed_repo is false when setup.toml exists` | A repo with setup.toml is template-managed; misclassifying it skips the conf layer chain entirely. |
 | `_is_self_managed_repo is true when neither .base nor setup.toml exist` | The complement of the previous test; a bare directory with no template markers must be classified as self-managed. |
 
-### test/bats/unit/toml_filename_lint_spec.bats (1)
-
-| Test | Description |
-|------|-------------|
-| `dist/ has zero .setup.conf references outside migration + gitignore (#1136)` | no stale `.setup.conf` in dist/ runtime code |
-
 ### test/bats/unit/toml_fixture_lint_spec.bats (26)
 
 The gate that keeps a file named `.toml` from holding INI. A body the bridge
