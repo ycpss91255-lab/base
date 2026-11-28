@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **423 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -300,6 +300,37 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_smoke_whole_golden_spec.bats (12)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_scwhole_<case>.Dockerfile has
+a `.tree` next to it and three goldens under testdata/golden/s43/: .tree one
+path per line, relative to .base/dist/test/bats/smoke/; a trailing `/` is an
+empty directory, otherwise a 0-byte file; a 0-byte .tree creates nothing
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> [TAB
+matched=.. TAB available=.. TAB names=.. TAB rewritten=..] The fixture is
+run as the relative path `Dockerfile` in a scratch directory.
+apply_migrations writes its warn events to stderr, so the events are merged
+with 2>&1 to keep the order in which they were emitted.
+
+| Test | Description |
+|------|-------------|
+| `s43 scwhole golden: stage with its own folder gets shared and stage COPYs` | the whole `.base/test/smoke/` COPY becomes shared plus the stage's own folder, and the repo-side `test/smoke/` COPY becomes its shared folder. |
+| `s43 scwhole golden: stage without its own folder gets shared only` | a stage with no folder of its own in the tree keeps only shared. |
+| `s43 scwhole golden: dist smoke COPYs are unchanged` | an already-dist Dockerfile is the fixed point, nothing is rewritten. |
+| `s43 scwhole golden: stage dockerfile golden equals the issue's literal` | the issue gives the stage Dockerfile as a literal; pin it so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 scwhole golden: stage events golden equals the issue's literal events` | the issue gives the stage events as literals, in emitted order. |
+| `s43 scwhole golden: stage files golden is the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 scwhole golden: nostage dockerfile golden equals the issue's literal` | the issue gives the nostage Dockerfile as a literal. |
+| `s43 scwhole golden: nostage events golden equals the issue's literal events` | the issue gives the nostage events as literals. |
+| `s43 scwhole golden: dist files golden is 0 bytes and events literal` | the fixed point is a no-op: 0-byte .files, one report event. |
+| `s43 scwhole golden: dist dockerfile golden equals its fixture` | nothing is rewritten, so the dockerfile golden must be the fixture bytes. |
+| `s43 scwhole golden: dist tree is 0 bytes` | the dist case needs no smoke tree, so its .tree is 0 bytes. |
+| `s43 scwhole golden: every fixture has its tree and three goldens and no extra` | each scwhole fixture has exactly one .tree and the three goldens, and no golden or tree lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
