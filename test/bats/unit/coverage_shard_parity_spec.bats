@@ -78,9 +78,10 @@ _make_parity_root() {
 }
 
 # _install_parity_mocks <kcov_log>
-#   kcov: logs its argv, answers `--merge` with a merged report, otherwise
-#   drops its own `--flag=value` options, leaves a report in its output
-#   directory and runs the command it wraps. bats: writes the junit report
+#   kcov: logs its argv to its own file <kcov_log>.<pid> (base#2338),
+#   answers `--merge` with a merged report, otherwise drops its own
+#   `--flag=value` options, leaves a report in its output directory and
+#   runs the command it wraps. bats: writes the junit report
 #   with the <testsuite name> rule measured above (header), one suite per
 #   spec it walked, directory targets expanded the way --recursive does.
 #   nproc reads 32 and `parallel` is present, so a job count derived from
@@ -90,7 +91,7 @@ _install_parity_mocks() {
   mock_cmd "nproc" 'echo 32'
   mock_cmd "parallel" 'exit 0'
   mock_cmd "kcov" '
-    printf "%s\n" "$*" >> "'"${_log}"'"
+    printf "%s\n" "$*" >> "'"${_log}"'.$$"
     if [ "$1" = "--merge" ]; then
       mkdir -p "$2/kcov-merged" && printf "<coverage/>\n" > "$2/kcov-merged/cobertura.xml"
       exit 0
@@ -154,7 +155,7 @@ _driver_prelude() {
 #   The number of kcov processes that instrumented a slice (the merge is
 #   not one).
 _instrumented_runs() {
-  grep -vc -- '^--merge' "${1}" || true
+  cat "${1}".* | grep -vc -- '^--merge' || true
 }
 
 # ════════════════════════════════════════════════════════════════════
@@ -369,7 +370,42 @@ _slice_loads() {
       if (load > max) max = load
     }
     END { printf "max=%d total=%d\n", max, total }
-  ' "${2}" "${1}"
+  ' "${2}" <(cat "${1}".*)
+}
+
+# _slice_evidence <kcov_log> <weights>
+#   Failure evidence (base#2338): every merged kcov line prefixed with its
+#   line number; an instrumented run also carries its summed spec weight.
+_slice_evidence() {
+  awk '
+    NR == FNR { w[$2] = $1; next }
+    /^--merge/ { printf "%d merge %s\n", FNR, $0; next }
+    {
+      load = 0
+      for (i = 1; i <= NF; i++) {
+        if ($i !~ /\.bats$/) continue
+        k = $i
+        sub(/^.*\/pool\//, "", k)
+        load += (k in w) ? w[k] : 1
+      }
+      printf "%d load=%d %s\n", FNR, load, $0
+    }
+  ' "${2}" <(cat "${1}".*)
+}
+
+# why: a mismatch of the load totals must show which spec is missing, so
+# _slice_evidence prints every merged kcov line prefixed with its line
+# number and its summed weight (base#2338).
+@test "_slice_evidence: prints each kcov line with its number and load (base#2338)" {
+  local _log="${BATS_TEST_TMPDIR}/kcov.log"
+  printf '%s\n' 'kcov /x/pool/test/a_spec.bats /x/pool/test/b_spec.bats' > "${_log}.1"
+  printf '%s\n' '--merge out in' > "${_log}.2"
+  printf '%s\n' '300 test/a_spec.bats' > "${BATS_TEST_TMPDIR}/w"
+
+  run _slice_evidence "${_log}" "${BATS_TEST_TMPDIR}/w"
+  assert_success
+  assert_line --index 0 "1 load=301 kcov /x/pool/test/a_spec.bats /x/pool/test/b_spec.bats"
+  assert_line --index 1 "2 merge --merge out in"
 }
 
 # why: a shard's slices run at the same time, so its heaviest slice is its
@@ -399,7 +435,35 @@ COVERAGE_JOBS=4 _run_coverage 2/2 >/dev/null 2>&1'
   # 714 is the shard's total weight: 300, four of 100, fourteen of 1.
   run _slice_loads "${_log}" "${_wf}"
   assert_success
-  assert_output "max=300 total=714"
+  # On a mismatch print the whole kcov log and each line's load to fd 3.
+  [[ "${output}" == "max=300 total=714" ]] || {
+    echo "# slice loads: ${output}" >&3
+    _slice_evidence "${_log}" "${_wf}" | sed 's/^/# /' >&3
+    false
+  }
+}
+
+# why: the mock kcov runs as one background process per slice. If they all
+# append to one log file, the per-slice load the test reads depends on
+# concurrent appends. Each kcov invocation must write its own file
+# (kcov.log.<pid>); the readers merge them with `cat kcov.log.*`.
+@test "_run_coverage: every mock kcov invocation logs to its own file (base#2338)" {
+  local _log="${BATS_TEST_TMPDIR}/kcov.log"
+  _make_parity_root >/dev/null
+  _install_parity_mocks "${_log}"
+
+  run bash -c 'REPO_ROOT="${BATS_TEST_TMPDIR}/pool"
+'"$(_driver_prelude)"'
+COVERAGE_JOBS=4 _run_coverage 2/2 >/dev/null 2>&1'
+  assert_success
+
+  # 4 slices + 1 merge = 5 invocations, 1 line each, in 5 distinct files.
+  run bash -c 'cat "${1}"* | wc -l' _ "${_log}"
+  assert_output "5"
+  run bash -c 'ls "${1}".* | wc -l' _ "${_log}"
+  assert_output "5"
+  run test -e "${_log}"
+  assert_failure
 }
 
 # ════════════════════════════════════════════════════════════════════
