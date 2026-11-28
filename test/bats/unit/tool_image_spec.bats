@@ -175,9 +175,9 @@ tool_image_resolve demo"
 }
 
 # _mock_docker_race <inspect_ok_from>
-#   build always fails; `image inspect` fails until its <inspect_ok_from>th
-#   call, which and every later one succeed (1 = present from the start is
-#   not used here; 2 = a sibling job finishes the image during our build).
+#   build always fails; `image inspect` fails before its <inspect_ok_from>th
+#   call and succeeds from that call on (2 = a sibling job finishes the
+#   image during our build; 99 = the image never appears).
 _mock_docker_race() {
   local _ok_from="${1:?}"
   export DOCKER_INSPECT_COUNT="${BATS_TEST_TMPDIR}/inspect.count"
