@@ -1,0 +1,6 @@
+rc=0
+mode=absent
+--- file
+--- stdout
+--- stderr
+WARN conf_no_repo_conf display="no per-repo setup.toml — using template defaults for all sections"

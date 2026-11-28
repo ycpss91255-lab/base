@@ -4741,7 +4741,7 @@ _cg_expected_job() {
         '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
     self-test-redpath)
       CG_IF="${CG_REDPATH_IF}" CG_STEPS="${_steps}" CG_SHARD_LIST="[$(seq -s, 1 "${_n}")]" CG_K="${_k}" \
-        yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest",
+        yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}",
           "strategy": {"fail-fast": false, "matrix": {"shard": env(CG_SHARD_LIST),
             "include": [{"shard": env(CG_K), "label": " + rerun, the baseline"}]}},
           "steps": env(CG_STEPS)} | sort_keys(..)' ;;
@@ -5337,29 +5337,186 @@ CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 FLEET_STUCK=${{ steps.fleet.outputs.stuck }}
 EOT
   # Only the switched jobs take their runner from the classify output, in
-  # runs-on or in a matrix leg's runner; acceptance (base#2270) and config-gen-gates (base#2269) are the
-  # switched ones.
+  # runs-on or in a matrix leg's runner; acceptance (base#2270), config-gen-gates (base#2269),
+  # config-gen-redpath (base#2271) and coverage (base#2273) are the switched ones.
   run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select(((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) or (([.value.strategy.matrix.include[]?.runner // ""] | map(tostring) | join(",")) | contains("runs_on_cpu"))) | .key'
   assert_success
   assert_output - <<'EOT'
+coverage
 acceptance
 config-gen-gates
+config-gen-redpath
 EOT
 }
 
-# why: config-gen-gates is the longest image job, and the first one to take its
-# runs-on from classify's runs_on_cpu so the CI_SELF_HOSTED switch decides where
-# it runs; every other job, config-gen-redpath included, keeps its own runs-on
-# until its own child moves it (base#2269, part of base#1586).
-@test "self-test.yaml: only config-gen-gates (besides acceptance) takes runs-on from runs_on_cpu (base#2269)" {
-  run _yaml_eval "${WF}" '.jobs["config-gen-gates"]["runs-on"]'
-  assert_success
-  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+# why: config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED
+# switch via classify's runs_on_cpu (base#2271, part of base#1586). This is the
+# load-bearing case: with a hardcoded ubuntu-latest the switch never moves the
+# shards to the self-hosted fleet. The other assertions pin that the if,
+# timeout and shard matrix stay as they were.
+@test "self-test.yaml: config-gen-redpath runs-on comes from classify runs_on_cpu, rest of the job unchanged (base#2271)" {
   run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
   assert_success
-  assert_output 'ubuntu-latest'
-  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates" and .key != "acceptance") | (.value["runs-on"] // "") | tostring')"
-  assert_failure
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].if'
+  assert_success
+  assert_output "needs.classify.outputs.select_config_gen_redpath == 'true'"
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["timeout-minutes"]'
+  assert_success
+  assert_output '120'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.shard | join(",")'
+  assert_success
+  assert_output '1,2,3,4,5'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include | length'
+  assert_success
+  assert_output '1'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include[0].shard'
+  assert_success
+  assert_output '5'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include[0].label'
+  assert_success
+  assert_output ' + rerun, the baseline'
+}
+# why: the CI_SELF_HOSTED switch decides where a job runs only for the jobs
+# that take their runs-on from classify's runs_on_cpu: config-gen-gates (the
+# longest image job, base#2269), config-gen-redpath (base#2271) and coverage
+# (the kcov shard primary gate, base#2273), all part of base#1586. Every other
+# job keeps its own runs-on until its own child moves it.
+@test "self-test.yaml: only config-gen-gates, config-gen-redpath and coverage take runs-on from runs_on_cpu (base#2269, base#2271, base#2273)" {
+  run _yaml_eval "${WF}" '[.jobs | to_entries | .[] | select((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) | .key] | sort | join(",")'
+  assert_success
+  assert_output 'config-gen-gates,config-gen-redpath,coverage'
+}
+
+# why: coverage is the kcov shard PRIMARY gate; its runner now comes from
+# classify's runs_on_cpu (ubuntu-latest when the switch is off, a fork or an
+# untrusted event), and nothing else about the job may move (base#2273,
+# part of base#1586).
+@test "self-test.yaml: coverage runs-on comes from classify runs_on_cpu and the rest of the job is unchanged (base#2273)" {
+  # Expected literals are the issue's acceptance criteria.
+  run _yaml_eval "${WF}" '.jobs.coverage["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs.coverage["timeout-minutes"]'
+  assert_success
+  assert_output '60'
+  run _yaml_eval "${WF}" '.jobs.coverage.needs | join(",")'
+  assert_success
+  assert_output 'actionlint,classify,compute-shards,test-tools-image-amd64'
+  run _yaml_eval "${WF}" '.jobs.coverage.if'
+  assert_success
+  assert_output "needs.classify.outputs.select_coverage == 'true'"
+  run _yaml_eval "${WF}" '.jobs.coverage.strategy["fail-fast"]'
+  assert_success
+  assert_output 'false'
+  run _yaml_eval "${WF}" '.jobs.coverage.strategy.matrix.shard'
+  assert_success
+  assert_output '${{ fromJSON(needs.compute-shards.outputs.shards) }}'
+}
+
+# why: the cpu fleet runs several coverage shards on one host and one docker
+# daemon, so the workflow-level TEST_TOOLS_IMAGE and COMPOSE_PROJECT_NAME
+# (one per run) collided between shards: 'image test-tools:ci-46086266476-1
+# already exists', 'network base-ci-46086266476-1_default not found', exit 137
+# (run 46086266476). Each shard must take its own names from
+# script/ci/job_env.sh before its first docker step (base#2273, base#2274,
+# base#2321).
+@test "self-test.yaml: coverage shard exports per-shard job names via job_env.sh before the first docker step (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .env.JOB_KEY'
+  assert_success
+  assert_output 'coverage-${{ matrix.shard }}'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/obtain_test_tools.sh")) | .key'
+  assert_success
+  obtain_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  [[ "${obtain_idx}" =~ ^[0-9]+$ ]]
+  [ "${job_env_idx}" -lt "${obtain_idx}" ]
+}
+
+# why: a shard that leaves its compose project and TMPDIR behind fills the
+# shared cpu-fleet host; the cleanup must be always() so a failed shard still
+# removes only its own names (base#2273).
+@test "self-test.yaml: coverage shard removes its own compose project and TMPDIR in an always() step (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .run'
+  assert_success
+  assert_output --partial './script/ci/job_cleanup.sh'
+}
+
+# why: job_cleanup.sh removes TMPDIR, and reclaim.sh --run delegates to
+# prune.sh which needs a mktemp file under TMPDIR. With cleanup first, the local
+# run printed "mktemp: failed to create file" and "prune.sh delegation failed"
+# (hidden by continue-on-error), so the --stale 12h layer never ran. The
+# reclaim step must therefore come before the job_cleanup step, both always()
+# (base#2273).
+@test "self-test.yaml: coverage reclaim step runs before the job_cleanup step, both always() (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/reclaim.sh")) | .key'
+  assert_success
+  reclaim_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_cleanup.sh")) | .key'
+  assert_success
+  cleanup_idx="${output%%$'\n'*}"
+  [[ "${reclaim_idx}" =~ ^[0-9]+$ ]]
+  [[ "${cleanup_idx}" =~ ^[0-9]+$ ]]
+  [ "${reclaim_idx}" -lt "${cleanup_idx}" ]
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/reclaim.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+}
+
+# why: job_env.sh now prints CI_RUN_KEY=<run>-<attempt>-<slug> (base#2328).
+# The coverage shard's always() reclaim runs `--run "${CI_RUN_KEY}"`; with the
+# workflow-level per-run key its name regex ci-<key>([^0-9]|$) also matched the
+# siblings' ci-<key>-<slug> projects, so the first shard to finish removed the
+# others' containers (exit 137, run 46112164146). Every consumer of the key in
+# the coverage job must therefore run after job_env.sh, and nothing inside the
+# job may set CI_RUN_KEY back to the run key (base#2273).
+@test "self-test.yaml: coverage job never re-sets CI_RUN_KEY at job or step level (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.env.CI_RUN_KEY // "unset"'
+  assert_success
+  assert_output 'unset'
+  run _yaml_eval "${WF}" '[.jobs.coverage.steps[] | select(.env.CI_RUN_KEY != null)] | length'
+  assert_success
+  assert_output '0'
+}
+
+# why: a step that reads CI_RUN_KEY before job_env.sh runs would see the
+# workflow-level per-run key and reclaim the sibling shards' containers
+# (exit 137), so every consumer must come after the job_env.sh step (base#2273).
+@test "self-test.yaml: coverage steps using CI_RUN_KEY all come after the job_env.sh step (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select((.value | tostring) | contains("CI_RUN_KEY")) | .key'
+  assert_success
+  local idx n=0
+  while IFS= read -r idx; do
+    [[ "${idx}" == "${job_env_idx}" ]] && continue
+    [ "${idx}" -gt "${job_env_idx}" ]
+    n=$((n + 1))
+  done <<<"${output}"
+  [ "${n}" -ge 2 ]
+}
+
+# why: the CI log is the proof that the per-job values win over the
+# workflow-level env, so the step that echoes the names must print
+# CI_RUN_KEY too, and the job_env.sh step must list it (base#2273).
+@test "self-test.yaml: coverage shard echoes CI_RUN_KEY with the other per-shard names (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'CI_RUN_KEY'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.name == "Show the names in effect") | .run'
+  assert_success
+  assert_output --partial 'echo "CI_RUN_KEY=${CI_RUN_KEY}"'
 }
 
 # why: select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes

@@ -1,0 +1,6 @@
+rc=0
+mode=absent
+--- file
+--- stdout
+--- stderr
+WARN conf_empty_repo_conf display="per-repo setup.toml has no section overrides — using template defaults for all sections"
