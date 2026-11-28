@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **425 tests**.
+Integration specs under `test/bats/integration/`: **426 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -132,7 +132,7 @@ stated expectation and a stale row can never stand for a deleted one.
 | `config-gen binary on a size-limited stdout exits 4 with one frame and a golden prefix` | the Go fault writer covers a write that fails at byte N in-process; this is the same contract on the built binary against a real file whose size limit (RLIMIT_FSIZE via prlimit) lets it take some bytes and then refuse with EFBIG, which /dev/full (0 bytes, ENOSPC) can not show. The answer is exit 4, exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations), and a non-empty stdout that is a strict prefix of the bridge golden (base#1469 I/O contract). SIGXFSZ is ignored so the write returns EFBIG instead of killing the process. prlimit must be on PATH in every environment the spec runs in (test-tools installs util-linux-misc); a missing prlimit fails here, it is never skipped. The same /dev/full and prlimit cases also run under `go test` in Dockerfile.config-gen's test stage (TestTablesDevFullStdoutIsExit4AndOneFrame, TestTablesSizeLimitedStdoutIsExit4AndAGoldenPrefix); this leg holds the shipped static binary to them. |
 | `config-gen binary on a closed stdout pipe exits 4 with one frame, not SIGPIPE` | prlimit and /dev/full fail the write on a file; a reader that is gone is the fourth way the single answer write fails, and the only one a signal can end first: a pipe whose read end is closed before the binary starts, as in `config-gen tables ... \| true`. The binary must not be killed by SIGPIPE (rc 141 from the shell, nothing on stderr); it exits 4 with exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations; stdout is the failing sink, so `-`) (base#1469 I/O contract). The golden is more than 65536 bytes, the default pipe buffer, so the case can not pass by the answer fitting into the buffer before the reader goes. |
 
-### test/bats/integration/config_gen_drift_golden_spec.bats (14)
+### test/bats/integration/config_gen_drift_golden_spec.bats (8)
 
 Before any Go code replaces the drift parsing, today's shell behaviour is
 pinned as goldens. The shell function is the oracle: this spec re-runs it on
@@ -162,12 +162,6 @@ stubbed (HASHNOW, DFNOW, false, false).
 | `s82 drift: the five-difference golden equals the issue's literal events` | the expected events as literals from the issue, so a wrong golden cannot pass by being regenerated the same way as the shell wrote it. |
 | `s82 drift: a duplicated SETUP_CONF_HASH is reported as drift` | SETUP_CONF_HASH twice with the same value is read as the two-line string HASHNOW LF HASHNOW, which differs from the current HASHNOW, so it is reported as drift. |
 | `s82 drift: a repeated GPU_ENABLED keeps its embedded newline` | GPU_ENABLED=false then GPU_ENABLED=true is read as the two-line value false LF true, kept with its embedded newline in the one detail. |
-| `s82 fallback corpus: every input has a golden and every golden an input` | a fallback corpus input with no golden would be read against nothing, and a stale golden would stand for a case no longer run. |
-| `s82 fallback: an absent setup.toml gives conf_no_repo_conf` | with no setup.toml the notice is conf_no_repo_conf, rc 0, nothing on stdout. |
-| `s82 fallback: a setup.toml without a header gives conf_empty_repo_conf` | a setup.toml with no [section] header gives conf_empty_repo_conf. |
-| `s82 fallback: an indented header reports nothing` | an indented [x] counts as a header, so no event. |
-| `s82 fallback: an empty setup.toml gives conf_empty_repo_conf` | an empty setup.toml has no header, so conf_empty_repo_conf. |
-| `s82 fallback: the goldens equal the issue's literal events` | the expected events as literals from the issue, so a wrong golden cannot pass by being regenerated the same way as the shell wrote it. |
 
 ### test/bats/integration/config_gen_gitignore_golden_spec.bats (21)
 
@@ -275,6 +269,22 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an aside that fails leaves the destination untouched (base#1464)` | If the first rename fails nothing has moved yet; the refusal must name that stage and leave the destination exactly as it was. |
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
+
+### test/bats/integration/config_gen_s43_arg_user_basic_golden_spec.bats (7)
+
+before any Go migration exists, the shell apply_migrations with
+_MIGRATIONS=( arg_user ) is the oracle; the Go side must match byte for
+byte. Shared generator: s43_arg_user_helper.bash.
+
+| Test | Description |
+|------|-------------|
+| `s43 arg_user golden: bare` | a bare ARG USER is warned about (line 5) after a literal-default one (line 2). |
+| `s43 arg_user golden: alias_root` | two ARG USER="${USER_NAME}" aliases are each warned about as may-run-as-root. |
+| `s43 arg_user golden: unrelated` | ARG USERLAND / ARG USER_NAME are not ARG USER; no warning. |
+| `s43 arg_user golden: bare events golden equals the issue's literal events` | the issue gives the bare events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 arg_user golden: unrelated events golden is the single none-matched report` | the unrelated case has no warning, only the report event. |
+| `s43 arg_user golden: dockerfile goldens equal their fixtures and files goldens are 0 bytes` | arg_user only reports, never rewrites: dockerfile golden == fixture, .files empty. |
+| `s43 arg_user golden: every case has one fixture and exactly its three goldens` | each case has exactly one fixture and exactly three goldens. |
 
 ### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
 
