@@ -34,6 +34,14 @@ _project_events() {
   jq -r '[.body, .attributes.display] | join("\t")' "$1"
 }
 
+# _healed_entrypoint -- the literal script/entrypoint.sh after the rename.
+_healed_entrypoint() {
+  printf '%s\n%s\n%s' \
+    '#!/usr/bin/env bash' \
+    '. /usr/local/lib/base/logging.sh' \
+    'exec "$@"'
+}
+
 # _exts_for <case> -- the golden extensions a case must have.
 _exts_for() {
   local _x="dockerfile files events"
@@ -129,10 +137,7 @@ _check_case() {
 @test "s43 logrn golden: entry entrypoint golden equals the issue's literal" {
   run cat "${GOLDEN}/s43_logrn_entry.entrypoint"
   assert_success
-  assert_output "$(printf '%s\n%s\n%s' \
-    '#!/usr/bin/env bash' \
-    '. /usr/local/lib/base/logging.sh' \
-    'exec "$@"')"
+  assert_output "$(_healed_entrypoint)"
 }
 
 # why: the issue gives the event order: entrypoint first, then Dockerfile.
@@ -166,10 +171,7 @@ _check_case() {
   assert_output "entrypoint_patched"
   run cat "${GOLDEN}/s43_logrn_partial.entrypoint"
   assert_success
-  assert_output "$(printf '%s\n%s\n%s' \
-    '#!/usr/bin/env bash' \
-    '. /usr/local/lib/base/logging.sh' \
-    'exec "$@"')"
+  assert_output "$(_healed_entrypoint)"
 }
 
 # ── the partition check ─────────────────────────────────────────────────────
