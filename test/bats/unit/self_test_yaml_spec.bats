@@ -5291,6 +5291,7 @@ HEAD_REPO=${{ github.event.pull_request.head.repo.full_name }}
 REPO=${{ github.repository }}
 MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
 CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
+FLEET_STUCK=${{ steps.fleet.outputs.stuck }}
 EOT
   # Only the switched jobs take their runner from the classify output, in
   # runs-on or in a matrix leg's runner; acceptance is the one switched here
@@ -5298,4 +5299,62 @@ EOT
   run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select(((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) or (([.value.strategy.matrix.include[]?.runner // ""] | map(tostring) | join(",")) | contains("runs_on_cpu"))) | .key'
   assert_success
   assert_output 'acceptance'
+}
+
+# why: select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes
+# it unless classify runs a step that lists the queued and in-progress runs'
+# jobs and hands them to fleet_stuck.sh. Without a step `fleet`, the env
+# stays empty and a dead CPU host keeps every job queued forever instead of
+# falling back to ubuntu-latest (base#2317, part of base#1586).
+@test "self-test.yaml: classify has a step with id fleet (base#2317)" {
+  run _yaml_eval "${WF}" '.jobs.classify.steps[] | select(.id == "fleet") | .id'
+  assert_success
+  assert_output 'fleet'
+}
+
+# why: The runner step reads steps.fleet.outputs.stuck. A step that exists but
+# runs after it would publish its output too late, so the runner step would
+# always see an empty value and never switch (base#2317).
+@test "self-test.yaml: classify runs the fleet step before the runner step (base#2317)" {
+  # Worked literal: the step ids in order, one per line, e.g. "fleet\nrunner".
+  run _yaml_eval "${WF}" '.jobs.classify.steps[] | .id // ""'
+  assert_success
+  local id fleet_at=-1 runner_at=-1 i=0
+  while IFS= read -r id; do
+    [[ "${id}" == "fleet" ]] && fleet_at="${i}"
+    [[ "${id}" == "runner" ]] && runner_at="${i}"
+    i=$((i + 1))
+  done <<<"${output}"
+  [[ "${fleet_at}" -ge 0 && "${runner_at}" -ge 0 && "${fleet_at}" -lt "${runner_at}" ]] || {
+    echo "fleet at ${fleet_at}, runner at ${runner_at} (need 0 <= fleet < runner)" >&2
+    return 1
+  }
+}
+
+# why: Without FLEET_STUCK in the runner step's env, select_runner.sh sees it
+# unset and always answers the cpu fleet, however stuck it is (base#2317).
+@test "self-test.yaml: classify runner step passes FLEET_STUCK from the fleet step (base#2317)" {
+  run _yaml_eval "${WF}" '.jobs.classify.steps[] | select(.id == "runner") | .env.FLEET_STUCK'
+  assert_success
+  assert_output '${{ steps.fleet.outputs.stuck }}'
+}
+
+# why: listing a repo's runs and their jobs through gh api needs the
+# actions: read scope. classify's block replaces the workflow-level one, so
+# without the line the API call is refused and the step can only fail open to
+# stuck=false, which never switches (base#2317).
+@test "self-test.yaml: classify permissions include actions: read (base#2317)" {
+  run _yaml_eval "${WF}" '.jobs.classify.permissions.actions'
+  assert_success
+  assert_output 'read'
+}
+
+# why: CI run 46092523272 showed the inlined fleet loop exiting 1 after 4s,
+# which failed classify and skipped every downstream job. The loop now
+# lives in script/ci/fleet_jobs.sh, which always exits 0 and is
+# unit-tested; the step must call it (base#2317).
+@test "self-test.yaml: classify fleet step calls script/ci/fleet_jobs.sh (base#2317)" {
+  run _yaml_eval "${WF}" '.jobs.classify.steps[] | select(.id == "fleet") | .run'
+  assert_success
+  assert_output --partial 'script/ci/fleet_jobs.sh'
 }
