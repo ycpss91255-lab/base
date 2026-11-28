@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **420 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -238,6 +238,32 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an aside that fails leaves the destination untouched (base#1464)` | If the first rename fails nothing has moved yet; the refusal must name that stage and leave the destination exactly as it was. |
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
+
+### test/bats/integration/config_gen_s43_bringup_golden_spec.bats (9)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_bringup_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2057):
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line: <body> TAB <display> bringup_residue reads
+script/entrypoint.sh next to the Dockerfile, so a case may also have
+s43_bringup_<case>.entrypoint.sh, copied to script/entrypoint.sh in the
+scratch directory. The Dockerfile is run as the relative path `Dockerfile`.
+The prefix is s43_bringup_ (corpus basenames must be unique).
+
+| Test | Description |
+|------|-------------|
+| `s43 bringup golden: exec in the bringup is advised` | a surviving exec in the bringup fires mid-source (advisory only). |
+| `s43 bringup golden: a re-sourced helper is advised` | a re-sourced orchestrator helper runs twice (advisory only). |
+| `s43 bringup golden: a clean bringup is silent` | a clean bringup is the steady state, no advisory. |
+| `s43 bringup golden: no bringup file is silent` | no bringup file at all is a supported shape, no advisory. |
+| `s43 bringup golden: exec events golden equals the issue's literal events` | the issue gives the exec events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 bringup golden: plumb events golden equals the issue's literal events` | the issue gives the plumb events as literals. |
+| `s43 bringup golden: clean and nobring events goldens equal the issue's literal` | clean and nobring report no match, a single line each. |
+| `s43 bringup golden: nothing is rewritten in any case` | the migration is warn-only, so every .files golden is 0 bytes and every .dockerfile golden is the fixture bytes. |
+| `s43 bringup golden: every fixture has exactly its three goldens and no extra` | each bringup fixture has exactly the three goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
 

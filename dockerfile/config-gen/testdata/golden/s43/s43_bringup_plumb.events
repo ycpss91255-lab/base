@@ -1,0 +1,2 @@
+entrypoint_advisory	  script/entrypoint.sh still sources a /usr/local/lib/base/ helper the orchestrator already sources, so it runs twice (a second per-start log, or a second watchdog). Drop the source line. Nothing was changed here.
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (bringup_residue), 0 file(s) rewritten
