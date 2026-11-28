@@ -5292,6 +5292,27 @@ EOT
   assert_output --partial './script/ci/job_cleanup.sh'
 }
 
+# why: job_cleanup.sh removes TMPDIR, and reclaim.sh --run delegates to
+# prune.sh which needs a mktemp file under TMPDIR. With cleanup first, the local
+# run printed "mktemp: failed to create file" and "prune.sh delegation failed"
+# (hidden by continue-on-error), so the --stale 12h layer never ran. The
+# reclaim step must therefore come before the job_cleanup step, both always()
+# (base#2273).
+@test "self-test.yaml: coverage reclaim step runs before the job_cleanup step, both always() (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/reclaim.sh")) | .key'
+  assert_success
+  reclaim_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_cleanup.sh")) | .key'
+  assert_success
+  cleanup_idx="${output%%$'\n'*}"
+  [[ "${reclaim_idx}" =~ ^[0-9]+$ ]]
+  [[ "${cleanup_idx}" =~ ^[0-9]+$ ]]
+  [ "${reclaim_idx}" -lt "${cleanup_idx}" ]
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/reclaim.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+}
+
 # why: job_env.sh now prints CI_RUN_KEY=<run>-<attempt>-<slug> (base#2328).
 # The coverage shard's always() reclaim runs `--run "${CI_RUN_KEY}"`; with the
 # workflow-level per-run key its name regex ci-<key>([^0-9]|$) also matched the
