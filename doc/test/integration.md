@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **384 tests**.
+Integration specs under `test/bats/integration/`: **405 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -335,6 +335,53 @@ partition check keeps fixtures and goldens one-to-one.
 | `s43 hash golden: a missing Dockerfile gives empty hash and rc 0` | a missing Dockerfile is not an error, so the Go side needs the same empty result and rc 0. |
 | `s43 hash golden: every hash fixture has exactly one golden and no extra` | a hash fixture with no golden, or a golden with no fixture, must fail. |
 
+### test/bats/integration/config_gen_s43_wrapper_copy_golden_spec.bats (10)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_wcopy_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2055):
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> [TAB
+matched=.. TAB available=.. TAB names=.. TAB rewritten=..] The fixture is
+run as the relative path `Dockerfile` in a scratch directory. The prefix is
+s43_wcopy_, not s43_migrate_ (that is the base#2055 partition).
+
+| Test | Description |
+|------|-------------|
+| `s43 wcopy golden: shape A is rewritten` | shape A (`COPY *.sh`) is rewritten to the wrapper glob, then flat_to_dist. |
+| `s43 wcopy golden: shape B is rewritten` | shape B (`COPY .base/script/docker/*.sh`) gives the same result as A. |
+| `s43 wcopy golden: dist wrapper glob is unchanged` | the dist wrapper glob is the fixed point, nothing is rewritten. |
+| `s43 wcopy golden: shape A events golden equals the issue's literal events` | the issue gives the shape A events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 wcopy golden: shape A dockerfile golden equals the issue's literal` | the issue gives the shape A Dockerfile as a literal. |
+| `s43 wcopy golden: shape B goldens are byte-identical to shape A goldens` | shape B ends in the same state as shape A (issue item 2). |
+| `s43 wcopy golden: shape A files golden is the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 wcopy golden: dist files golden is 0 bytes and events literal` | the fixed point is a no-op: 0-byte .files, one report event, dockerfile == fixture. |
+| `s43 wcopy golden: dist dockerfile golden equals its fixture` | nothing is rewritten, so the dockerfile golden must be the fixture bytes. |
+| `s43 wcopy golden: every fixture has exactly its three goldens and no extra` | each wcopy fixture has exactly the three goldens and no golden lacks a fixture. |
+
+### test/bats/integration/config_gen_s72_vm_golden_spec.bats (6)
+
+Before any Go code reads a version string, the shell's reading of it is
+pinned. The corpus file testdata/corpus/s72/s72_vm_versions.txt holds one
+input per line; the golden testdata/golden/s72/s72_vm_versions.golden holds,
+per input, "<input>TAB<_vm_is_semver exit code>TAB<_vm_key output>"
+(dist/script/docker/lib/version_migrate.sh). The third column is "-" when
+the exit code is 1: _vm_key is only ever fed a value that passed
+_vm_is_semver. The spec regenerates the golden from the shell and fails on
+any byte difference, on a corpus with no golden, and on a golden with no
+corpus.
+
+| Test | Description |
+|------|-------------|
+| `s72: the vm_versions corpus and golden exist` | a missing corpus or golden would silently pin nothing. |
+| `s72: the corpus holds the issue's nineteen inputs` | the inputs must be the issue's own nineteen, in its order, including the empty line and the line with a leading space, or the golden pins other cases (base#2300). |
+| `s72: the golden holds the issue's results` | the worked results come from the issue's table, not from the shell. |
+| `s72: the shell result matches the golden` | _vm_is_semver and _vm_key read the corpus the way the golden says; the shell result must match it byte for byte. |
+| `s72: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
+| `s72: every corpus file has a golden` | a corpus file with no golden would pin nothing; and with no files at all the loops above pass vacuously. |
+
 ### test/bats/integration/config_gen_s93_cmdout_golden_spec.bats (17)
 
 Before any Go code reads `docker info` or `dpkg-query` output, the shell's
@@ -366,6 +413,24 @@ golden with no corpus file.
 | `s93: detect_image_name result matches every golden` | detect_image_name applies [image] rules then sanitizes the name. |
 | `s93: the six image goldens hold the issue's names` | the worked names come from the issue, not from the shell. |
 | `s93: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
+
+### test/bats/integration/config_gen_s93_mount_golden_spec.bats (5)
+
+Before any Go code takes the host path out of a mount spec, the shell's
+reading is pinned. testdata/corpus/s93/s93_mount_specs.txt holds one spec
+per line; testdata/golden/s93/s93_mount_specs.golden holds, per spec, the
+line `_mount_host_path` (dist/script/docker/lib/_tui_conf.sh) leaves in its
+outvar. The spec regenerates the golden from the shell and fails on any byte
+difference, on a missing corpus or golden, and on a line count that differs
+between the two.
+
+| Test | Description |
+|------|-------------|
+| `s93: the mount spec corpus and golden exist` | a missing corpus or golden would silently pin nothing. |
+| `s93: the mount spec corpus holds the issue's six specs` | the inputs must be the issue's own, in the issue's order, or the golden pins other cases (base#2081): ro option, no colon, leading colon, empty line, an unexpanded ${HOME}, and extra colons. |
+| `s93: _mount_host_path result matches the golden` | _mount_host_path keeps the text before the first colon; the shell result must match the golden byte for byte. |
+| `s93: the mount golden holds the issue's six results` | the worked results come from the issue, not from the shell. |
+| `s93: the mount golden has as many lines as the corpus` | one golden line per corpus line, or a spec is unpinned. |
 
 ### test/bats/integration/deploy_bundle_flow_spec.bats (8)
 
