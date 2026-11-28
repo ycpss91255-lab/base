@@ -1244,8 +1244,8 @@ _scan_scratch_unguarded() {
 # bash-shebang files such as an entrypoint.sh. They are the migration's
 # INPUT DATA, compared byte for byte, never run by the suite, so kcov never
 # measures them and SOURCE_PATHSPEC must not have to name them (base#2373).
-# The scratch tree holds exactly one such file; the dirty check must not
-# report it as an unguarded instrumented source.
+# The scratch tree holds two such files (a `.sh` one and a suffixless one);
+# the dirty check must not report either as an unguarded instrumented source.
 @test "coverage_badge: a bash fixture under config-gen testdata is not an instrumented source (base#2373)" {
   local _scratch="${BATS_TEST_TMPDIR}/tree"
   mkdir -p "${_scratch}/dockerfile/config-gen/testdata/corpus/x"
