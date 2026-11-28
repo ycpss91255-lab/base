@@ -221,6 +221,11 @@ readonly _PIN_RESOLVERS=(
 #   read. Any other file kind below `testdata` is read too; the
 #   config-gen corpus `.tsv` files there carry markers.
 #
+#   Every file below `dockerfile/config-gen/testdata/golden/` (base#2360).
+#   A golden is the program's expected output byte for byte, so a version
+#   in it is data the program produced, not a pin, and a marker line
+#   cannot be added without breaking the diff.
+#
 # The lint checks this list rather than trusting it: a `tool-pin:` marker
 # in an exempt file is a failure, so "exempt the shape the awkward pin
 # lives in" cannot quietly become a way to stop watching a pin.
@@ -400,6 +405,8 @@ readonly _PIN_ACTION_REF_RE='^([A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9._-]+)+)@([
 _pin_is_exempt_shape() {
   local _base="${1##*/}" _glob
   [[ "/${1}" == */testdata/* && "${_base}" == *.toml ]] && return 0
+  # A config-gen golden is the program's expected output (base#2360).
+  [[ "${1}" == dockerfile/config-gen/testdata/golden/* ]] && return 0
   for _glob in "${_PIN_SCAN_EXEMPT_SHAPES[@]}"; do
     # Deliberately unquoted: _glob IS a pattern.
     # shellcheck disable=SC2053
