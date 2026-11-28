@@ -1,0 +1,2 @@
+dockerfile_patched	  Dockerfile patched: runtime/{entrypoint,smoke}.sh moved out of the helper dir (#971)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (runtime_moved_files), 1 file(s) rewritten	matched=1	available=16	names=runtime_moved_files	rewritten=1

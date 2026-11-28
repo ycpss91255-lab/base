@@ -125,6 +125,7 @@ _check_case() {
     '# COPY .base/dist/test/bats/smoke/smoke.sh /usr/local/lib/base/smoke.sh')"
 }
 
+# why: the issue gives the entry Dockerfile as a literal.
 @test "s43 rmove golden: entry dockerfile golden equals the issue's literal" {
   run cat "${GOLDEN}/s43_rmove_entry.dockerfile"
   assert_success
@@ -151,6 +152,7 @@ _check_case() {
   assert_output $'dockerfile_migrations_reported\t  Dockerfile migrations: 0 of 16 matched (none), 0 file(s) rewritten\tmatched=0\tavailable=16\tnames=none\trewritten=0'
 }
 
+# why: nothing is rewritten, so the dockerfile golden must be the fixture bytes.
 @test "s43 rmove golden: dist dockerfile golden equals its fixture" {
   cmp -- "${CORPUS}/s43_rmove_dist.Dockerfile" "${GOLDEN}/s43_rmove_dist.dockerfile"
 }

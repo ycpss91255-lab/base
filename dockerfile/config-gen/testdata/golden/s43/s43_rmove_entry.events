@@ -1,0 +1,3 @@
+dockerfile_patched	  Dockerfile patched: flat .base/{config,script} -> .base/dist/ (#915)
+dockerfile_patched	  Dockerfile patched: runtime/{entrypoint,smoke}.sh moved out of the helper dir (#971)
+dockerfile_migrations_reported	  Dockerfile migrations: 2 of 16 matched (flat_to_dist runtime_moved_files), 1 file(s) rewritten	matched=2	available=16	names=flat_to_dist runtime_moved_files	rewritten=1
