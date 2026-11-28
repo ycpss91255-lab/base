@@ -196,35 +196,35 @@ tool therefore needs its own join to `.github/workflows/self-test.yaml`:
 |------|----------|--------|--------|
 | `shellcheck` | shell static analysis | `shellcheck` (`--lint --shellcheck`) | `select_shellcheck` |
 | `hadolint` | Dockerfile static analysis | `hadolint` (`--lint --hadolint`) | `select_hadolint` |
-| `issueref` | no transient `#NNN` in code comments (ADR-00000013) | `lint-static` (one group) | ungated |
-| `adr-numbering` | `doc/adr/` duplicate-free + well-formed | `lint-static` (one group) | ungated |
-| `adr-structure` | every ADR carries each required part exactly once at column 0 -- `> Serves:`, Context, Decision, Consequences, Alternatives, Status | `lint-static` (one group) | ungated |
-| `stale-setup-conf` | no legacy `config/docker/setup.conf` under `dist/` | `lint-static` (one group) | ungated |
-| `readme-sync` | localized READMEs still match `README.md` | `lint-static` (one group) | ungated |
-| `doc-counts` | the figures / catalog rows below | `doc-counts` (`--lint --doc-counts`) | ungated |
-| `home-literal` | no concrete username in a home path under `dist/` or `dockerfile/` (ADR-00000024) | `lint-static` (one group) | ungated |
-| `arch-literal` | no bare architecture literal in a shipped Dockerfile under `dist/` or `dockerfile/`; architecture comes from `ARG TARGETARCH`, and a mapping onto an upstream asset spelling opts out with a stated reason | `lint-static` (one group) | ungated |
-| `moving-tag` | no workflow, Dockerfile, compose file or script in base resolves the test-tools image by `:latest`, `:main`, no tag or a tag decided at run time, outside the per-line allow-list in `script/test/drivers/moving_tag.sh` (base#1647) | `lint-static` (one group) | ungated |
-| `bash-source-guard` | no undefaulted `BASH_SOURCE` self-location read under `dist/` or `script/` | `lint-static` (one group) | ungated |
-| `early-close-reader` | no `\| head` / `\| grep -q` under `dist/` or `script/`, where an early-closing reader strands its writer and `pipefail` inverts the answer | `lint-static` (one group) | ungated |
-| `errexit-bang` | no `!` statement outside the LAST statement of any `*.bats` body in the repo, and none handing its verdict on via a `;`, an async `&` or an `\|\| true` anywhere in it, continuation lines included. An `\|\|` with a live right operand still exempts the statement -- `! A \|\| return 1` fails its test from any position -- unless a RIGHT operand -- one after such an operator, never the leading `!` that made the statement a candidate -- is itself `!`-inverted: bash exempts THAT from errexit too, so `! A \|\| ! B` aborts nothing and is judged by position and by `;` like any other statement. It is the list's FINAL operand that decides whether it can abort, and the whole class is declined rather than only the inert half, so a live chain (`! A \|\| ! B \|\| return 1`, which DOES abort from a non-final position) is reported alongside it: telling them apart needs the chain evaluated, not read, and that over-report costs one allow region. The judgement is made on the FOLDED statement: physical lines are joined while the text is INCOMPLETE -- a `\` continuation, a quote or a `(` still open, or a `\|` / `\|\|` / `&&` / `\|&` still waiting for its right operand -- and the scan then runs once from the first character, so a separator inside a `( ... )` is the argument's wherever the `(` and its `)` sit. The `\` join is a SPLICE, matching bash: `! grep -q A\` over `#b f; true` is the one word `A#b` and a live `; true`, while `! grep -q A \` over the same text is a comment. The fold answers where a statement STARTS as well as where it ends: a `!` line read in as an operator's right operand -- `echo a \|\|` over `! grep -q A f; true` -- is judged from the line the `!` opens on, over the span that begins there, so the `\|\|` in front of it stays the `echo`'s rather than being read as the `!`'s own hand-off. A statement still unfinished where its body closes is REPORTED when that span is a `!` one, or when an unterminated quote or `(` folded a line opening with `!` into it; otherwise it is unreadable but provably hid nothing this rule judges, which is stated in the driver rather than claimed away. Every row that judges a `!` line is silenced by the allow region; the two that report the FILE instead -- a body left open at EOF, an unbalanced allow marker -- are deliberately not, because the mechanism they are about must not be able to silence them. What is NOT modelled is listed in the driver header with the direction each errs in: `$'...'`, backticks, a heredoc's fixture text and a `!` that ends a compound command ending the body (#991) all OVER-report, which is the refusing direction. The ones that MISS are a `}` at column 0 inside a heredoc, a CRLF file (#990), and the `{ }` half of that same compound-command entry (#991): a brace group carries the `!` exemption out of itself, so a one-line `{ ! cmd; }` away from the body's last statement is inert in bash and unreported, because the scan needs `!` as the statement's first token and there it is `{`. Those two are not every miss the lint has, and the list does not claim to be: the `\|\|` narrowings the driver states separately miss as well -- an always-zero GROUP (`\|\| { true; }`, `\|\| ( true )`) and an operand outside the closed set of always-zero builtins that cannot fail in practice (`\|\| echo x`) are inert and go unreported, and a `;` behind either is swallowed with them (#992). A list whose FINAL operand cannot fail is inert in EVERY position, so position cannot catch it either -- `! A && ! B \|\| echo x` as a body's last statement is such a case, and a spec PINS it as a known miss so it cannot change shape unnoticed; that spec is inverted when #992 lands. The population is derived by walking the tree, not listed: `test/bats/` and the shipped `dist/test/bats/smoke/` both count | `lint-static` (one group) | ungated |
-| `derived-figures` | a figure a document repeats matches the code that defines it | `lint-static` (one group) | ungated |
-| `i18n-orphan` | no identifier-shaped token in a translation's code spans that `README.md` never names | `lint-static` (one group) | ungated |
-| `self-hosted-guard` | a job that can land on the org's self-hosted runner is guarded to same-repository events (ADR-00000026) | `lint-static` (one group) | ungated |
-| `tool-provenance` | no CI job runs a tool this repo pins unless the job also obtains that pin | `lint-static` (one group) | ungated |
-| `changelog-entry` | no `[Unreleased]` changelog entry over 700 chars (measured whitespace-collapsed over the whole entry), no entry repeating another's lead bullet, no `### <category>` heading opening twice in one release block, and every `### <category>` heading one of the seven in `script/release/changelog_categories.sh` | `lint-static` (one group) | ungated |
-| `changelog-layout` | the split changelog stays addressable: `doc/changelog/CHANGELOG.md`'s index is re-derived from the per-series files and must match byte for byte | `lint-static` (one group) | ungated |
-| `pin-coverage` | every third-party version this repo names is declared to the upstream-release watch, so nothing is pinned with nothing watching it | `lint-static` (one group) | ungated |
-| `action-ref-agreement` | every call site of the same GitHub Action agrees on one ref | `lint-static` (one group) | ungated |
-| `generated-workflow-actions` | a workflow `init.sh` / `upgrade.sh` writes into a consumer keeps its action refs in lockstep with this repo's own | `lint-static` (one group) | ungated |
-| `just-provenance` | every site that obtains the `just` runner names the one pinned version | `lint-static` (one group) | ungated |
-| `catalog-description` | every `@test` says why its case matters, in the `# why:` marker the catalogues render | `lint-static` (one group) | ungated |
-| `spec-repo-root` | a spec's `REPO_ROOT` is a fixture, never the live checkout | `lint-static` (one group) | ungated |
-| `test-name-backtick` | a `@test` name is a literal -- a backtick in one is executed by bats at collection time | `lint-static` (one group) | ungated |
-| `toml-fixture` | every fixture body a spec writes to a `*.toml` path parses as TOML -- a body the bridge refuses leaves an empty config handle, so a test asserting a schema default passes without its fixture ever being read | `lint-static` (one group) | ungated |
-| `canonical-ignore-sync` | base's own root `.dockerignore` carries a line for every entry `_canonical_dockerignore_entries` emits -- the block is headed as a copy of that function, so both sides are derived and compared rather than the copy being re-synchronised by hand. One-directional: extras are allowed, and presence is a whole line (the `grep -qxF` the shipped sync applies) | `lint-static` (one group) | ungated |
-| `tracked-crlf` | no tracked file is stored with CRLF line endings in the git index unless `.gitattributes` marks its path `-text` -- the root rule `* text=auto eol=lf` fixes the checkout side, and this reads the index side, which `text=auto` leaves alone for a file already committed with a CR | `lint-static` (one group) | ungated |
-| `workflow-run-name` | every `.github/workflows/*.yaml` / `*.yml` sets a top-level `run-name` holding a `${{ }}` expression that reads `github.event.merge_group.head_ref`, so each run in the Actions list names its PR, push or tag instead of the bare workflow name. Missing, static, without the merge queue ref, commented-out or job-level only fails; zero workflow files fails too | `lint-static` (one group) | ungated |
+| `issueref` | no transient `#NNN` in code comments (ADR-00000013) | `lint-static` (one group) | `full_run` |
+| `adr-numbering` | `doc/adr/` duplicate-free + well-formed | `lint-static` (one group) | `full_run` |
+| `adr-structure` | every ADR carries each required part exactly once at column 0 -- `> Serves:`, Context, Decision, Consequences, Alternatives, Status | `lint-static` (one group) | `full_run` |
+| `stale-setup-conf` | no legacy `config/docker/setup.conf` under `dist/` | `lint-static` (one group) | `full_run` |
+| `readme-sync` | localized READMEs still match `README.md` | `lint-static` (one group) | `full_run` |
+| `doc-counts` | the figures / catalog rows below | `doc-counts` (`--lint --doc-counts`) | `full_run` |
+| `home-literal` | no concrete username in a home path under `dist/` or `dockerfile/` (ADR-00000024) | `lint-static` (one group) | `full_run` |
+| `arch-literal` | no bare architecture literal in a shipped Dockerfile under `dist/` or `dockerfile/`; architecture comes from `ARG TARGETARCH`, and a mapping onto an upstream asset spelling opts out with a stated reason | `lint-static` (one group) | `full_run` |
+| `moving-tag` | no workflow, Dockerfile, compose file or script in base resolves the test-tools image by `:latest`, `:main`, no tag or a tag decided at run time, outside the per-line allow-list in `script/test/drivers/moving_tag.sh` (base#1647) | `lint-static` (one group) | `full_run` |
+| `bash-source-guard` | no undefaulted `BASH_SOURCE` self-location read under `dist/` or `script/` | `lint-static` (one group) | `full_run` |
+| `early-close-reader` | no `\| head` / `\| grep -q` under `dist/` or `script/`, where an early-closing reader strands its writer and `pipefail` inverts the answer | `lint-static` (one group) | `full_run` |
+| `errexit-bang` | no `!` statement outside the LAST statement of any `*.bats` body in the repo, and none handing its verdict on via a `;`, an async `&` or an `\|\| true` anywhere in it, continuation lines included. An `\|\|` with a live right operand still exempts the statement -- `! A \|\| return 1` fails its test from any position -- unless a RIGHT operand -- one after such an operator, never the leading `!` that made the statement a candidate -- is itself `!`-inverted: bash exempts THAT from errexit too, so `! A \|\| ! B` aborts nothing and is judged by position and by `;` like any other statement. It is the list's FINAL operand that decides whether it can abort, and the whole class is declined rather than only the inert half, so a live chain (`! A \|\| ! B \|\| return 1`, which DOES abort from a non-final position) is reported alongside it: telling them apart needs the chain evaluated, not read, and that over-report costs one allow region. The judgement is made on the FOLDED statement: physical lines are joined while the text is INCOMPLETE -- a `\` continuation, a quote or a `(` still open, or a `\|` / `\|\|` / `&&` / `\|&` still waiting for its right operand -- and the scan then runs once from the first character, so a separator inside a `( ... )` is the argument's wherever the `(` and its `)` sit. The `\` join is a SPLICE, matching bash: `! grep -q A\` over `#b f; true` is the one word `A#b` and a live `; true`, while `! grep -q A \` over the same text is a comment. The fold answers where a statement STARTS as well as where it ends: a `!` line read in as an operator's right operand -- `echo a \|\|` over `! grep -q A f; true` -- is judged from the line the `!` opens on, over the span that begins there, so the `\|\|` in front of it stays the `echo`'s rather than being read as the `!`'s own hand-off. A statement still unfinished where its body closes is REPORTED when that span is a `!` one, or when an unterminated quote or `(` folded a line opening with `!` into it; otherwise it is unreadable but provably hid nothing this rule judges, which is stated in the driver rather than claimed away. Every row that judges a `!` line is silenced by the allow region; the two that report the FILE instead -- a body left open at EOF, an unbalanced allow marker -- are deliberately not, because the mechanism they are about must not be able to silence them. What is NOT modelled is listed in the driver header with the direction each errs in: `$'...'`, backticks, a heredoc's fixture text and a `!` that ends a compound command ending the body (#991) all OVER-report, which is the refusing direction. The ones that MISS are a `}` at column 0 inside a heredoc, a CRLF file (#990), and the `{ }` half of that same compound-command entry (#991): a brace group carries the `!` exemption out of itself, so a one-line `{ ! cmd; }` away from the body's last statement is inert in bash and unreported, because the scan needs `!` as the statement's first token and there it is `{`. Those two are not every miss the lint has, and the list does not claim to be: the `\|\|` narrowings the driver states separately miss as well -- an always-zero GROUP (`\|\| { true; }`, `\|\| ( true )`) and an operand outside the closed set of always-zero builtins that cannot fail in practice (`\|\| echo x`) are inert and go unreported, and a `;` behind either is swallowed with them (#992). A list whose FINAL operand cannot fail is inert in EVERY position, so position cannot catch it either -- `! A && ! B \|\| echo x` as a body's last statement is such a case, and a spec PINS it as a known miss so it cannot change shape unnoticed; that spec is inverted when #992 lands. The population is derived by walking the tree, not listed: `test/bats/` and the shipped `dist/test/bats/smoke/` both count | `lint-static` (one group) | `full_run` |
+| `derived-figures` | a figure a document repeats matches the code that defines it | `lint-static` (one group) | `full_run` |
+| `i18n-orphan` | no identifier-shaped token in a translation's code spans that `README.md` never names | `lint-static` (one group) | `full_run` |
+| `self-hosted-guard` | a job that can land on the org's self-hosted runner is guarded to same-repository events (ADR-00000026) | `lint-static` (one group) | `full_run` |
+| `tool-provenance` | no CI job runs a tool this repo pins unless the job also obtains that pin | `lint-static` (one group) | `full_run` |
+| `changelog-entry` | no `[Unreleased]` changelog entry over 700 chars (measured whitespace-collapsed over the whole entry), no entry repeating another's lead bullet, no `### <category>` heading opening twice in one release block, and every `### <category>` heading one of the seven in `script/release/changelog_categories.sh` | `lint-static` (one group) | `full_run` |
+| `changelog-layout` | the split changelog stays addressable: `doc/changelog/CHANGELOG.md`'s index is re-derived from the per-series files and must match byte for byte | `lint-static` (one group) | `full_run` |
+| `pin-coverage` | every third-party version this repo names is declared to the upstream-release watch, so nothing is pinned with nothing watching it | `lint-static` (one group) | `full_run` |
+| `action-ref-agreement` | every call site of the same GitHub Action agrees on one ref | `lint-static` (one group) | `full_run` |
+| `generated-workflow-actions` | a workflow `init.sh` / `upgrade.sh` writes into a consumer keeps its action refs in lockstep with this repo's own | `lint-static` (one group) | `full_run` |
+| `just-provenance` | every site that obtains the `just` runner names the one pinned version | `lint-static` (one group) | `full_run` |
+| `catalog-description` | every `@test` says why its case matters, in the `# why:` marker the catalogues render | `lint-static` (one group) | `full_run` |
+| `spec-repo-root` | a spec's `REPO_ROOT` is a fixture, never the live checkout | `lint-static` (one group) | `full_run` |
+| `test-name-backtick` | a `@test` name is a literal -- a backtick in one is executed by bats at collection time | `lint-static` (one group) | `full_run` |
+| `toml-fixture` | every fixture body a spec writes to a `*.toml` path parses as TOML -- a body the bridge refuses leaves an empty config handle, so a test asserting a schema default passes without its fixture ever being read | `lint-static` (one group) | `full_run` |
+| `canonical-ignore-sync` | base's own root `.dockerignore` carries a line for every entry `_canonical_dockerignore_entries` emits -- the block is headed as a copy of that function, so both sides are derived and compared rather than the copy being re-synchronised by hand. One-directional: extras are allowed, and presence is a whole line (the `grep -qxF` the shipped sync applies) | `lint-static` (one group) | `full_run` |
+| `tracked-crlf` | no tracked file is stored with CRLF line endings in the git index unless `.gitattributes` marks its path `-text` -- the root rule `* text=auto eol=lf` fixes the checkout side, and this reads the index side, which `text=auto` leaves alone for a file already committed with a CR | `lint-static` (one group) | `full_run` |
+| `workflow-run-name` | every `.github/workflows/*.yaml` / `*.yml` sets a top-level `run-name` holding a `${{ }}` expression that reads `github.event.merge_group.head_ref`, so each run in the Actions list names its PR, push or tag instead of the bare workflow name. Missing, static, without the merge queue ref, commented-out or job-level only fails; zero workflow files fails too | `lint-static` (one group) | `full_run` |
 
 `lint-static` is a matrix of GROUPS, not of lints (base#1071): each entry is a
 position (`1/4` ... `4/4`) and `test.sh --lint --group N/T` computes which lints
@@ -235,9 +235,11 @@ red check names a group, and the group's own output names every lint that
 failed in it, because the phase enumerates rather than stopping at the first
 (#1059). `test.sh --lint-group-members N/T` answers which group holds a lint.
 
-It is ungated because two of the lints it runs (`adr-numbering`,
+It has no diff gate because two of the lints it runs (`adr-numbering`,
 `readme-sync`) are breakable by a change `classify` scores as doc-only -- a
-`code_changed` gate would skip them on exactly the PR they exist to catch.
+`code_changed` gate would skip them on exactly the PR they exist to catch. Its
+only condition is `classify`'s `full_run`, which is `false` on a push to `main`
+alone (see "What a push to `main` runs" below).
 Every lint job runs inside the test-tools image, the one the local `just test`
 lint phase uses (base#1412). `hadolint` keeps its own job, as do `shellcheck`
 and `doc-counts`, whose results `ci-rollup` reads by name.
@@ -286,6 +288,36 @@ compose) or `just test lint --log-event-registry` (in-container). It is in
 `_UNTABLED_LINT_ENTRY_POINTS` in `test/bats/unit/ci_spec.bats` with that reason,
 which is what keeps base#1113's completeness guard honest rather than silent:
 a lint in neither the table nor the stated exemptions fails that guard.
+
+## What a push to `main` runs
+
+`main` accepts commits only through the merge queue, so the commit a push to
+`main` carries is the one its `merge_group` run already tested. That run is
+the check; the push run repeats only what writes a cache on `main` alone:
+
+| Job | Why it runs on a push to `main` |
+|-----|---------------------------------|
+| `test-tools-image-amd64`, `test-tools-image-arm64` | write the GHA layer cache (`scope=test-tools`, `scope=test-tools-arm64`) |
+| `coverage-gate` | saves the shard-weights cache the next run's partition reads |
+| `coverage`, `compute-shards` | `coverage-gate` needs them |
+| `actionlint`, `classify` | every job needs them |
+| `ci-rollup` | the verdict |
+| `release-gate` | runs on every event; with the release-only jobs unselected it passes without checking, under the name `release-gate (not a release run)` |
+
+Everything else skips, and `ci-rollup` passes those skips because `classify`
+wrote their key `false`: the select_* keys of the diff-gated jobs
+(`config-gen-gates` included), and `full_run` for the four with no diff gate
+(`doc-counts`, `lint-static`, `single-issue-pr`, `commit-attribution`).
+`config-gen-gates` repeats nothing either: the `merge_group` run's mutation
+base is `main` before the group, which covers every file `HEAD^1` would.
+`worker-selftest` skips too, so a push to `main` no longer refreshes its
+buildx cache (the `worker-selftest-*` GHA scopes `build-worker.yaml` writes);
+a pull request reads what `main` last wrote. Its fixture is a minimal alpine
+image, so a stale cache costs little.
+
+Only `push` to `refs/heads/main` is narrowed. A pull request, a merge group, a
+push to `master`, a tag and `workflow_dispatch` run what they ran before, and
+an event or ref `classify` does not name runs everything.
 
 ## Breaking the behaviour on purpose: `just test mutation-probe`
 
@@ -616,7 +648,7 @@ speak and whether they can stop you:
 | Entry point | When | Blocking? |
 |-------------|------|-----------|
 | `just test` lint phase (`just test lint --doc-counts`) | every local full gate | **yes** -- this is the gate |
-| the `doc-counts` CI job (`test.sh --lint --doc-counts`) | every CI run, ungated (a hand-edited count is a doc-only change) | **yes** -- same driver, hard-mandatory in `ci-rollup` |
+| the `doc-counts` CI job (`test.sh --lint --doc-counts`) | every CI run but a push to `main`, with no diff gate (a hand-edited count is a doc-only change) | **yes** -- same driver, required through `ci-rollup` |
 | `just test sync-docs-check` | on demand | yes, but only if a human runs it |
 | harness repo `.claude/hooks/check_test_md_drift.sh` (PostToolUse) | seconds after the Edit that caused the drift, in an interactive session only | no -- advisory |
 

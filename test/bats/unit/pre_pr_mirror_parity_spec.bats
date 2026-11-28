@@ -76,6 +76,9 @@ zz/unknown.txt"
 # select_<job> output. _ci_gate compares a job's whole `if:` against it,
 # never a substring.
 SELECT_GATE_RE="^needs\\.classify\\.outputs\\.select_([a-z_]+) == 'true'$"
+# The gate of the jobs no diff deselects: classify's full_run, `true` on
+# every pull request.
+FULL_RUN_GATE="needs.classify.outputs.full_run == 'true'"
 SELECTION="/source/script/ci/check_selection.sh"
 
 setup() {
@@ -196,7 +199,8 @@ _local_mode() {
 }
 
 # _ci_gate <job> -- `select:<job>` or `always`, read from the job's own
-# job-level `if:` as one value and matched whole against SELECT_GATE_RE;
+# job-level `if:` as one value and matched whole against SELECT_GATE_RE or
+# FULL_RUN_GATE (`always`: it holds on every pull request);
 # anything else is `unknown:<value>` so a new gate shape fails loudly
 # rather than reading as ungated. A substring match read
 # `<gate> && false` as gated (base#1462).
@@ -211,6 +215,8 @@ _ci_gate() {
   _if="$(LP_J="${1}" yq '.jobs[strenv(LP_J)].if' "${WF}")"
   if [[ "${_if}" =~ ${SELECT_GATE_RE} ]]; then
     echo "select:${BASH_REMATCH[1]//_/-}"
+  elif [[ "${_if}" == "${FULL_RUN_GATE}" ]]; then
+    echo always
   else
     echo "unknown:${_if}"
   fi
@@ -937,7 +943,7 @@ ${_recipe}"
 # why: A gate read by substring took `<gate> && false` -- a job that
 # never runs -- for a gated job, so the plan check demanded a local
 # command for it and the mirror attested a job CI never ran.
-@test "pre-PR mirror: a job if: that only contains the code gate reads as unknown (base#1462)" {
+@test "pre-PR mirror: a job if: that only contains the code gate reads as unknown (base#1462, base#2190)" {
   local _wf="${SCRATCH}/self-test.yaml"
   cp "${WF}" "${_wf}"
   yq -i '.jobs.shellcheck.if += " && false"' "${_wf}"
@@ -947,6 +953,11 @@ ${_recipe}"
   assert_output select:hadolint
   WF="${_wf}" run _ci_gate actionlint
   assert_output always
+  WF="${_wf}" run _ci_gate doc-counts
+  assert_output always
+  yq -i '.jobs."doc-counts".if += " && false"' "${_wf}"
+  WF="${_wf}" run _ci_gate doc-counts
+  assert_output "unknown:${FULL_RUN_GATE} && false"
 }
 
 # why: the mirror runs the recipe the CI job runs; `just test go` would also
