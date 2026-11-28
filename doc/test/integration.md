@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **405 tests**.
+Integration specs under `test/bats/integration/`: **411 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -360,6 +360,28 @@ s43_wcopy_, not s43_migrate_ (that is the base#2055 partition).
 | `s43 wcopy golden: dist files golden is 0 bytes and events literal` | the fixed point is a no-op: 0-byte .files, one report event, dockerfile == fixture. |
 | `s43 wcopy golden: dist dockerfile golden equals its fixture` | nothing is rewritten, so the dockerfile golden must be the fixture bytes. |
 | `s43 wcopy golden: every fixture has exactly its three goldens and no extra` | each wcopy fixture has exactly the three goldens and no golden lacks a fixture. |
+
+### test/bats/integration/config_gen_s72_interval_golden_spec.bats (6)
+
+Before any Go code selects migrations, the shell's selection and order are
+pinned. The corpus file testdata/corpus/s72/s72_interval_decl.txt holds one
+declaration per line ("<version> <name>", in declaration order); the golden
+testdata/golden/s72/s72_interval_decl.golden holds, per interval, a "<from>
+-> <to>" line, the stdout lines of interval_migrations indented by two
+spaces, a "warn=<n>" line (the count of interval_migration_declined warnings
+on stderr; their text is not pinned) and "rc=<exit code>"
+(dist/script/docker/lib/version_migrate.sh). The spec regenerates the golden
+from the shell and fails on any byte difference, on a corpus with no golden,
+and on a golden with no corpus.
+
+| Test | Description |
+|------|-------------|
+| `s72: the interval_decl corpus and golden exist` | a missing corpus or golden would silently pin nothing. |
+| `s72: the corpus holds the issue's seven declarations` | the declarations must be the issue's own seven, in its order, or the golden pins other cases (base#2301). |
+| `s72: the golden holds the issue's results` | the worked results come from the issue's table, not from the shell. Both declined declarations warn on every call, so warn=2 throughout. |
+| `s72: the shell result matches the golden` | interval_migrations must select and order the corpus the way the golden says; the shell result must match it byte for byte. |
+| `s72: every golden has a corpus file` | a golden whose corpus file was deleted would stand for nothing. |
+| `s72: every corpus file has a golden` | a corpus file with no golden would pin nothing; and with no files at all the loops above pass vacuously. |
 
 ### test/bats/integration/config_gen_s72_vm_golden_spec.bats (6)
 
