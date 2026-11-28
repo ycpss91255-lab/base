@@ -402,6 +402,29 @@ COVERAGE_JOBS=4 _run_coverage 2/2 >/dev/null 2>&1'
   assert_output "max=300 total=714"
 }
 
+# why: the mock kcov runs as one background process per slice. If they all
+# append to one log file, the per-slice load the test reads depends on
+# concurrent appends. Each kcov invocation must write its own file
+# (kcov.log.<pid>); the readers merge them with `cat kcov.log*`.
+@test "_run_coverage: every mock kcov invocation logs to its own file (base#2338)" {
+  local _log="${BATS_TEST_TMPDIR}/kcov.log"
+  _make_parity_root >/dev/null
+  _install_parity_mocks "${_log}"
+
+  run bash -c 'REPO_ROOT="${BATS_TEST_TMPDIR}/pool"
+'"$(_driver_prelude)"'
+COVERAGE_JOBS=4 _run_coverage 2/2 >/dev/null 2>&1'
+  assert_success
+
+  # 4 slices + 1 merge = 5 invocations, 1 line each, in 5 distinct files.
+  run bash -c 'cat "${1}"* | wc -l' _ "${_log}"
+  assert_output "5"
+  run bash -c 'ls "${1}".* | wc -l' _ "${_log}"
+  assert_output "5"
+  run test -e "${_log}"
+  assert_failure
+}
+
 # ════════════════════════════════════════════════════════════════════
 # 1. The local entry runs CI's partition
 # ════════════════════════════════════════════════════════════════════
