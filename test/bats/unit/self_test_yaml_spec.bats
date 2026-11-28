@@ -720,6 +720,31 @@ _acceptance_step_idx() {
   [ "${cleanup_idx}" -gt "${scaffold_idx}" ]
 }
 
+# why: job_cleanup.sh removes the job's TMPDIR, and reclaim.sh delegates to
+# prune.sh, which needs a usable TMPDIR (mktemp). Reclaim therefore has to run
+# before job_cleanup.sh, as in base#2308; both steps are `if: always()` so a
+# failed scaffold still gets both. The reclaim step is scoped to the per-job
+# CI_RUN_KEY that job_env.sh exports (base#2270).
+@test "self-test.yaml: acceptance runs reclaim.sh before job_cleanup.sh, both always() (base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/reclaim.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/reclaim.sh")) | .run'
+  assert_success
+  assert_output './script/ci/reclaim.sh --run "${CI_RUN_KEY}" --stale 12h'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  _acceptance_step_idx script/ci/reclaim.sh
+  reclaim_idx="${REPLY}"
+  _acceptance_step_idx script/ci/job_cleanup.sh
+  cleanup_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
+  [ "${reclaim_idx}" -gt "${scaffold_idx}" ]
+  [ "${reclaim_idx}" -lt "${cleanup_idx}" ]
+}
+
 # why: COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY are also set at
 # workflow level; the per-job values job_env.sh appends to GITHUB_ENV must win
 # for every later step. A step between job_env.sh and acceptance.sh prints the
