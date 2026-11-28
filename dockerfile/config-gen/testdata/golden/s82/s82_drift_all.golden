@@ -1,0 +1,11 @@
+rc=1
+mode=absent
+--- file
+--- stdout
+--- stderr
+WARN env_drift_detected display="drift detected since last setup.sh run:"
+WARN env_drift_detail display="  - setup.toml modified since last setup" detail="setup.toml modified since last setup"
+WARN env_drift_detail display="  - Dockerfile stage list changed since last setup (added/removed FROM ... AS <stage>)" detail="Dockerfile stage list changed since last setup (added/removed FROM ... AS <stage>)"
+WARN env_drift_detail display="  - GPU detection changed: true → false" detail="GPU detection changed: true → false"
+WARN env_drift_detail display="  - GUI detection changed: true → false" detail="GUI detection changed: true → false"
+WARN env_drift_detail display="  - USER_UID changed: 99999 → <UID>" detail="USER_UID changed: 99999 → <UID>"
