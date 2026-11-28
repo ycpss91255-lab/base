@@ -5280,6 +5280,9 @@ EOT
   [ "${job_env_idx}" -lt "${obtain_idx}" ]
 }
 
+# why: a shard that leaves its compose project and TMPDIR behind fills the
+# shared cpu-fleet host; the cleanup must be always() so a failed shard still
+# removes only its own names (base#2273).
 @test "self-test.yaml: coverage shard removes its own compose project and TMPDIR in an always() step (base#2273)" {
   run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
   assert_success
@@ -5305,6 +5308,9 @@ EOT
   assert_output '0'
 }
 
+# why: a step that reads CI_RUN_KEY before job_env.sh runs would see the
+# workflow-level per-run key and reclaim the sibling shards' containers
+# (exit 137), so every consumer must come after the job_env.sh step (base#2273).
 @test "self-test.yaml: coverage steps using CI_RUN_KEY all come after the job_env.sh step (base#2273)" {
   run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
   assert_success

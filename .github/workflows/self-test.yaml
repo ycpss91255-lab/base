@@ -1668,13 +1668,14 @@ jobs:
           JOB_KEY: coverage-${{ matrix.shard }}
         run: |
           ./script/ci/job_env.sh >> "${GITHUB_ENV}"
-          grep -E '^(COMPOSE_PROJECT_NAME|TMPDIR|TEST_TOOLS_IMAGE)=' "${GITHUB_ENV}"
+          grep -E '^(COMPOSE_PROJECT_NAME|TMPDIR|TEST_TOOLS_IMAGE|CI_RUN_KEY)=' "${GITHUB_ENV}"
 
       - name: Show the names in effect
         run: |
           echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
           echo "TMPDIR=${TMPDIR}"
           echo "TEST_TOOLS_IMAGE=${TEST_TOOLS_IMAGE}"
+          echo "CI_RUN_KEY=${CI_RUN_KEY}"
           echo "runner=${RUNNER_NAME} host=$(hostname)"
 
       - name: Download this run's test-tools image
