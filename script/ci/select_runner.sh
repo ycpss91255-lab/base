@@ -67,7 +67,8 @@ if [[ "${trusted}" == "true" && ( -z "${CI_SELF_HOSTED:-}" || "${CI_SELF_HOSTED}
   runs_on="${CPU_RUNS_ON}"
 fi
 
-# base#2316: fleet_stuck.sh verdict. Only `true` moves runs to hosted; any other non-empty value other than `false` is ignored with a warning.
+# base#2316: fleet_stuck.sh verdict. Only `true` moves runs to hosted; any
+# other non-empty value except `false` is ignored with a warning.
 case "${FLEET_STUCK:-}" in
   true)
     runs_on="${HOSTED_RUNS_ON}"
