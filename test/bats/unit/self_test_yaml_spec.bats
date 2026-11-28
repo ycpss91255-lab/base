@@ -5289,6 +5289,50 @@ EOT
   assert_output --partial './script/ci/job_cleanup.sh'
 }
 
+# why: job_env.sh now prints CI_RUN_KEY=<run>-<attempt>-<slug> (base#2328).
+# The coverage shard's always() reclaim runs `--run "${CI_RUN_KEY}"`; with the
+# workflow-level per-run key its name regex ci-<key>([^0-9]|$) also matched the
+# siblings' ci-<key>-<slug> projects, so the first shard to finish removed the
+# others' containers (exit 137, run 46112164146). Every consumer of the key in
+# the coverage job must therefore run after job_env.sh, and nothing inside the
+# job may set CI_RUN_KEY back to the run key (base#2273).
+@test "self-test.yaml: coverage job never re-sets CI_RUN_KEY at job or step level (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.env.CI_RUN_KEY // "unset"'
+  assert_success
+  assert_output 'unset'
+  run _yaml_eval "${WF}" '[.jobs.coverage.steps[] | select(.env.CI_RUN_KEY != null)] | length'
+  assert_success
+  assert_output '0'
+}
+
+@test "self-test.yaml: coverage steps using CI_RUN_KEY all come after the job_env.sh step (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select((.value | tostring) | contains("CI_RUN_KEY")) | .key'
+  assert_success
+  local idx n=0
+  while IFS= read -r idx; do
+    [[ "${idx}" == "${job_env_idx}" ]] && continue
+    [ "${idx}" -gt "${job_env_idx}" ]
+    n=$((n + 1))
+  done <<<"${output}"
+  [ "${n}" -ge 2 ]
+}
+
+# why: the CI log is the proof that the per-job values win over the
+# workflow-level env, so the step that echoes the names must print
+# CI_RUN_KEY too, and the job_env.sh step must list it (base#2273).
+@test "self-test.yaml: coverage shard echoes CI_RUN_KEY with the other per-shard names (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'CI_RUN_KEY'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.name == "Show the names in effect") | .run'
+  assert_success
+  assert_output --partial 'echo "CI_RUN_KEY=${CI_RUN_KEY}"'
+}
+
 # why: select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes
 # it unless classify runs a step that lists the queued and in-progress runs'
 # jobs and hands them to fleet_stuck.sh. Without a step `fleet`, the env
