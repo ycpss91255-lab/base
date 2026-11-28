@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **420 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -238,6 +238,32 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an aside that fails leaves the destination untouched (base#1464)` | If the first rename fails nothing has moved yet; the refusal must name that stage and leave the destination exactly as it was. |
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
+
+### test/bats/integration/config_gen_s43_explicit_copy_golden_spec.bats (9)
+
+Before any Go migration exists, the shell `_migrate_explicit_copy_detect` /
+`_migrate_explicit_copy_apply`
+(dist/script/docker/lib/dockerfile_migrate.sh) are the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_ecopy_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2057):
+.dockerfile the Dockerfile bytes after detect && apply .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> (0 bytes when
+nothing was reported) The fixture is run as the relative path `Dockerfile`
+in a scratch directory. The prefix is s43_ecopy_ so basenames stay unique
+across the corpus.
+
+| Test | Description |
+|------|-------------|
+| `s43 ecopy golden: single-line explicit COPY is dropped` | the single-line explicit COPY is dropped, the lib dir COPY stays. |
+| `s43 ecopy golden: multi-line backslash COPY block is dropped` | the backslash-continued COPY block is dropped as a whole. |
+| `s43 ecopy golden: lib and wrapper dir COPYs are unchanged` | lib and wrapper/*.sh dir COPYs need no rewrite. |
+| `s43 ecopy golden: single dockerfile golden equals the issue's literal` | the issue gives the single-line result: the explicit COPY is gone and the lib COPY is kept. |
+| `s43 ecopy golden: multi dockerfile golden equals the issue's literal` | the issue gives the multi-line result: whole block gone, lib kept. |
+| `s43 ecopy golden: rewritten cases report one dockerfile_patched event` | a rewrite reports dockerfile_patched exactly once. |
+| `s43 ecopy golden: rewritten cases record the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 ecopy golden: noop case detect fails and leaves no trace` | detect fails on the noop shape, so nothing is rewritten, recorded or reported and the Dockerfile bytes equal the fixture. |
+| `s43 ecopy golden: every fixture has exactly its three goldens and no extra` | each ecopy fixture has exactly the three goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
 
