@@ -592,3 +592,51 @@ HOOK
   assert_output --partial "PRE_PRUNE_HOOK_FIRED"
   refute_output --partial "docker network prune"
 }
+
+# ════════════════════════════════════════════════════════════════════
+# Concurrent prune on a shared daemon (base#2329)
+#
+# why: CPU 主機上同一個 docker daemon 被多個 job 共用，docker 同一時間只
+# 允許一個 prune；另一個 job 正在 prune 時，這個 job 的 prune 會回
+# `a prune operation is already running` 並 exit 1。這不是本 job 的失敗，
+# prune.sh 要印 notice、略過該類別、繼續下一個類別，結束碼與沒有錯誤時
+# 相同。假 docker 把每次呼叫記到 DOCKER_CALLS，讓測試能斷言「其餘類別仍
+# 然被呼叫」。
+@test "prune.sh --all skips a kind whose prune is already running and continues (base#2329)" {
+  export DOCKER_CALLS="${TEMP_DIR}/docker-calls"
+  : > "${DOCKER_CALLS}"
+  cat > "${BIN_DIR}/docker" <<'EOS'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${DOCKER_CALLS}"
+if [[ "$1" == "image" && "$2" == "prune" ]]; then
+  echo "Error response from daemon: a prune operation is already running" >&2
+  exit 1
+fi
+EOS
+  chmod +x "${BIN_DIR}/docker"
+  run --separate-stderr bash "${SANDBOX}/prune.sh" --all
+  assert_success
+  [[ "${stderr}" == *"another prune is running on this daemon, skipped image"* ]]
+  run cat "${DOCKER_CALLS}"
+  assert_output --partial "network prune"
+  assert_output --partial "image prune"
+  assert_output --partial "builder prune"
+}
+
+# why: 只有 `a prune operation is already running` 是「別人正在 prune」；
+# 其他錯誤（這裡是 daemon 連不上）仍然是真的失敗，行為維持原樣：結束碼
+# 非 0、不印 skipped notice、錯誤訊息照常出現在 stderr。
+@test "prune.sh --all still fails on any other prune error (base#2329)" {
+  cat > "${BIN_DIR}/docker" <<'EOS'
+#!/usr/bin/env bash
+if [[ "$1" == "image" && "$2" == "prune" ]]; then
+  echo "Cannot connect to the Docker daemon" >&2
+  exit 1
+fi
+EOS
+  chmod +x "${BIN_DIR}/docker"
+  run --separate-stderr bash "${SANDBOX}/prune.sh" --all
+  assert_failure
+  [[ "${stderr}" == *"Cannot connect to the Docker daemon"* ]]
+  [[ "${stderr}" != *"::notice::prune"* ]]
+}
