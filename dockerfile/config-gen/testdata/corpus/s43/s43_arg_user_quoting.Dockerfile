@@ -1,0 +1,8 @@
+FROM busybox AS sys
+ARG USER_NAME='user'
+FROM sys AS a
+ARG USER=${USER_NAME}
+FROM sys AS b
+ARG USER='${USER_NAME}'
+FROM sys AS c
+ARG USER="$USER_NAME"
