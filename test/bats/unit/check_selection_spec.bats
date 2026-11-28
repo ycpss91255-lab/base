@@ -418,6 +418,128 @@ _diff_select() {
   assert_output "$(_expect all)"
 }
 
+# _workflow_seed -- commits two workflow files on main, one .yaml and one
+#   .yml, each with a top-level name:, a job name: and a step name:, and
+#   leaves the current branch at main.
+_workflow_seed() {
+  _scratch_repo
+  mkdir -p .github/workflows
+  local _f
+  for _f in .github/workflows/ci.yaml .github/workflows/other.yml; do
+    printf '%s\n' 'name: CI' 'on: pull_request' 'jobs:' '  test:' \
+      '    name: test' '    runs-on: ubuntu-latest' '    steps:' \
+      '      - name: Say' '        run: echo hi' > "${_f}"
+  done
+  _commit workflows
+}
+
+# why: base#2216. A workflow's top-level name: is the label the Actions
+# page shows and nothing else: no job reads it, the required check is a
+# job name, and callers reach a reusable workflow by its path. A diff that
+# changes only that line in .yaml and .yml workflow files affects no gated
+# job, the same answer as a docs-only diff.
+@test "check_selection: a diff changing only workflows' top-level name: selects no gated job (base#2216)" {
+  _workflow_seed
+  git checkout -q -b rename
+  sed -i '1s/.*/name: "PR_Push\/CI_測試"/' .github/workflows/ci.yaml
+  sed -i '1s/.*/name: "PR_Push\/Other"/' .github/workflows/other.yml
+  _commit rename
+  run _diff_select
+  assert_success
+  assert_output "$(_expect)"
+}
+
+# why: base#2216. The name-only answer is about the WHOLE file's diff: a
+# top-level name: changed beside any other line, a job's or a step's
+# name: (a job name is a check name, the thing ci-rollup and the ruleset
+# match), or a line that only looks like the key once indented, is a
+# workflow change and selects every job.
+@test "check_selection: a workflow diff with any change beside its top-level name: selects every gated job (base#2216)" {
+  _workflow_seed
+  git checkout -q -b both
+  sed -i -e '1s/.*/name: New/' -e 's/echo hi/echo bye/' .github/workflows/ci.yaml
+  _commit both
+  run _diff_select
+  assert_success
+  assert_output "$(_expect all)"
+
+  git checkout -q -B job main
+  sed -i 's/^    name: test$/    name: renamed/' .github/workflows/ci.yaml
+  _commit job
+  run _diff_select
+  assert_output "$(_expect all)"
+
+  git checkout -q -B step main
+  sed -i 's/^      - name: Say$/      - name: Shout/' .github/workflows/ci.yaml
+  _commit step
+  run _diff_select
+  assert_output "$(_expect all)"
+
+  git checkout -q -B indented main
+  sed -i '1a\  name: x' .github/workflows/ci.yaml
+  _commit indented
+  run _diff_select
+  assert_output "$(_expect all)"
+}
+
+# why: base#2216. Only an edit of a plain file that exists on both sides
+# can be name-only: a workflow added, deleted, renamed or made executable
+# changes what runs or how it is read, and each selects every job.
+@test "check_selection: a workflow added, deleted, renamed or made executable selects every gated job (base#2216)" {
+  _workflow_seed
+  git checkout -q -b added
+  printf 'name: New\n' > .github/workflows/new.yaml
+  _commit added
+  run _diff_select
+  assert_success
+  assert_output "$(_expect all)"
+
+  git checkout -q -B deleted main
+  git rm -q .github/workflows/other.yml
+  _commit deleted
+  run _diff_select
+  assert_output "$(_expect all)"
+
+  git checkout -q -B renamed main
+  git mv .github/workflows/other.yml .github/workflows/moved.yml
+  _commit renamed
+  run _diff_select
+  assert_output "$(_expect all)"
+
+  git checkout -q -B exec main
+  sed -i '1s/.*/name: New/' .github/workflows/ci.yaml
+  git add .github/workflows/ci.yaml
+  git update-index --chmod=+x .github/workflows/ci.yaml
+  git -c user.name=t -c user.email=t@t commit -q -m exec
+  run _diff_select
+  assert_output "$(_expect all)"
+}
+
+# why: base#2216. The rule reads the workflow directory only. A top-level
+# name: elsewhere is not a workflow label -- compose.yaml's names the
+# compose project, and a workflow under dist/ ships to downstream repos --
+# so a name-only edit there selects every job. Without the diff's content
+# (`--paths`) a workflow path cannot be judged name-only and selects every
+# job as before.
+@test "check_selection: a top-level name: outside .github/workflows, or a workflow path without its diff, selects every gated job (base#2216)" {
+  _workflow_seed
+  mkdir -p dist/.github/workflows
+  printf 'name: a\n' > compose.yaml
+  printf 'name: a\n' > dist/.github/workflows/w.yaml
+  _commit others
+  git checkout -q -b rename
+  printf 'name: b\n' > compose.yaml
+  printf 'name: b\n' > dist/.github/workflows/w.yaml
+  _commit rename
+  run _diff_select
+  assert_success
+  assert_output "$(_expect all)"
+
+  run _select pull_request .github/workflows/ci.yaml
+  assert_success
+  assert_output "$(_expect all)"
+}
+
 # why: cycle 28. The base map is run from a scratch directory, so it must
 # read nothing but the deny list beside it: a working tree with NO
 # selection files still gets the base map's answer.
