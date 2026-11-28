@@ -7,7 +7,7 @@
 # why: OTel-aligned logger (#423, #438). Single-sink tty-detect dispatch,
 # `LOG_FORMAT=auto|text|json` override, strict body enforcement
 # (unregistered body = fatal), `display=` attribute for i18n text in text
-# mode, UTC microsecond timestamps, `_log_plain` removed.
+# mode, UTC microsecond timestamps.
 #
 # Grouped by concern:
 #
@@ -42,8 +42,6 @@
 #
 # - Scoped wrappers: `_log_with_trace` save/restore, `_log_with_span`
 # trace_id
-#
-# - `_log_plain` removed (#438)
 #
 # - `_log_color_enabled`: TTY detect, FORCE_COLOR, NO_COLOR precedence
 #
@@ -260,14 +258,19 @@ setup() {
   assert_success
 }
 
+# why: A run that was not on a terminal at startup keeps that answer,
+# however its fds are rearranged later.
 @test "_log_is_tty: cached non-zero wins over the live probe (#605)" {
   run bash -c "export _LOG_IS_TTY=1; source ${LOG_SH}; _log_is_tty 1"
-  assert_failure
+  # Pinned: a missing function is 127 (base#2174).
+  assert_failure 1
 }
 
+# why: A script that sources log.sh on its own never sets the cache, so
+# the live probe is the only answer it has.
 @test "_log_is_tty: unset falls back to live test -t (non-TTY pipe -> non-zero) (#605)" {
   run bash -c "unset _LOG_IS_TTY; source ${LOG_SH}; _log_is_tty 1"
-  assert_failure
+  assert_failure 1
 }
 
 @test "auto dispatch: _LOG_IS_TTY=0 forces text even on a non-TTY pipe (#605)" {
@@ -301,14 +304,17 @@ setup() {
   assert_success
 }
 
+# why: Colour follows the same cached answer as the format, so a
+# redirected run gets no ANSI codes in its log.
 @test "_log_color_enabled with _LOG_IS_TTY=1 stays disabled (#605)" {
   run bash -c "source ${LOG_SH}; _LOG_IS_TTY=1 _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
+# why: NO_COLOR is the user's opt-out; a terminal does not undo it.
 @test "_log_color_enabled: NO_COLOR wins over _LOG_IS_TTY=0 (#605)" {
   run bash -c "source ${LOG_SH}; NO_COLOR=1 _LOG_IS_TTY=0 _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
 @test "_log_color_enabled: FORCE_COLOR wins over _LOG_IS_TTY=1 (#605)" {
@@ -511,12 +517,19 @@ setup() {
 
 # ── Missing service is rejected ────────────────────────────────────
 
+# why: A record without a service names no source, so the call is refused
+# instead of written.
 @test "_log_info with no args exits non-zero" {
   run -127 bash -c "source ${LOG_SH}; _log_info"
+  # 127 is also what a missing function returns, so the message decides
+  # (base#2174).
+  assert_output --partial "requires service"
 }
 
+# why: The stderr levels reach the same refusal through their own wrapper.
 @test "_log_err with no args exits non-zero" {
   run -127 bash -c "source ${LOG_SH}; _log_err"
+  assert_output --partial "requires service"
 }
 
 # ── _log_fatal does NOT auto-exit ──────────────────────────────────
@@ -576,18 +589,12 @@ setup() {
   [[ "${stderr}" == *"[trace started:"* ]]
 }
 
-# ── _log_plain removed ─────────────────────────────────────
-
-@test "_log_plain is no longer defined" {
-  run bash -c "source ${LOG_SH}; declare -F _log_plain"
-  assert_failure
-}
-
 # ── _log_color_enabled ─────────────────────────────────────────────
 
+# why: The default for a pipe or a CI log, where ANSI codes are noise.
 @test "_log_color_enabled returns non-zero on non-TTY without overrides" {
   run bash -c "source ${LOG_SH}; _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
 @test "_log_color_enabled returns 0 with FORCE_COLOR=1" {
@@ -595,9 +602,11 @@ setup() {
   assert_success
 }
 
+# why: The two overrides contradict each other, and the opt-out is the
+# one that has to win.
 @test "_log_color_enabled returns non-zero with NO_COLOR=1 + FORCE_COLOR=1" {
   run bash -c "NO_COLOR=1 FORCE_COLOR=1 source ${LOG_SH}; NO_COLOR=1 FORCE_COLOR=1 _log_color_enabled 1"
-  assert_failure
+  assert_failure 1
 }
 
 # ── FORCE_COLOR text ───────────────────────────────────────────────

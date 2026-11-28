@@ -109,6 +109,9 @@ EOF
 # why: Required arg check
 @test "_load_env errors when no path is given" {
   run -127 bash -c "source ${LIB}; _load_env"
+  # 127 is also what a missing function returns, so the message decides
+  # (base#2174).
+  assert_output --partial "requires an env file path"
 }
 
 # why: %q-quoted hostile value loads literally (no command-sub / word-split)
@@ -524,12 +527,11 @@ EOF
 
 # why: Real-call branch
 @test "_compose without DRY_RUN tries to invoke docker compose (sanity)" {
-  # When DRY_RUN is unset/false, _compose calls real docker compose; on a
-  # CI runner without docker the command exits non-zero, but we just want
-  # to confirm the false branch executes (kcov coverage).
+  # PATH=/nonexistent makes the `docker` lookup itself fail, so the message
+  # naming docker shows the real invocation was reached. The status cannot:
+  # a missing _compose is 127 as well (base#2174).
   run -127 bash -c "source ${LIB}; PATH=/nonexistent _compose version"
-  # PATH=/nonexistent forces `docker compose` lookup to fail with rc 127,
-  # confirming the non-dry-run branch was taken (reached the real invocation).
+  assert_output --partial "docker: command not found"
   refute_output --partial "[dry-run]"
 }
 
