@@ -189,3 +189,33 @@ _check_s32_declined() {
 @test "s32 clearing an index after filling it is declined (base#2085)" {
   _check_s32_declined s32_clear_after_fill
 }
+
+# _check_s32_env_local <name> <event ids, space separated>
+#   Convert corpus/s32/<name>.env with `_migrate_env_local_to_toml`, then
+#   compare the bytes of the written env.local.toml with
+#   golden/s32/<name>.toml, the logged event ids (JSON log body, in order)
+#   with the expected list, the return with 0, and check that .env.local
+#   was renamed to .env.local.bak.
+_check_s32_env_local() {
+  local _name="${1}" _events="${2}" _got
+  cp "${TESTDATA}/corpus/s32/${_name}.env" "${TEMP_DIR}/.env.local"
+  LOG_FORMAT=json run --separate-stderr bash -c \
+    "source '${LIB}/_lib.sh'; source '${LIB}/ini_to_toml_migrate.sh'; _migrate_env_local_to_toml '${TEMP_DIR}'"
+  assert_success
+  _got="$(printf '%s\n%s\n' "${output}" "${stderr}" \
+    | sed -n 's/.*"body":"\([a-z_]*\)".*/\1/p' | paste -sd' ')"
+  assert_equal "${_got}" "${_events}"
+  assert [ ! -e "${TEMP_DIR}/.env.local" ]
+  assert [ -f "${TEMP_DIR}/.env.local.bak" ]
+  assert [ -f "${TESTDATA}/golden/s32/${_name}.toml" ]
+  run cmp "${TEMP_DIR}/env.local.toml" "${TESTDATA}/golden/s32/${_name}.toml"
+  assert_success
+}
+
+# why: .env.local quoting converts as the shell does: paired outer quotes
+# are stripped, only the first = splits, surrounding blanks are trimmed,
+# comments are skipped and every value is written as a quoted string; the
+# golden pins the bytes and the single migrated event.
+@test "s32 .env.local quoting converts to quoted TOML strings (base#2088)" {
+  _check_s32_env_local s32_env_local "env_local_to_toml_migrated"
+}
