@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **423 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -300,6 +300,37 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_nounset_source_golden_spec.bats (12)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. The oracle is
+the shell after base#2153 (fix of base#2149): the `set +u` scope is tracked,
+comment-only lines are not wrapped. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_nounset_<case>.Dockerfile has
+a sibling s43_nounset_<case>.entrypoint.sh input, and four goldens under
+testdata/golden/s43/: .dockerfile the Dockerfile bytes after
+apply_migrations .entrypoint the script/entrypoint.sh bytes after
+apply_migrations .files `migrated_files` stdout (0 bytes when nothing was
+rewritten) .events one projected event per line, tab separated: <body> TAB
+<display> [TAB matched=.. TAB available=.. TAB names=.. TAB rewritten=..]
+The inputs are copied to `Dockerfile` and `script/entrypoint.sh` in a
+scratch directory and run as relative paths (same approach as base#2057).
+
+| Test | Description |
+|------|-------------|
+| `s43 nounset golden: bare source is wrapped` | bare source gets set +u before the shellcheck directive and set -u after. |
+| `s43 nounset golden: guarded source is unchanged` | an already guarded source is the fixed point, nothing is rewritten. |
+| `s43 nounset golden: mixed wraps only the unguarded source` | only the unguarded second source is wrapped; the first group stays. |
+| `s43 nounset golden: orchestrator entrypoint source is wrapped` | with an orchestrator ENTRYPOINT and no set -u, the first line is wrapped. |
+| `s43 nounset golden: bare events golden equals the issue's literal events` | the issue gives the bare events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 nounset golden: bare entrypoint golden equals the issue's literal` | the issue gives the bare entrypoint result as a literal. |
+| `s43 nounset golden: bare files golden is ./script/entrypoint.sh` | the bare case records the rewritten script as ./script/entrypoint.sh. |
+| `s43 nounset golden: guarded files golden is 0 bytes and events literal` | the guarded fixed point: 0-byte .files, one report event, entrypoint == input. |
+| `s43 nounset golden: guarded entrypoint golden equals its input` | nothing is rewritten for guarded, so the entrypoint golden is the input bytes. |
+| `s43 nounset golden: mixed and orch events and files goldens equal bare's` | mixed and orch end with the same event/files shape as bare. |
+| `s43 nounset golden: every dockerfile golden equals its fixture` | this migration never changes the Dockerfile, so every .dockerfile golden is the fixture bytes. |
+| `s43 nounset golden: every fixture has exactly its four goldens and no extra` | each nounset fixture has exactly its four goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
