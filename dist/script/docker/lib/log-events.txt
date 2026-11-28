@@ -159,6 +159,7 @@ prune_volume_aborted
 prune_no_workspace
 prune_unknown_flag
 prune_reclaim_failed
+prune_skipped_concurrent
 
 # lib/project_reclaim.sh - the scoped reclaim
 reclaim_artifacts_unreadable
