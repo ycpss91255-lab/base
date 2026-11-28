@@ -11,7 +11,10 @@
 # `["self-hosted","linux","x64","cpu"]` only when the event is trusted and
 # CI_SELF_HOSTED is unset, empty or `cpu`; every other case is
 # `["ubuntu-latest"]`, so setting the switch to `off` falls back to the
-# hosted pool, base#2266, base#2287.
+# hosted pool, base#2266, base#2287. FLEET_STUCK=true (the verdict of
+# fleet_stuck.sh) also forces hosted and prints a ::notice:: on stderr;
+# `trusted` is unchanged; other non-false values warn and are ignored,
+# base#2316.
 #
 # push (a tag push is a push), workflow_dispatch, a pull_request whose head
 # repository equals REPO, and a merge_group whose MERGE_GROUP_SAME_REPO is
@@ -63,6 +66,19 @@ runs_on="${HOSTED_RUNS_ON}"
 if [[ "${trusted}" == "true" && ( -z "${CI_SELF_HOSTED:-}" || "${CI_SELF_HOSTED}" == "cpu" ) ]]; then
   runs_on="${CPU_RUNS_ON}"
 fi
+
+# base#2316: fleet_stuck.sh verdict. Only `true` moves runs to hosted; any
+# other non-empty value except `false` is ignored with a warning.
+case "${FLEET_STUCK:-}" in
+  true)
+    runs_on="${HOSTED_RUNS_ON}"
+    printf '::notice::select_runner: cpu fleet stuck, using ubuntu-latest\n' >&2
+    ;;
+  "" | false) ;;
+  *)
+    printf '::warning::select_runner: FLEET_STUCK=%s ignored\n' "${FLEET_STUCK}" >&2
+    ;;
+esac
 
 printf 'trusted=%s\n' "${trusted}"
 printf 'runs_on=%s\n' "${runs_on}"

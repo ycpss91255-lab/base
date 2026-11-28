@@ -26,7 +26,8 @@
 # commit gate reads an unavailable bridge as a declined conversion
 # (base#1137); an exit here would turn that containment into a crash.
 #
-# Event ids are `<ns>_unprovisionable`, `<ns>_building` and
+# Event ids are `<ns>_unprovisionable`, `<ns>_building`,
+# `<ns>_built_concurrently` (a failed build whose image then exists) and
 # `<ns>_build_failed`, under service `<ns>`; each tool registers its own
 # in log-events.txt. The display text is the tool's, from the callback
 #   _<ns>_tool_image_display <kind> <image> <path> <rc> <builder-out> <lib>
@@ -197,6 +198,17 @@ tool_image_ensure() {
   _out="$(docker build -t "${_image}" -f "${_dockerfile}" "${_args[@]}" \
     "${_context}" 2>&1)" || _rc=$?
   (( _rc == 0 )) && return 0
+
+  # A sibling build of the same tag can win the naming race and make ours
+  # fail; the tag is keyed to its inputs, so the image now there is the
+  # one we wanted (base#2320).
+  if docker image inspect "${_image}" > /dev/null 2>&1; then
+    _log_info "${_ns}" "${_ns}_built_concurrently" \
+      "image already built concurrently: ${_image}" \
+      "image=${_image}" \
+      "path=${_dockerfile}" >&2
+    return 0
+  fi
 
   _out="${_out//$'\n'/ }"
   _log_err "${_ns}" "${_ns}_build_failed" \

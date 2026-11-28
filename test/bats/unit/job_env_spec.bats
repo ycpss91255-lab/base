@@ -4,7 +4,7 @@
 # project name and TMPDIR, base#2274 (part of base#1586).
 #
 # The script is pure bash: inputs are GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT,
-# JOB_KEY and RUNNER_TEMP, output is exactly two KEY=value lines on stdout.
+# JOB_KEY and RUNNER_TEMP, output is exactly three KEY=value lines on stdout.
 # Expected values are the literals worked out in the issue's acceptance
 # criteria, not recomputed here.
 #
@@ -30,13 +30,39 @@ _run_env() {
 }
 
 # why: The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274.
-@test "job_env: worked example prints exactly the two documented lines" {
+@test "job_env: worked example prints exactly the three documented lines" {
   _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
     JOB_KEY=Config-gen/Gates RUNNER_TEMP="${RT}"
   [ "${status}" -eq 0 ]
-  [ "${#lines[@]}" -eq 2 ]
+  [ "${#lines[@]}" -eq 3 ]
   [ "${lines[0]}" = "COMPOSE_PROJECT_NAME=ci-42-1-config-gen-gates" ]
   [ "${lines[1]}" = "TMPDIR=${RT}/job-42-1-config-gen-gates" ]
+  [ "${lines[2]}" = "TEST_TOOLS_IMAGE=test-tools:ci-42-1-config-gen-gates" ]
+}
+
+# why: Jobs on one host share one docker daemon, so a shared test-tools image tag makes concurrent builds fail with "already exists"; each job needs its own tag, base#2321.
+@test "job_env: different JOB_KEY values give different TEST_TOOLS_IMAGE" {
+  _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
+    JOB_KEY=Lint RUNNER_TEMP="${RT}"
+  [ "${status}" -eq 0 ]
+  [ "${lines[2]}" = "TEST_TOOLS_IMAGE=test-tools:ci-42-1-lint" ]
+  local first="${lines[2]}"
+
+  _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=1 \
+    JOB_KEY=Config-gen/Gates RUNNER_TEMP="${RT}"
+  [ "${status}" -eq 0 ]
+  [ "${lines[2]}" = "TEST_TOOLS_IMAGE=test-tools:ci-42-1-config-gen-gates" ]
+  [ "${lines[2]}" != "${first}" ]
+}
+
+# why: The image tag and the compose project must carry the same <run>-<attempt>-<slug> id so one job's resources can be traced together; a diverging id would break that link, base#2321.
+@test "job_env: TEST_TOOLS_IMAGE and COMPOSE_PROJECT_NAME share one id" {
+  _run_env GITHUB_RUN_ID=42 GITHUB_RUN_ATTEMPT=3 \
+    "JOB_KEY=Lint (ubuntu, 22.04)" RUNNER_TEMP="${RT}"
+  [ "${status}" -eq 0 ]
+  [ "${lines[0]}" = "COMPOSE_PROJECT_NAME=ci-42-3-lint--ubuntu--22-04-" ]
+  [ "${lines[2]}" = "TEST_TOOLS_IMAGE=test-tools:ci-42-3-lint--ubuntu--22-04-" ]
+  [ "${lines[2]#TEST_TOOLS_IMAGE=test-tools:}" = "${lines[0]#COMPOSE_PROJECT_NAME=}" ]
 }
 
 # why: The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274.

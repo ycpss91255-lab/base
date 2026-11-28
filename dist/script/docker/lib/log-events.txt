@@ -423,6 +423,7 @@ merge_no_files
 merge_layer_not_regular
 toml_bridge_building
 toml_bridge_build_failed
+toml_bridge_built_concurrently
 toml_bridge_unprovisionable
 
 # general
@@ -440,6 +441,7 @@ config_gen_gate_lint_failed
 config_gen_gate_race_failed
 config_gen_gate_coverage_failed
 config_gen_build_failed
+config_gen_built_concurrently
 config_gen_step_failed
 config_gen_step_reused
 config_gen_context_invalid
