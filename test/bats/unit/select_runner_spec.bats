@@ -19,7 +19,7 @@ bats_require_minimum_version 1.5.0
 setup() {
   load "${BATS_TEST_DIRNAME}/test_helper"
   SELECT="/source/script/ci/select_runner.sh"
-  unset EVENT_NAME HEAD_REPO REPO MERGE_GROUP_SAME_REPO CI_SELF_HOSTED
+  unset EVENT_NAME HEAD_REPO REPO MERGE_GROUP_SAME_REPO CI_SELF_HOSTED FLEET_STUCK
 }
 
 # _run_row <event> <head_repo> <repo> <merge_group_same_repo>
@@ -235,4 +235,68 @@ _run_switch() {
   assert_equal "${lines[0]}" "trusted=false"
   assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
   [[ "${stderr}" == "::error::select_runner: REPO is not set" ]]
+}
+
+# --- runs_on: FLEET_STUCK auto fallback, base#2316 (part of base#1586) ---
+#
+# FLEET_STUCK is the verdict of script/ci/fleet_stuck.sh (base#2288). `true`
+# forces runs_on to hosted ubuntu-latest and prints a notice on stderr;
+# `trusted` is decided by the event alone. Empty, unset and `false` change
+# nothing; any other value is read as false with a warning.
+
+# _run_stuck <event> <head_repo> <repo> <fleet_stuck>
+_run_stuck() {
+  EVENT_NAME="$1" HEAD_REPO="$2" REPO="$3" FLEET_STUCK="$4" \
+    run --separate-stderr bash "${SELECT}"
+}
+
+# why: When the CPU fleet is stuck a trusted event must move to hosted so the run does not queue forever, and the notice tells the run page why (base#2316).
+@test "select_runner.sh: trusted + FLEET_STUCK=true selects ubuntu-latest with a notice (base#2316)" {
+  _run_stuck pull_request o/r o/r true
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=true"
+  assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
+  [[ "${stderr}" == "::notice::select_runner: cpu fleet stuck, using ubuntu-latest" ]]
+}
+
+# why: FLEET_STUCK only changes the pool, never the trust verdict, so a fork stays untrusted (base#2316).
+@test "select_runner.sh: a fork pull_request + FLEET_STUCK=true stays not trusted (base#2316)" {
+  _run_stuck pull_request fork/r o/r true
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=false"
+  assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
+  [[ "${stderr}" == "::notice::select_runner: cpu fleet stuck, using ubuntu-latest" ]]
+}
+
+# why: false is the healthy-fleet answer of fleet_stuck.sh and must behave exactly like an unset variable, with no stderr (base#2316).
+@test "select_runner.sh: trusted + FLEET_STUCK=false still selects the cpu fleet (base#2316)" {
+  _run_stuck push "" o/r false
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=true"
+  assert_equal "${lines[1]}" 'runs_on=["self-hosted","linux","x64","cpu"]'
+  [[ -z "${stderr}" ]]
+}
+
+# why: An unknown value must not move runs to hosted by accident, so it is read as false and the warning names the value (base#2316).
+@test "select_runner.sh: trusted + FLEET_STUCK=yes is ignored with a warning (base#2316)" {
+  _run_stuck push "" o/r yes
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=true"
+  assert_equal "${lines[1]}" 'runs_on=["self-hosted","linux","x64","cpu"]'
+  [[ "${stderr}" == "::warning::select_runner: FLEET_STUCK=yes ignored" ]]
+}
+
+# why: With the master switch off the answer is already hosted, so FLEET_STUCK=true adds only the notice and nothing else on stderr (base#2316).
+@test "select_runner.sh: CI_SELF_HOSTED=off + FLEET_STUCK=true selects ubuntu-latest with only the notice (base#2316)" {
+  EVENT_NAME=push REPO=o/r CI_SELF_HOSTED=off FLEET_STUCK=true \
+    run --separate-stderr bash "${SELECT}"
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=true"
+  assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
+  [[ "${stderr}" == "::notice::select_runner: cpu fleet stuck, using ubuntu-latest" ]]
 }

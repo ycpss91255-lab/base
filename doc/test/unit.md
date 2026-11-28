@@ -7267,7 +7267,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/select_runner_spec.bats (24)
+### test/bats/unit/select_runner_spec.bats (29)
 
 A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
 `false` silently moves every run to the hosted pool. Each row of the issue's
@@ -7299,6 +7299,11 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: schedule with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | An unlisted event is untrusted, so the switch cannot lift it onto self-hosted (base#2266). |
 | `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
 | `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
+| `select_runner.sh: trusted + FLEET_STUCK=true selects ubuntu-latest with a notice (base#2316)` | When the CPU fleet is stuck a trusted event must move to hosted so the run does not queue forever, and the notice tells the run page why (base#2316). |
+| `select_runner.sh: a fork pull_request + FLEET_STUCK=true stays not trusted (base#2316)` | FLEET_STUCK only changes the pool, never the trust verdict, so a fork stays untrusted (base#2316). |
+| `select_runner.sh: trusted + FLEET_STUCK=false still selects the cpu fleet (base#2316)` | false is the healthy-fleet answer of fleet_stuck.sh and must behave exactly like an unset variable, with no stderr (base#2316). |
+| `select_runner.sh: trusted + FLEET_STUCK=yes is ignored with a warning (base#2316)` | An unknown value must not move runs to hosted by accident, so it is read as false and the warning names the value (base#2316). |
+| `select_runner.sh: CI_SELF_HOSTED=off + FLEET_STUCK=true selects ubuntu-latest with only the notice (base#2316)` | With the master switch off the answer is already hosted, so FLEET_STUCK=true adds only the notice and nothing else on stderr (base#2316). |
 
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (28)
 
