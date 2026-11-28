@@ -5275,11 +5275,10 @@ EOT
   assert_output 'read'
 }
 
-# why: The fleet step once inlined its API loop, and under the default
-# `bash -e` shell a failing last `gh api` exited 1 and failed classify, so
-# every downstream job skipped. The loop lives in script/ci/fleet_jobs.sh,
-# which always exits 0 and is unit-tested; the step must call it
-# (base#2317).
+# why: CI run 46092523272 showed the inlined fleet loop exiting 1 after 4s,
+# which failed classify and skipped every downstream job. The loop now
+# lives in script/ci/fleet_jobs.sh, which always exits 0 and is
+# unit-tested; the step must call it (base#2317).
 @test "self-test.yaml: classify fleet step calls script/ci/fleet_jobs.sh (base#2317)" {
   run _yaml_eval "${WF}" '.jobs.classify.steps[] | select(.id == "fleet") | .run'
   assert_success

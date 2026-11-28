@@ -7810,7 +7810,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: classify runs the fleet step before the runner step (base#2317)` | The runner step reads steps.fleet.outputs.stuck. A step that exists but runs after it would publish its output too late, so the runner step would always see an empty value and never switch (base#2317). |
 | `self-test.yaml: classify runner step passes FLEET_STUCK from the fleet step (base#2317)` | Without FLEET_STUCK in the runner step's env, select_runner.sh sees it unset and always answers the cpu fleet, however stuck it is (base#2317). |
 | `self-test.yaml: classify permissions include actions: read (base#2317)` | listing a repo's runs and their jobs through gh api needs the actions: read scope. classify's block replaces the workflow-level one, so without the line the API call is refused and the step can only fail open to stuck=false, which never switches (base#2317). |
-| `self-test.yaml: classify fleet step calls script/ci/fleet_jobs.sh (base#2317)` | The fleet step once inlined its API loop, and under the default `bash -e` shell a failing last `gh api` exited 1 and failed classify, so every downstream job skipped. The loop lives in script/ci/fleet_jobs.sh, which always exits 0 and is unit-tested; the step must call it (base#2317). |
+| `self-test.yaml: classify fleet step calls script/ci/fleet_jobs.sh (base#2317)` | CI run 46092523272 showed the inlined fleet loop exiting 1 after 4s, which failed classify and skipped every downstream job. The loop lives in script/ci/fleet_jobs.sh, which always exits 0 and is unit-tested; the step must call it (base#2317). |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 
