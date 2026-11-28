@@ -7351,7 +7351,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (177)
+### test/bats/unit/self_test_yaml_spec.bats (179)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7843,6 +7843,8 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: mutation-roster shard removes its own compose project and TMPDIR in an always() step (base#2272)` | each shard removes only its own compose project and TMPDIR, in an always() step so a failed or cancelled shard still cleans up (base#2272). |
 | `self-test.yaml: mutation-roster never re-sets CI_RUN_KEY and its consumers come after the job_env.sh step (base#2272)` | the per-job values only win if nothing sets CI_RUN_KEY back to the run key, and every consumer of it (build label, reclaim) runs after job_env.sh (base#2272). |
 | `self-test.yaml: mutation-roster shard echoes the four per-shard names (base#2272)` | the CI log is the proof that the per-shard values win over the workflow-level env, so a step must echo all four names (base#2272). |
+| `self-test.yaml: config-gen-redpath runs-on comes from classify runs_on_cpu, rest of the job unchanged (base#2271)` | config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED switch via classify's runs_on_cpu (base#2271, part of base#1586). This is the load-bearing case: with a hardcoded ubuntu-latest the switch never moves the shards to the self-hosted fleet. The other assertions pin that the if, timeout and shard matrix stay as they were. |
+| `self-test.yaml: only config-gen-gates, config-gen-redpath and mutation-roster take runs-on from runs_on_cpu (base#2269, base#2271, base#2272)` | config-gen-gates is the longest image job, and the first one to take its runs-on from classify's runs_on_cpu so the CI_SELF_HOSTED switch decides where it runs; config-gen-redpath followed in base#2271. Every other job keeps its own runs-on until its own child moves it (base#2269, part of base#1586). |
 | `self-test.yaml: classify has a step with id fleet (base#2317)` | select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes it unless classify runs a step that lists the queued and in-progress runs' jobs and hands them to fleet_stuck.sh. Without a step `fleet`, the env stays empty and a dead CPU host keeps every job queued forever instead of falling back to ubuntu-latest (base#2317, part of base#1586). |
 | `self-test.yaml: classify runs the fleet step before the runner step (base#2317)` | The runner step reads steps.fleet.outputs.stuck. A step that exists but runs after it would publish its output too late, so the runner step would always see an empty value and never switch (base#2317). |
 | `self-test.yaml: classify runner step passes FLEET_STUCK from the fleet step (base#2317)` | Without FLEET_STUCK in the runner step's env, select_runner.sh sees it unset and always answers the cpu fleet, however stuck it is (base#2317). |
