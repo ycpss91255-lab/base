@@ -720,6 +720,24 @@ _acceptance_step_idx() {
   [ "${cleanup_idx}" -gt "${scaffold_idx}" ]
 }
 
+# why: COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY are also set at
+# workflow level; the per-job values job_env.sh appends to GITHUB_ENV must win
+# for every later step. A step between job_env.sh and acceptance.sh prints the
+# three, so the CI log shows which value the job really ran with (base#2270).
+@test "self-test.yaml: acceptance prints the per-job COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY after job_env.sh (base#2270)" {
+  # Worked literal: the step index of the step whose run prints all three names.
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select((.value.run // "") | (contains("COMPOSE_PROJECT_NAME") and contains("TEST_TOOLS_IMAGE") and contains("CI_RUN_KEY"))) | .key'
+  assert_success
+  [[ "${output}" =~ ^[0-9]+$ ]] || fail "no acceptance step prints all three names"
+  print_idx="${output}"
+  _acceptance_step_idx script/ci/job_env.sh
+  job_env_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
+  [ "${print_idx}" -gt "${job_env_idx}" ]
+  [ "${print_idx}" -lt "${scaffold_idx}" ]
+}
+
 @test "self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)" {
   run _yaml_eval "${WF}" '.jobs.acceptance["runs-on"]'
   assert_success
