@@ -653,6 +653,15 @@ _acceptance_code() {
   refute_output --partial 'just docker setup-tui'
 }
 
+# Sets REPLY to the index of the first acceptance step whose run: contains
+# the given script path, and fails the test when no step does (base#2270).
+_acceptance_step_idx() {
+  run _yaml_eval "${WF}" ".jobs.acceptance.steps | to_entries | .[] | select(.value.run // \"\" | contains(\"${1}\")) | .key"
+  assert_success
+  REPLY="${output%%$'\n'*}"
+  [[ "${REPLY}" =~ ^[0-9]+$ ]]
+}
+
 # why: acceptance's amd64 leg takes its runner from classify's runs_on_cpu
 # (["ubuntu-latest"] when the switch is off, a fork or an untrusted event);
 # the arm64 leg stays on ubuntu-24.04-arm because the cpu scale set is x64
@@ -686,14 +695,10 @@ _acceptance_code() {
   run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
   assert_success
   assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
-  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
-  assert_success
-  job_env_idx="${output%%$'\n'*}"
-  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/acceptance.sh")) | .key'
-  assert_success
-  scaffold_idx="${output%%$'\n'*}"
-  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
-  [[ "${scaffold_idx}" =~ ^[0-9]+$ ]]
+  _acceptance_step_idx script/ci/job_env.sh
+  job_env_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
   [ "${job_env_idx}" -lt "${scaffold_idx}" ]
 }
 
@@ -708,14 +713,10 @@ _acceptance_code() {
   run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
   assert_success
   assert_output 'always()'
-  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_cleanup.sh")) | .key'
-  assert_success
-  cleanup_idx="${output%%$'\n'*}"
-  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/acceptance.sh")) | .key'
-  assert_success
-  scaffold_idx="${output%%$'\n'*}"
-  [[ "${cleanup_idx}" =~ ^[0-9]+$ ]]
-  [[ "${scaffold_idx}" =~ ^[0-9]+$ ]]
+  _acceptance_step_idx script/ci/job_cleanup.sh
+  cleanup_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
   [ "${cleanup_idx}" -gt "${scaffold_idx}" ]
 }
 
