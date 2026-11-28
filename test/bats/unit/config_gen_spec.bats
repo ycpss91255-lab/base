@@ -1093,7 +1093,7 @@ config_gen_tables layer.toml ${_name}"
   _run_cg_tables "${_wd}" layer.toml
   assert_refusal 1 config_gen_build_failed "path=${CG_DF}" "status=125"
   assert_equal "$(_cg_tables_seen)" "[]"
-  assert_cg_calls image build
+  assert_cg_calls image build image
 
   # A fresh stub: _cg_assert_recording in assert_cg_calls proves it
   # records before its empty call list is read.
