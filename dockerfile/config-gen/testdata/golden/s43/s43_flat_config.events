@@ -1,0 +1,2 @@
+dockerfile_patched	  Dockerfile patched: flat .base/{config,script} -> .base/dist/ (#915)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (flat_to_dist), 1 file(s) rewritten	matched=1	available=16	names=flat_to_dist	rewritten=1

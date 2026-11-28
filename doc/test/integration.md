@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **423 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -238,6 +238,34 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an aside that fails leaves the destination untouched (base#1464)` | If the first rename fails nothing has moved yet; the refusal must name that stage and leave the destination exactly as it was. |
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
+
+### test/bats/integration/config_gen_s43_flat_to_dist_golden_spec.bats (12)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_flat_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2057):
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> [TAB
+matched=.. TAB available=.. TAB names=.. TAB rewritten=..] The fixture is
+run as the relative path `Dockerfile` in a scratch directory. The prefix is
+s43_flat_, not s43_migrate_ (that is the base#2055 partition).
+
+| Test | Description |
+|------|-------------|
+| `s43 flat golden: lint lib/wrapper COPYs are rewritten` | the flat lint-stage lib/wrapper COPYs are rewritten to .base/dist/. |
+| `s43 flat golden: config COPY is rewritten` | the flat config COPY is rewritten, flags and destination unchanged. |
+| `s43 flat golden: mixed two-stage Dockerfile is rewritten` | two stages are both rewritten and the blank line between them is kept. |
+| `s43 flat golden: dist layout is unchanged` | an already-dist layout is the fixed point, nothing is rewritten. |
+| `s43 flat golden: lint, config and mixed events goldens equal the issue's event A` | the issue gives event A as literals; pin them so a wrong golden cannot pass by being regenerated the same way. Cases lint, config, mixed share it. |
+| `s43 flat golden: lint dockerfile golden equals the issue's literal` | the issue gives the lint Dockerfile result as a literal. |
+| `s43 flat golden: config dockerfile golden equals the issue's literal` | only the source changes; --chown/--chmod flags and destination stay. |
+| `s43 flat golden: mixed dockerfile golden equals the issue's literal` | both stages are rewritten and the blank line separator survives. |
+| `s43 flat golden: rewritten cases' files goldens are the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 flat golden: dist files golden is 0 bytes and events literal` | the fixed point is a no-op: 0-byte .files, one report event (event B). |
+| `s43 flat golden: dist dockerfile golden equals its fixture` | nothing is rewritten, so the dockerfile golden must be the fixture bytes. |
+| `s43 flat golden: every fixture has exactly its three goldens and no extra` | each flat fixture has exactly the three goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
 
