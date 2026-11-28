@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **422 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -300,6 +300,34 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_runtime_moved_files_golden_spec.bats (11)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_rmove_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2055):
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> [TAB
+matched=.. TAB available=.. TAB names=.. TAB rewritten=..] The fixture is
+run as the relative path `Dockerfile` in a scratch directory. The prefix is
+s43_rmove_, not s43_migrate_ (that is the base#2055 partition; s43_wcopy_ is
+base#2057).
+
+| Test | Description |
+|------|-------------|
+| `s43 rmove golden: smoke.sh source is rewritten` | smoke.sh named in a commented COPY is rewritten too. |
+| `s43 rmove golden: entrypoint.sh source is rewritten` | entrypoint.sh at the pre-dist path goes through flat_to_dist, then this migration. |
+| `s43 rmove golden: whole-directory COPY is unchanged` | a whole-directory COPY names neither file, nothing is rewritten. |
+| `s43 rmove golden: smoke events golden equals the issue's literal events` | the issue gives event A as literals. |
+| `s43 rmove golden: entry events golden equals the issue's literal events` | the issue gives event B as literals (flat_to_dist first). |
+| `s43 rmove golden: smoke dockerfile golden equals the issue's literal` | the issue gives the rewritten second lines as literals. |
+| `s43 rmove golden: entry dockerfile golden equals the issue's literal` | the issue gives the entry Dockerfile as a literal. |
+| `s43 rmove golden: rewritten cases' files golden is the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 rmove golden: dist files golden is 0 bytes and events literal` | event C, 0-byte .files, dockerfile == fixture. |
+| `s43 rmove golden: dist dockerfile golden equals its fixture` | nothing is rewritten, so the dockerfile golden must be the fixture bytes. |
+| `s43 rmove golden: every fixture has exactly its three goldens and no extra` | each rmove fixture has exactly the three goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
