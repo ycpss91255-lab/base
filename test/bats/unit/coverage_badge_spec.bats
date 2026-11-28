@@ -1206,6 +1206,81 @@ _make_cobertura() {
   [ "${_scanned}" -gt 50 ]
 }
 
+# Scan a scratch tree the way the real dirty-check test scans /source:
+# every bash-shebang file that kcov would instrument must match
+# SOURCE_PATHSPEC. The exclusion list is the real `_coverage_exclude_path`
+# output with its /source prefix moved onto the scratch root, so the
+# scratch tree is judged by the repo's own roster, not by a copy.
+_scan_scratch_unguarded() {
+  local _root="${1:?scratch root}"
+  local _excluded_csv _e _abs _first _rel _g
+  local -a _excluded _pathspec
+  _excluded_csv="$(source /source/script/test/test.sh; _coverage_exclude_path)"
+  _excluded_csv="${_excluded_csv//\/source\//${_root}/}"
+  IFS="," read -r -a _excluded <<< "${_excluded_csv}"
+  mapfile -t _pathspec < <(source /source/script/release/coverage_badge.sh
+                           printf "%s\n" "${SOURCE_PATHSPEC[@]}")
+  local _flagged=0
+  while IFS= read -r -d "" _abs; do
+    for _e in "${_excluded[@]}"; do
+      [[ "${_abs}" == "${_e}"* ]] && continue 2
+    done
+    read -r _first < "${_abs}" 2>/dev/null || continue
+    case "${_first}" in
+      "#!"*bash*|"#!"*sh|"#!"*sh\ *|"#!"*bats*) ;;
+      *) continue ;;
+    esac
+    _rel="${_abs#"${_root}/"}"
+    for _g in "${_pathspec[@]}"; do
+      [[ "${_rel}" == ${_g} ]] && continue 2
+    done
+    printf "UNGUARDED %s\n" "${_rel}"
+    _flagged=$(( _flagged + 1 ))
+  done < <(find "${_root}" -type f -print0)
+  (( _flagged == 0 ))
+}
+
+# why: config-gen's golden corpus (dockerfile/config-gen/testdata/) holds
+# bash-shebang files such as an entrypoint.sh. They are the migration's
+# INPUT DATA, compared byte for byte, never run by the suite, so kcov never
+# measures them and SOURCE_PATHSPEC must not have to name them (base#2373).
+# The scratch tree holds exactly one such file; the dirty check must not
+# report it as an unguarded instrumented source.
+@test "coverage_badge: a bash fixture under config-gen testdata is not an instrumented source (base#2373)" {
+  local _scratch="${BATS_TEST_TMPDIR}/tree"
+  mkdir -p "${_scratch}/dockerfile/config-gen/testdata/corpus/x"
+  printf '#!/usr/bin/env bash\necho fixture\n' \
+    > "${_scratch}/dockerfile/config-gen/testdata/corpus/x/a.entrypoint.sh"
+  # The golden side of the corpus carries the same script WITHOUT the .sh
+  # suffix (`*.entrypoint`), which SOURCE_PATHSPEC does not name; that is
+  # the spelling PR #2357 hit. A `.sh` name alone is already guarded by
+  # the `*.sh` entry and would not exercise the exclusion.
+  mkdir -p "${_scratch}/dockerfile/config-gen/testdata/golden/x"
+  printf '#!/usr/bin/env bash\necho fixture\n' \
+    > "${_scratch}/dockerfile/config-gen/testdata/golden/x/a.entrypoint"
+
+  export -f _scan_scratch_unguarded
+  run bash -c '_scan_scratch_unguarded "$1"' _ "${_scratch}"
+  assert_output ""
+  [ "${status}" -eq 0 ]
+}
+
+# why: the testdata exclusion must stay as narrow as the issue says: a bash
+# file anywhere else under dockerfile/config-gen/ is real, executed source
+# and still has to be reported as unguarded, otherwise the exclusion would
+# silently widen into the whole config-gen tree (base#2373).
+@test "coverage_badge: a bash file elsewhere under config-gen is still unguarded (base#2373)" {
+  local _scratch="${BATS_TEST_TMPDIR}/tree"
+  mkdir -p "${_scratch}/dockerfile/config-gen/cmd/x"
+  printf '#!/usr/bin/env bash\necho real\n' \
+    > "${_scratch}/dockerfile/config-gen/cmd/x/a.entrypoint"
+
+  export -f _scan_scratch_unguarded
+  run bash -c '_scan_scratch_unguarded "$1"' _ "${_scratch}"
+  [ "${status}" -ne 0 ]
+  assert_output --partial "UNGUARDED dockerfile/config-gen/cmd/x/a.entrypoint"
+}
+
 @test "coverage_badge: the roster's drift note promises only the guard it has" {
   # The guard above defines "instrumented" operationally, and narrowly: a
   # file counts when its SHEBANG says bash runs it. That is the right
