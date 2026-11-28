@@ -1,0 +1,2 @@
+dockerfile_patched	  Dockerfile patched: runtime helper COPYs collapsed into one directory COPY (#971)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (runtime_dir_copy), 1 file(s) rewritten	matched=1	available=16	names=runtime_dir_copy	rewritten=1

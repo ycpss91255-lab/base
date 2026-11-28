@@ -1,0 +1,5 @@
+dockerfile_patched	  Dockerfile patched: flat .base/{config,script} -> .base/dist/ (#915)
+dockerfile_patched	  Dockerfile patched: runtime/{entrypoint,smoke}.sh moved out of the helper dir (#971)
+dockerfile_patched	  Dockerfile patched: runtime helper COPYs collapsed into one directory COPY (#971)
+dockerfile_patched	  Dockerfile patched: hadolint DL3007/DL3046/DL3003/DL3042/DL4006/DL3006/DL3066 (#567 m5, #946)
+dockerfile_migrations_reported	  Dockerfile migrations: 4 of 16 matched (flat_to_dist runtime_moved_files runtime_dir_copy hadolint), 1 file(s) rewritten	matched=4	available=16	names=flat_to_dist runtime_moved_files runtime_dir_copy hadolint	rewritten=1
