@@ -333,3 +333,29 @@ _assert_golden() {
   _run_logging_case s82_logging_empty_absent - "" ""
   _assert_golden s82_logging_empty_absent
 }
+
+# why: a second managed block is ambiguous, so the sync is refused with
+# rc 1, the file stays byte for byte, and one ERROR event
+# gitignore_managed_block_invalid names line 3 (base#2089).
+@test "s82 logging: a second managed block is refused" {
+  _run_logging_case s82_logging_second_block s82_logging_second_block.gitignore \
+    "local_path=log/a" ""
+  _assert_golden s82_logging_second_block
+}
+
+# why: an end marker with no begin before it is refused the same way, the
+# event naming the end marker's line 2 (base#2089).
+@test "s82 logging: an end marker with no begin is refused" {
+  _run_logging_case s82_logging_end_no_begin s82_logging_end_no_begin.gitignore \
+    "local_path=log/a" ""
+  _assert_golden s82_logging_end_no_begin
+}
+
+# why: a begin marker never closed is corruption, not a legacy block; the
+# sync is refused, the file is not modified, and the event names the begin
+# line 2 (base#2089).
+@test "s82 logging: an unterminated managed block is refused" {
+  _run_logging_case s82_logging_unterminated s82_logging_unterminated.gitignore \
+    "local_path=log/a" ""
+  _assert_golden s82_logging_unterminated
+}
