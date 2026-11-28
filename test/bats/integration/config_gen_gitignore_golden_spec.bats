@@ -192,6 +192,23 @@ _assert_golden() {
   assert_output ""
 }
 
+# why: the pairing check covers only the goldens this spec owns (the
+# s82_prune_, s82_sync_, s82_pathspec_ and s82_logging_ names). In a scratch
+# copy of the s82 data, which also holds the drift and fallback goldens that
+# config_gen_drift_golden_spec.bats owns, an orphan golden with an owned
+# prefix is the only violation reported; the other specs' goldens are not
+# flagged (base#2372).
+@test "s82 corpus: an orphan golden with an owned prefix fails the pairing check" {
+  mkdir -p "${S}/td/corpus" "${S}/td/golden"
+  cp -r -- "${TESTDATA}/corpus/s82" "${S}/td/corpus/s82"
+  cp -r -- "${TESTDATA}/golden/s82" "${S}/td/golden/s82"
+  : > "${S}/td/golden/s82/s82_logging_orphan.golden"
+  TESTDATA="${S}/td"
+  run _partition_violations
+  assert_success
+  assert_output "golden with no corpus input: s82_logging_orphan"
+}
+
 # why: the managed half is the lines below the marker; the entry above it
 # is the user's own and stays, both retired entries below go, the missing
 # final newline is added, and the file keeps mode 640 (base#1356).
