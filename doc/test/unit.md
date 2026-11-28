@@ -9655,7 +9655,7 @@ handing the extractor exactly them.
 | `toml-fixture: has a lint-static CI join` | One plain-runner lint group, no docker -- and exactly one, because none gates nothing and two pays twice |
 | `toml-fixture: its failure event id is registered` | An unregistered event id is an anonymous exit: the log line carries no name a reader can look up |
 
-### test/bats/unit/tool_image_spec.bats (8)
+### test/bats/unit/tool_image_spec.bats (10)
 
 the TOML bridge provisions its image from the shipped Dockerfile under a
 content-digest tag; the config generator needs the same, with a build
@@ -9679,6 +9679,8 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `tool-image: the profile's override variable is used verbatim, with no docker call` | the override and memo are the profile's variables, not a tool's literal names: a non-empty override wins verbatim with no docker call, and the memo is the named global. |
 | `tool-image: the profile's memo variable holds the resolution for the shell` | the memo variable is a profile field; a helper that memoised under a fixed name would make two tools share one slot. A second resolve in the same shell reads the profile's variable and asks docker nothing. |
 | `tool-image: a failed build carries the display callback text and returns 1` | the shim's display callback writes the text; the helper owns the event id, attributes and the folded builder output, and returns 1. |
+| `tool-image: a failed build whose image then exists returns 0 as <ns>_built_concurrently` | jobs on one CPU host share a docker daemon; the tag is a digest of the inputs, so when our build loses the naming race the image a sibling built is the same image. A failed build followed by a successful inspect is success, reported as an INFO event on stderr and not as <ns>_build_failed (base#2320). |
+| `tool-image: a failed build whose image is still absent stays <ns>_build_failed` | the re-inspect must not turn every failure into success: when the image is still absent after the failed build the refusal is the unchanged <ns>_build_failed with status 1 (base#2320). |
 | `tool-image: a missing Dockerfile refuses as <ns>_unprovisionable` | the event id is built from the ns, so every tool refuses under its own name, with the shim's display text and the missing path. |
 | `tool-image: the bridge with TOML_BRIDGE_IMAGE= derives and inspects` | TOML_BRIDGE_IMAGE set but empty counts as unset, as it does today: the bridge derives and inspects. Pinned here because the bridge now reaches the override through the helper. |
 | `tool-image: the toml_bridge wrapper and tool_image_derive toml_bridge agree` | the bridge's functions are wrappers over the helper, so the bridge and the helper name the same tag. |
