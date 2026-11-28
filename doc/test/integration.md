@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **432 tests**.
+Integration specs under `test/bats/integration/`: **442 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -289,6 +289,25 @@ byte. Shared generator: s43_arg_user_helper.bash.
 | `s43 arg_user golden: unrelated` | ARG USERLAND / ARG USER_NAME are not ARG USER; no warning. |
 | `s43 arg_user golden: bare events golden equals the issue's literal events` | the issue gives the bare events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
 | `s43 arg_user golden: unrelated events golden is the single none-matched report` | the unrelated case has no warning, only the report event. |
+| `s43 arg_user golden: dockerfile goldens equal their fixtures and files goldens are 0 bytes` | arg_user only reports, never rewrites: dockerfile golden == fixture, .files empty. |
+| `s43 arg_user golden: every case has one fixture and exactly its three goldens` | each case has exactly one fixture and exactly three goldens. |
+
+### test/bats/integration/config_gen_s43_arg_user_scope_golden_spec.bats (10)
+
+before any Go migration exists, the shell apply_migrations with
+_MIGRATIONS=( arg_user ) is the oracle; the Go side must match byte for
+byte. Shared generator: s43_arg_user_helper.bash.
+
+| Test | Description |
+|------|-------------|
+| `s43 arg_user golden: parent_inherit` | a bare ARG USER in a stage whose parent declares none, after a USER_NAME-default one. |
+| `s43 arg_user golden: case_from` | lower-case `from` still opens a stage. |
+| `s43 arg_user golden: global_user_name` | a global (pre-FROM) ARG USER_NAME changes which stage lines are warned. |
+| `s43 arg_user golden: sibling_stage` | a sibling stage's ARG USER does not leak into this stage. |
+| `s43 arg_user golden: inherited_stage` | a stage inheriting from a stage that declares ARG USER. |
+| `s43 arg_user golden: decl_order` | declaration order of USER_NAME vs ARG USER. |
+| `s43 arg_user golden: quoting` | quoting variants of the USER_NAME default. |
+| `s43 arg_user golden: parent_inherit events golden equals the issue's literal events` | the issue gives parent_inherit's warnings as 4:root 6:bare; pin the events as literals so a wrong golden cannot pass by being regenerated the same way. |
 | `s43 arg_user golden: dockerfile goldens equal their fixtures and files goldens are 0 bytes` | arg_user only reports, never rewrites: dockerfile golden == fixture, .files empty. |
 | `s43 arg_user golden: every case has one fixture and exactly its three goldens` | each case has exactly one fixture and exactly three goldens. |
 
