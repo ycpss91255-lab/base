@@ -5258,13 +5258,9 @@ EOT
 # (the kcov shard primary gate, base#2273), all part of base#1586. Every other
 # job keeps its own runs-on until its own child moves it.
 @test "self-test.yaml: only config-gen-gates, config-gen-redpath and coverage take runs-on from runs_on_cpu (base#2269, base#2271, base#2273)" {
-  run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) | .key'
+  run _yaml_eval "${WF}" '[.jobs | to_entries | .[] | select((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) | .key] | sort | join(",")'
   assert_success
-  assert_output - <<'EOS'
-config-gen-gates
-config-gen-redpath
-coverage
-EOS
+  assert_output 'config-gen-gates,config-gen-redpath,coverage'
 }
 
 # why: coverage is the kcov shard PRIMARY gate; its runner now comes from
