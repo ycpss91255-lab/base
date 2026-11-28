@@ -653,23 +653,129 @@ _acceptance_code() {
   refute_output --partial 'just docker setup-tui'
 }
 
-@test "self-test.yaml: acceptance runs as a native-runner matrix over amd64 + arm64 (#603)" {
-  # A2: verify the runnability contract on BOTH arches via native
-  # runners (no QEMU), mirroring the platform->runner convention in
-  # build-worker / publish-worker / release-test-tools.
-  run yaml_job_lines "${WF}" acceptance
+# Sets REPLY to the index of the first acceptance step whose run: contains
+# the given script path, and fails the test when no step does (base#2270).
+_acceptance_step_idx() {
+  run _yaml_eval "${WF}" ".jobs.acceptance.steps | to_entries | .[] | select(.value.run // \"\" | contains(\"${1}\")) | .key"
   assert_success
-  assert_output --partial 'fail-fast: false'
-  assert_output --partial 'linux/amd64'
-  assert_output --partial 'ubuntu-latest'
-  assert_output --partial 'linux/arm64'
-  assert_output --partial 'ubuntu-24.04-arm'
+  REPLY="${output%%$'\n'*}"
+  [[ "${REPLY}" =~ ^[0-9]+$ ]]
 }
 
-@test "self-test.yaml: acceptance shards run on the matrix runner (#603)" {
-  run yaml_job_lines "${WF}" acceptance
+# why: acceptance's amd64 leg takes its runner from classify's runs_on_cpu
+# (["ubuntu-latest"] when the switch is off, a fork or an untrusted event);
+# the arm64 leg stays on ubuntu-24.04-arm because the cpu scale set is x64
+# (base#2270, part of base#1586).
+@test "self-test.yaml: acceptance runs as a native-runner matrix over amd64 + arm64 (#603, base#2270)" {
+  # Expected literals are the issue's acceptance criteria.
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[0].platform'
   assert_success
-  assert_output --partial 'runs-on: ${{ matrix.runner }}'
+  assert_output 'linux/amd64'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[0].runner'
+  assert_success
+  assert_output '${{ needs.classify.outputs.runs_on_cpu }}'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[1].platform'
+  assert_success
+  assert_output 'linux/arm64'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy.matrix.include[1].runner'
+  assert_success
+  assert_output '["ubuntu-24.04-arm"]'
+  run _yaml_eval "${WF}" '.jobs.acceptance.strategy["fail-fast"]'
+  assert_success
+  assert_output 'false'
+}
+
+# why: on the cpu fleet /tmp is private to the job container while the
+# toml-bridge `docker run -v` goes to the host daemon, so a scaffold under
+# /tmp is invisible to it (conf_toml_merge_failed, run 46080939073). Only
+# paths under RUNNER_TEMP are same-path visible, so the job must export a
+# TMPDIR there via script/ci/job_env.sh before acceptance.sh's mktemp runs
+# (base#2270, base#2274).
+@test "self-test.yaml: acceptance exports a RUNNER_TEMP TMPDIR via job_env.sh before the scaffold step (base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
+  _acceptance_step_idx script/ci/job_env.sh
+  job_env_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
+  [ "${job_env_idx}" -lt "${scaffold_idx}" ]
+}
+
+# why: job_env.sh gives the job its own compose project and TMPDIR on a host
+# daemon shared with sibling jobs; job_cleanup.sh removes exactly those, and it
+# must run after a failed scaffold too, so the step is `if: always()` and comes
+# after the step that scaffolds (base#2270, base#2275).
+@test "self-test.yaml: acceptance runs job_cleanup.sh in an always() step after the scaffold step (base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .run'
+  assert_success
+  assert_output --partial './script/ci/job_cleanup.sh'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  _acceptance_step_idx script/ci/job_cleanup.sh
+  cleanup_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
+  [ "${cleanup_idx}" -gt "${scaffold_idx}" ]
+}
+
+# why: job_cleanup.sh removes the job's TMPDIR, and reclaim.sh delegates to
+# prune.sh, which needs a usable TMPDIR (mktemp). Reclaim therefore has to run
+# before job_cleanup.sh, as in base#2308; both steps are `if: always()` so a
+# failed scaffold still gets both. The reclaim step is scoped to the per-job
+# CI_RUN_KEY that job_env.sh exports (base#2270).
+@test "self-test.yaml: acceptance runs reclaim.sh before job_cleanup.sh, both always() (base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/reclaim.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/reclaim.sh")) | .run'
+  assert_success
+  assert_output './script/ci/reclaim.sh --run "${CI_RUN_KEY}" --stale 12h'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  _acceptance_step_idx script/ci/reclaim.sh
+  reclaim_idx="${REPLY}"
+  _acceptance_step_idx script/ci/job_cleanup.sh
+  cleanup_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
+  [ "${reclaim_idx}" -gt "${scaffold_idx}" ]
+  [ "${reclaim_idx}" -lt "${cleanup_idx}" ]
+}
+
+# why: COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY are also set at
+# workflow level; the per-job values job_env.sh appends to GITHUB_ENV must win
+# for every later step. A step between job_env.sh and acceptance.sh prints the
+# three, so the CI log shows which value the job really ran with (base#2270).
+@test "self-test.yaml: acceptance prints the per-job COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY after job_env.sh (base#2270)" {
+  # Worked literal: the step index of the step whose run prints all three names.
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select((.value.run // "") | (contains("COMPOSE_PROJECT_NAME") and contains("TEST_TOOLS_IMAGE") and contains("CI_RUN_KEY"))) | .key'
+  assert_success
+  [[ "${output}" =~ ^[0-9]+$ ]] || fail "no acceptance step prints all three names"
+  print_idx="${output}"
+  _acceptance_step_idx script/ci/job_env.sh
+  job_env_idx="${REPLY}"
+  _acceptance_step_idx script/ci/acceptance.sh
+  scaffold_idx="${REPLY}"
+  [ "${print_idx}" -gt "${job_env_idx}" ]
+  [ "${print_idx}" -lt "${scaffold_idx}" ]
+}
+
+@test "self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(matrix.runner) }}'
+  run _yaml_eval "${WF}" '.jobs.acceptance["timeout-minutes"]'
+  assert_success
+  assert_output '120'
+  run _yaml_eval "${WF}" '.jobs.acceptance.needs | join(",")'
+  assert_success
+  assert_output 'actionlint,classify,test-tools-image-amd64,test-tools-image-arm64'
+  run _yaml_eval "${WF}" '.jobs.acceptance.if'
+  assert_success
+  assert_output "needs.classify.outputs.select_acceptance == 'true'"
 }
 
 @test "self-test.yaml: acceptance Obtain step pulls the matrix platform, not a hardcoded amd64 (#603)" {
@@ -903,6 +1009,14 @@ _assert_mutants_fail() {
 _tt_resolve() {
   local _t="${4}" _rt=/RT _v _new
   local _re="needs\[format\('([^']*)\{0\}', matrix\.([A-Za-z0-9_]+)\)\]"
+  local _fre='^\$\{\{[[:space:]]*fromJSON\(matrix\.([A-Za-z0-9_]+)\)[[:space:]]*\}\}$'
+  # `${{ fromJSON(matrix.K) }}` is the leg's K, a JSON list of runner labels
+  # (base#2270); it resolves to those labels, comma-joined.
+  if [[ "${_t}" =~ ${_fre} ]]; then
+    _v="$(LP_K="${BASH_REMATCH[1]}" yq -p json '.[strenv(LP_K)] // ""' <<< "${3}")"
+    yq -p json '. | join(",")' <<< "${_v}"
+    return 0
+  fi
   _t="${_t//'${{ runner.temp }}'/${_rt}}"
   while [[ "${_t}" =~ ${_re} ]]; do
     _v="$(LP_K="${BASH_REMATCH[2]}" yq -p json '.[strenv(LP_K)] // ""' <<< "${3}")"
@@ -5221,6 +5335,17 @@ REPO=${{ github.repository }}
 MERGE_GROUP_SAME_REPO=${{ steps.trust.outputs.same_repo }}
 CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 FLEET_STUCK=${{ steps.fleet.outputs.stuck }}
+EOT
+  # Only the switched jobs take their runner from the classify output, in
+  # runs-on or in a matrix leg's runner; acceptance (base#2270), config-gen-gates (base#2269),
+  # config-gen-redpath (base#2271) and coverage (base#2273) are the switched ones.
+  run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select(((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) or (([.value.strategy.matrix.include[]?.runner // ""] | map(tostring) | join(",")) | contains("runs_on_cpu"))) | .key'
+  assert_success
+  assert_output - <<'EOT'
+coverage
+acceptance
+config-gen-gates
+config-gen-redpath
 EOT
 }
 

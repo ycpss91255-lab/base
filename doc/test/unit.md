@@ -7351,7 +7351,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (181)
+### test/bats/unit/self_test_yaml_spec.bats (185)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7690,8 +7690,12 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: acceptance exercises the remaining downstream just commands for real (#769)` | every verb named here was once reachable only through --dry-run, which exercises the argument parser and none of the effect. Dropping one of them from the script is the regression this case catches. |
 | `self-test.yaml: acceptance drives 'just template new' end-to-end and asserts the consumer artifact (#785)` | new.sh has unit coverage, but the recipe wiring and the consumer symlink chain that resolve `just template new` are exercised nowhere else; this is the only witness that the consumer can actually reach it. |
 | `self-test.yaml: acceptance documents setup-tui as intentionally out of scope (#769)` | an undocumented gap reads as an oversight and gets "fixed" by a TUI drive that hangs without a pseudo-TTY. The comment is the decision; the refutation keeps anyone from invoking the TUI in a non-interactive job. |
-| `self-test.yaml: acceptance runs as a native-runner matrix over amd64 + arm64 (#603)` | - |
-| `self-test.yaml: acceptance shards run on the matrix runner (#603)` | - |
+| `self-test.yaml: acceptance runs as a native-runner matrix over amd64 + arm64 (#603, base#2270)` | acceptance's amd64 leg takes its runner from classify's runs_on_cpu (["ubuntu-latest"] when the switch is off, a fork or an untrusted event); the arm64 leg stays on ubuntu-24.04-arm because the cpu scale set is x64 (base#2270, part of base#1586). |
+| `self-test.yaml: acceptance exports a RUNNER_TEMP TMPDIR via job_env.sh before the scaffold step (base#2270)` | on the cpu fleet /tmp is private to the job container while the toml-bridge `docker run -v` goes to the host daemon, so a scaffold under /tmp is invisible to it (conf_toml_merge_failed, run 46080939073). Only paths under RUNNER_TEMP are same-path visible, so the job must export a TMPDIR there via script/ci/job_env.sh before acceptance.sh's mktemp runs (base#2270, base#2274). |
+| `self-test.yaml: acceptance runs job_cleanup.sh in an always() step after the scaffold step (base#2270)` | job_env.sh gives the job its own compose project and TMPDIR on a host daemon shared with sibling jobs; job_cleanup.sh removes exactly those, and it must run after a failed scaffold too, so the step is `if: always()` and comes after the step that scaffolds (base#2270, base#2275). |
+| `self-test.yaml: acceptance runs reclaim.sh before job_cleanup.sh, both always() (base#2270)` | job_cleanup.sh removes the job's TMPDIR, and reclaim.sh delegates to prune.sh, which needs a usable TMPDIR (mktemp). Reclaim therefore has to run before job_cleanup.sh, as in base#2308; both steps are `if: always()` so a failed scaffold still gets both. The reclaim step is scoped to the per-job CI_RUN_KEY that job_env.sh exports (base#2270). |
+| `self-test.yaml: acceptance prints the per-job COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY after job_env.sh (base#2270)` | COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY are also set at workflow level; the per-job values job_env.sh appends to GITHUB_ENV must win for every later step. A step between job_env.sh and acceptance.sh prints the three, so the CI log shows which value the job really ran with (base#2270). |
+| `self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)` | - |
 | `self-test.yaml: acceptance Obtain step pulls the matrix platform, not a hardcoded amd64 (#603)` | - |
 | `self-test.yaml: system job declares needs on actionlint AND classify (#317)` | - |
 | `self-test.yaml: no unquoted name: is cut short by a # (base#2121)` | In an unquoted YAML value a blank followed by `#` starts a comment, so a name carrying an issue number is cut off there and the check list shows half of it (base#2121) |

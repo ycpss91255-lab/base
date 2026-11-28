@@ -1913,14 +1913,14 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: ${{ needs.classify.outputs.runs_on_cpu }}
             hardware: amd64
             arch: amd64
           - platform: linux/arm64
-            runner: ubuntu-24.04-arm
+            runner: '["ubuntu-24.04-arm"]'
             hardware: arm64
             arch: arm64
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ fromJSON(matrix.runner) }}
     # The heaviest job here: it scaffolds a consumer repo and builds its
     # image stages, once per arch, on a runner that may be self-hosted.
     timeout-minutes: 120
@@ -1935,6 +1935,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Put TMPDIR under RUNNER_TEMP (job_env.sh)
+        # On the cpu fleet the scaffold under a /tmp TMPDIR failed the
+        # TOML merge (conf_toml_merge_failed, run 46080939073); TMPDIR goes
+        # under RUNNER_TEMP through job_env.sh, base#2270.
+        env:
+          JOB_KEY: acceptance-${{ matrix.arch }}
+        run: ./script/ci/job_env.sh >> "${GITHUB_ENV}"
+
+      - name: Print this job's compose project, tooling image and run key
+        # COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY are also set
+        # at workflow level; the CI log of this step shows the per-job
+        # values job_env.sh appended to GITHUB_ENV won, base#2270.
+        run: |
+          echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+          echo "TEST_TOOLS_IMAGE=${TEST_TOOLS_IMAGE}"
+          echo "CI_RUN_KEY=${CI_RUN_KEY}"
 
       - name: Set up Docker Buildx
         # Use the docker driver (not docker-container) so the run-scoped
@@ -2053,6 +2070,14 @@ jobs:
         if: always()
         continue-on-error: true
         run: ./script/ci/reclaim.sh --run "${CI_RUN_KEY}" --stale 12h
+
+      - name: Remove this job's compose project and TMPDIR (job_cleanup.sh)
+        # job_env.sh gave this job its own compose project and TMPDIR on a
+        # host daemon shared with sibling jobs; remove exactly those, also
+        # after a failed scaffold, base#2270.
+        if: always()
+        continue-on-error: true
+        run: ./script/ci/job_cleanup.sh
 
   system:
     name: "System Regression Test (runtime-test smoke gate, #249)"
