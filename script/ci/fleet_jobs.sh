@@ -13,7 +13,7 @@ set -uo pipefail
 collect() {
   local status run_id ids
   for status in queued in_progress; do
-    if ! ids="$(gh api "repos/${REPO}/actions/runs?status=${status}" \
+    if ! ids="$(gh api "repos/${REPO}/actions/runs?status=${status}&per_page=20" \
       --jq '.workflow_runs[].id' 2>/dev/null)"; then
       printf '::warning::fleet_jobs: cannot list %s runs\n' "${status}" >&2
       continue
