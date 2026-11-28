@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **422 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -300,6 +300,35 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_logging_rename_golden_spec.bats (11)
+
+Before any Go migration exists, the shell `_migrate_logging_rename_detect` /
+`_migrate_logging_rename_apply`
+(dist/script/docker/lib/dockerfile_migrate.sh) are the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_logrn_<case>.Dockerfile has
+these goldens under testdata/golden/s43/ (same shape as base#2057):
+.dockerfile the Dockerfile bytes after detect && apply .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> .entrypoint
+script/entrypoint.sh after apply; only for a case that has a
+s43_logrn_<case>.entrypoint.sh fixture The fixture is run as the relative
+path `Dockerfile` in a scratch directory; its entrypoint fixture is copied
+to script/entrypoint.sh beside it.
+
+| Test | Description |
+|------|-------------|
+| `s43 logrn golden: copy case is rewritten` | the Dockerfile COPY alone is renamed (no sibling entrypoint). |
+| `s43 logrn golden: entry case is rewritten` | with a sibling entrypoint both files are healed. |
+| `s43 logrn golden: new case is unchanged` | already on the new name and no entrypoint, detect is false, bytes unchanged. |
+| `s43 logrn golden: partial case heals only the entrypoint` | partial migration heals only the entrypoint. |
+| `s43 logrn golden: copy dockerfile golden equals the issue's literal` | the issue gives the rewritten COPY line as a literal. |
+| `s43 logrn golden: entry entrypoint golden equals the issue's literal` | the issue gives the rewritten source line as a literal. |
+| `s43 logrn golden: entry events are entrypoint_patched then dockerfile_patched` | the issue gives the event order: entrypoint first, then Dockerfile. |
+| `s43 logrn golden: copy events are only dockerfile_patched` | copy-only emits just dockerfile_patched. |
+| `s43 logrn golden: new goldens are empty and the dockerfile equals its fixture` | the new-name case is a no-op: no events, no files, dockerfile == fixture. |
+| `s43 logrn golden: partial keeps the dockerfile bytes and emits only entrypoint_patched` | partial leaves the Dockerfile bytes and emits only entrypoint_patched. |
+| `s43 logrn golden: every fixture has exactly its goldens and no extra` | each logrn fixture has exactly its goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+. /usr/local/lib/base/logging.sh
+exec "$@"
