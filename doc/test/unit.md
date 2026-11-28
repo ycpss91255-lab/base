@@ -5883,7 +5883,7 @@ the outer run's value, which is the wrong mode's value.
 | `_run_pin_coverage: FAILS on a pin with only the ARM64 checksum ARG` | The same rule from the other side, so an either-arch match fails |
 | `_run_pin_coverage: PASSES a pending-allowlisted pin that has no checksum ARG` | The pending allowlist is what keeps main green while a sibling issue lands its checksum; a listed pin with none must pass (fixture list: the real one is empty once every pin has its checksum) |
 
-### test/bats/unit/pin_coverage_lint_spec.bats (82)
+### test/bats/unit/pin_coverage_lint_spec.bats (85)
 
 | Test | Description |
 |------|-------------|
@@ -5944,6 +5944,9 @@ the outer run's value, which is the wrong mode's value.
 | `_run_pin_coverage: a Go test file needs no marker, a non-test Go file still does (base#1530)` | A Go test file is a spec, as a .bats file is, and Go has no `#` comment, so no marker can stand above a line in it: an expected diagnostic such as "t.toml:1:7: x" has the image-reference shape (base#1530). The same version in a Go file that is not a test is still read. |
 | `_run_pin_coverage: a .toml file below a testdata directory needs no marker, a near miss is still read (base#1530)` | A vendored toml-test case below a testdata directory is upstream bytes, so no marker line can be added to it (base#1530). The exemption is keyed on a whole `testdata` path component and on the .toml suffix, so a .toml outside it, a near-miss directory name, and a file named `testdata` are still read. |
 | `_run_pin_coverage: a non-TOML file below a testdata directory is still read (base#1530)` | The testdata exemption is for TOML case bytes only (base#1530). Any other file kind below a testdata directory can carry a marker, so it is still read: exempting the whole directory would hide a real pin there. |
+| `_run_pin_coverage: a file below config-gen testdata/golden needs no marker (base#2360)` | A config-gen golden is the byte-for-byte expected output of the program under test, so the version in it is data that program produced, not a pin this repo depends on, and no marker line can be added without breaking the diff (base#2360). Any extension below testdata/golden/ is therefore not read. |
+| `_run_pin_coverage: a file below config-gen testdata/corpus is still read (base#2360)` | The golden exemption is for testdata/golden only (base#2360). A corpus input below testdata/corpus is not an expected output, so the same line there is still a version this repo names and is read exactly as before. |
+| `_run_pin_coverage: FAILS when a tool-pin marker sits in a file below testdata/golden (base#2360)` | Exempting a file means nothing reads it, so a tool-pin marker written in a golden is a pin its author believes is watched and is not (base#2360). The existing marker-in-an-unscanned-file refusal must therefore still apply there. |
 | `_run_pin_coverage: FAILS when a tool-pin marker sits in a .toml below a testdata directory (base#1530)` | A marker in a testdata .toml would be a belief in watching that nothing reads, now that the walk skips that shape (base#1530), so it is refused. |
 | `_run_pin_coverage: FAILS when a tool-pin marker sits in an unscanned file` | The exemption list is the last hand-kept thing in the scan surface, so a marker in an exempt file is a belief in watching that nothing reads |
 | `_run_pin_coverage: FAILS on a local= version with no marker` | local sat outside the keyword roster while the extraction regex already named it, so the convention pushed authors into the one invisible shape |

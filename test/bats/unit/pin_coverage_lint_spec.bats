@@ -1007,6 +1007,47 @@ _one_good_pin() {
   refute_output --partial 'x.toml'
 }
 
+# why: A config-gen golden is the byte-for-byte expected output of the program
+# under test, so the version in it is data that program produced, not a pin this
+# repo depends on, and no marker line can be added without breaking the diff
+# (base#2360). Any extension below testdata/golden/ is therefore not read.
+@test "_run_pin_coverage: a file below config-gen testdata/golden needs no marker (base#2360)" {
+  _one_good_pin
+  mkdir -p "${SCRATCH}/dockerfile/config-gen/testdata/golden/x"
+  printf 'FROM alpine:3.23\n' > "${SCRATCH}/dockerfile/config-gen/testdata/golden/x/a.dockerfile"
+  _lint
+  assert_success
+  refute_output --partial 'testdata/golden'
+}
+
+# why: The golden exemption is for testdata/golden only (base#2360). A corpus
+# input below testdata/corpus is not an expected output, so the same line there
+# is still a version this repo names and is read exactly as before.
+@test "_run_pin_coverage: a file below config-gen testdata/corpus is still read (base#2360)" {
+  _one_good_pin
+  mkdir -p "${SCRATCH}/dockerfile/config-gen/testdata/corpus/x"
+  printf 'FROM alpine:3.23\n' > "${SCRATCH}/dockerfile/config-gen/testdata/corpus/x/a.Dockerfile"
+  _lint
+  assert_failure
+  assert_output --partial 'dockerfile/config-gen/testdata/corpus/x/a.Dockerfile:1:'
+}
+
+# why: Exempting a file means nothing reads it, so a tool-pin marker written in
+# a golden is a pin its author believes is watched and is not (base#2360). The
+# existing marker-in-an-unscanned-file refusal must therefore still apply there.
+@test "_run_pin_coverage: FAILS when a tool-pin marker sits in a file below testdata/golden (base#2360)" {
+  _one_good_pin
+  mkdir -p "${SCRATCH}/dockerfile/config-gen/testdata/golden/x"
+  printf '%s\n' \
+    '# tool-pin: ghost github-release owner/ghost' \
+    'FROM alpine:3.23' \
+    > "${SCRATCH}/dockerfile/config-gen/testdata/golden/x/a.dockerfile"
+  _lint
+  assert_failure
+  assert_output --partial 'is not scanned'
+  assert_output --partial 'dockerfile/config-gen/testdata/golden/x/a.dockerfile'
+}
+
 # why: A marker in a testdata .toml would be a belief in watching that nothing
 # reads, now that the walk skips that shape (base#1530), so it is refused.
 @test "_run_pin_coverage: FAILS when a tool-pin marker sits in a .toml below a testdata directory (base#1530)" {
