@@ -1,0 +1,6 @@
+rc=0
+mode=absent
+--- file
+--- stdout
+c2507fada1e1bf3a5006833bec38f02ced1c9ec870b62ceb191f2a2d99e738f2
+--- stderr

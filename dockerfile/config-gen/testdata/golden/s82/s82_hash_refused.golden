@@ -1,0 +1,6 @@
+rc=1
+mode=absent
+--- file
+--- stdout
+--- stderr
+ERROR conf_local_override_unusable display="the local conf layer was addressed as <S>/w/missing.toml, which does not exist; refusing to resolve the chain without it rather than emitting the template defaults as if the parameters had been applied"
