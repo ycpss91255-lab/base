@@ -4624,7 +4624,7 @@ _cg_expected_job() {
   case "${1}" in
     self-test)
       CG_IF="${CG_GATES_IF}" CG_STEPS="${_steps}" yq -n -o json -I0 \
-        '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
+        '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
     self-test-redpath)
       CG_IF="${CG_REDPATH_IF}" CG_STEPS="${_steps}" CG_SHARD_LIST="[$(seq -s, 1 "${_n}")]" CG_K="${_k}" \
         yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}",
@@ -5251,6 +5251,21 @@ EOT
   run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include[0].label'
   assert_success
   assert_output ' + rerun, the baseline'
+}
+
+# why: config-gen-gates is the longest image job, and the first one to take its
+# runs-on from classify's runs_on_cpu so the CI_SELF_HOSTED switch decides where
+# it runs; config-gen-redpath followed in base#2271. Every other job keeps its
+# own runs-on until its own child moves it (base#2269, part of base#1586).
+@test "self-test.yaml: only config-gen-gates and config-gen-redpath take runs-on from runs_on_cpu (base#2269, base#2271)" {
+  run _yaml_eval "${WF}" '.jobs["config-gen-gates"]["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates" and .key != "config-gen-redpath") | (.value["runs-on"] // "") | tostring')"
+  assert_failure
 }
 
 # why: select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes
