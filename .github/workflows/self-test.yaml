@@ -259,19 +259,13 @@ jobs:
 
       # Whether a self-hosted job has sat queued too long, so the runner
       # step can fall back to ubuntu-latest (base#2317, part of base#1586).
-      # API errors are swallowed: fleet_stuck.sh then sees no jobs and
-      # answers stuck=false.
+      # fleet_jobs.sh always exits 0: an API error drops those jobs with a
+      # ::warning::, and fleet_stuck.sh then answers stuck=false.
       - id: fleet
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: |
-          set -uo pipefail
-          for status in queued in_progress; do
-            for run_id in $(gh api "repos/${REPO}/actions/runs?status=${status}" --jq '.workflow_runs[].id' 2>/dev/null); do
-              gh api --paginate "repos/${REPO}/actions/runs/${run_id}/jobs" --jq '.jobs[]' 2>/dev/null
-            done
-          done | jq -s . | bash ./script/ci/fleet_stuck.sh >> "${GITHUB_OUTPUT}"
+        run: bash ./script/ci/fleet_jobs.sh | bash ./script/ci/fleet_stuck.sh >> "${GITHUB_OUTPUT}"
 
       # Whether this event's code is trusted enough for a self-hosted
       # runner, and which runs-on that means (base#2268, part of base#1586).
