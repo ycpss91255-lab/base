@@ -1644,6 +1644,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Per-shard job names (compose project, TMPDIR, test-tools tag)
+        # Shards on one cpu-fleet host share the docker daemon; the
+        # workflow-level per-run names collided (image already exists,
+        # network not found), base#2273. job_env.sh gives each shard its own
+        # three names; the echo below is what the CI log checks they win
+        # over the workflow-level env.
+        env:
+          JOB_KEY: coverage-${{ matrix.shard }}
+        run: |
+          ./script/ci/job_env.sh >> "${GITHUB_ENV}"
+          grep -E '^(COMPOSE_PROJECT_NAME|TMPDIR|TEST_TOOLS_IMAGE)=' "${GITHUB_ENV}"
+
+      - name: Show the names in effect
+        run: |
+          echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+          echo "TMPDIR=${TMPDIR}"
+          echo "TEST_TOOLS_IMAGE=${TEST_TOOLS_IMAGE}"
+          echo "runner=${RUNNER_NAME} host=$(hostname)"
+
       - name: Download this run's test-tools image
         # Built once per arch by its test-tools-image builder (base#1588).
         if: needs.test-tools-image-amd64.outputs.produced == 'true'
@@ -1751,6 +1770,11 @@ jobs:
           path: ./coverage
           if-no-files-found: error
           retention-days: 7
+
+      - name: Remove this shard's compose project and TMPDIR
+        if: always()
+        continue-on-error: true
+        run: ./script/ci/job_cleanup.sh
 
       - name: Reclaim this run's docker artifacts
         if: always()
