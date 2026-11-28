@@ -39,7 +39,9 @@ _S82_INPUTLESS=(s82_prune_absent s82_sync_absent s82_sync_mode
   s82_logging_empty_absent)
 
 # _partition_violations -- print one line per corpus input with no golden
-# and per golden with neither an input nor a listed inputless name.
+# and per owned golden (the four prefixes in the case below) with neither an
+# input nor a listed inputless name. Other s82 goldens belong to
+# config_gen_drift_golden_spec.bats and are skipped (base#2372).
 _partition_violations() {
   local _f _stem _n _ok
   for _f in "${TESTDATA}"/corpus/s82/*.gitignore; do
