@@ -1,0 +1,6 @@
+/h/a:/c/a:ro
+/h/a
+:/c
+
+${HOME}/x:/y
+a:b:c
