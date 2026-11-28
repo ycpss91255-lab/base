@@ -5242,10 +5242,19 @@ EOT
 # runs after it would publish its output too late, so the runner step would
 # always see an empty value and never switch (base#2317).
 @test "self-test.yaml: classify runs the fleet step before the runner step (base#2317)" {
-  # Worked literal: the index of each step id in the steps array.
-  run _yaml_eval "${WF}" '[.jobs.classify.steps[] | .id // ""] | index("fleet") as $f | index("runner") as $r | ($f != null and $r != null and $f < $r)'
+  # Worked literal: the step ids in order, one per line, e.g. "fleet\nrunner".
+  run _yaml_eval "${WF}" '.jobs.classify.steps[] | .id // ""'
   assert_success
-  assert_output 'true'
+  local ids=() id fleet_at=-1 runner_at=-1 i=0
+  while IFS= read -r id; do
+    [[ "${id}" == "fleet" ]] && fleet_at="${i}"
+    [[ "${id}" == "runner" ]] && runner_at="${i}"
+    i=$((i + 1))
+  done <<<"${output}"
+  [[ "${fleet_at}" -ge 0 && "${runner_at}" -ge 0 && "${fleet_at}" -lt "${runner_at}" ]] || {
+    echo "fleet at ${fleet_at}, runner at ${runner_at} (need 0 <= fleet < runner)" >&2
+    return 1
+  }
 }
 
 # why: Without FLEET_STUCK in the runner step's env, select_runner.sh sees it
