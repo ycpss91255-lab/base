@@ -285,3 +285,143 @@ _run_fallback_case() {
   assert_output "$(printf '%s\n' \
     'rc=0' 'mode=absent' '--- file' '--- stdout' '--- stderr')"
 }
+
+# ---------------------------------------------------------------------
+# _compute_conf_hash (base#2092, slice S82i)
+#
+# The corpus inputs are the layers: s82_hash_<case>.toml is copied to
+# ${S}/w/setup.toml and s82_hash_<case>.local, when present, to
+# ${S}/w/setup.local.toml. `-` leaves the layer absent. _SETUP_SCRIPT_DIR
+# is unset, so the chain is <dir>/setup.toml then <dir>/setup.local.toml
+# (no template layer). The digest is printed on stdout as `<digest>` LF.
+# The golden format is the one above (mode=absent, empty file section).
+# ---------------------------------------------------------------------
+
+_S82_HASH_INPUTLESS=(s82_hash_absent s82_hash_refused)
+
+# _hash_violations -- _pairing_violations for the s82_hash_*.toml corpus.
+_hash_violations() {
+  _pairing_violations s82_hash_ toml "${_S82_HASH_INPUTLESS[@]}"
+}
+
+# _run_hash_case <name> <setup.toml input|-> <setup.local.toml input|-> [local-override]
+# -- run _compute_conf_hash on ${S}/w and write the actual golden to
+# ${S}/actual/<name>.golden. A fourth argument sets _SETUP_CONF_LOCAL to
+# that path (relative to ${S}/w), the way a caller addresses a layer.
+_run_hash_case() {
+  local _name="${1}" _toml="${2}" _local="${3}" _over="${4:-}" _rc=0
+  rm -rf -- "${S}/w"
+  mkdir -p "${S}/w" "${S}/actual"
+  if [[ "${_toml}" != - ]]; then
+    cp -- "${TESTDATA}/corpus/s82/${_toml}" "${S}/w/setup.toml"
+  fi
+  if [[ "${_local}" != - ]]; then
+    cp -- "${TESTDATA}/corpus/s82/${_local}" "${S}/w/setup.local.toml"
+  fi
+  (
+    export LOG_FORMAT=json
+    unset _SETUP_SCRIPT_DIR _SETUP_CONF_LOCAL
+    [[ -z "${_over}" ]] || export _SETUP_CONF_LOCAL="${S}/w/${_over}"
+    # shellcheck source=dist/script/docker/lib/_lib.sh
+    source /source/dist/script/docker/lib/_lib.sh
+    # shellcheck source=dist/script/docker/lib/resolve.sh
+    source /source/dist/script/docker/lib/resolve.sh
+    local _out=""
+    _compute_conf_hash "${S}/w" _out || exit 1
+    printf '%s\n' "${_out}"
+  ) > "${S}/stdout" 2> "${S}/stderr.raw" || _rc=$?
+  _project_events "${S}/stderr.raw" > "${S}/stderr"
+  {
+    printf 'rc=%d\nmode=absent\n--- file\n--- stdout\n' "${_rc}"
+    cat -- "${S}/stdout"
+    printf -- '--- stderr\n'
+    sed "s|${S}|<S>|g" "${S}/stderr"
+  } > "${S}/actual/${_name}.golden"
+}
+
+# _golden_digest <name> -- the digest line of a stored golden (line 5).
+_golden_digest() {
+  sed -n '5p' "${TESTDATA}/golden/s82/${1}.golden"
+}
+
+# _sha_of <printf-format>... -- sha256 of the literal bytes, from sha256sum
+# over printf, never from the function under test.
+_sha_of() {
+  # shellcheck disable=SC2059
+  printf "$@" | sha256sum | cut -d' ' -f1
+}
+
+# why: a hash corpus input with no golden would be read against nothing,
+# and a stale golden would stand for a case no longer run.
+@test "s82 hash corpus: every input has a golden and every golden an input" {
+  run _hash_violations
+  assert_success
+  assert_output ""
+}
+
+# why: with neither layer present the hash is that of empty input.
+@test "s82 hash: no layer present gives the sha256 of empty input" {
+  _run_hash_case s82_hash_absent - -
+  _assert_golden s82_hash_absent
+}
+
+# why: a lone setup.toml is hashed on its own bytes.
+@test "s82 hash: a lone setup.toml is hashed on its own bytes" {
+  _run_hash_case s82_hash_base s82_hash_base.toml -
+  _assert_golden s82_hash_base
+}
+
+# why: both layers are hashed as setup.toml bytes then setup.local.toml
+# bytes, with no separator.
+@test "s82 hash: both layers are concatenated without a separator" {
+  _run_hash_case s82_hash_both s82_hash_both.toml s82_hash_both.local
+  _assert_golden s82_hash_both
+}
+
+# why: swapping the two layers' contents changes the digest, so the order
+# matters.
+@test "s82 hash: swapping the layer contents changes the hash" {
+  _run_hash_case s82_hash_swapped s82_hash_swapped.toml s82_hash_swapped.local
+  _assert_golden s82_hash_swapped
+}
+
+# why: one changed byte in setup.toml changes the digest.
+@test "s82 hash: one changed byte in setup.toml changes the hash" {
+  _run_hash_case s82_hash_changed s82_hash_changed.toml -
+  _assert_golden s82_hash_changed
+}
+
+# why: one changed byte in setup.local.toml changes the digest.
+@test "s82 hash: one changed byte in setup.local.toml changes the hash" {
+  _run_hash_case s82_hash_localchanged s82_hash_localchanged.toml s82_hash_localchanged.local
+  _assert_golden s82_hash_localchanged
+}
+
+# why: a refused chain (the addressed override cannot be read) gives rc 1
+# and no digest.
+@test "s82 hash: a refused layer chain gives rc 1 and no digest" {
+  _run_hash_case s82_hash_refused - - missing.toml
+  _assert_golden s82_hash_refused
+}
+
+# why: the expected digests as literals computed by sha256sum over
+# printf-built bytes, so a wrong golden cannot pass by being regenerated
+# the same way as the shell wrote it.
+@test "s82 hash: the goldens equal the sha256 of the issue's literal bytes" {
+  run _golden_digest s82_hash_absent
+  assert_output "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  run _golden_digest s82_hash_base
+  assert_output "$(_sha_of '[a]\nx = 1\n')"
+  run _golden_digest s82_hash_both
+  assert_output "$(_sha_of '[a]\nx = 1\n[b]\ny = 2\n')"
+  run _golden_digest s82_hash_swapped
+  assert_output "$(_sha_of '[b]\ny = 2\n[a]\nx = 1\n')"
+  run _golden_digest s82_hash_changed
+  assert_output "$(_sha_of '[a]\nx = 2\n')"
+  run _golden_digest s82_hash_localchanged
+  assert_output "$(_sha_of '[a]\nx = 1\n[b]\ny = 3\n')"
+  run cat "${TESTDATA}/golden/s82/s82_hash_refused.golden"
+  assert_success
+  assert_line --index 0 'rc=1'
+  assert_line --index 4 '--- stderr'
+}
