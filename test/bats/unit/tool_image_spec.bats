@@ -48,7 +48,7 @@ _seed_demo_subtree() {
   printf 'payload v1\n' > "${SUB}/dockerfile/demo-ctx/payload.txt"
   printf 'v0.0.0-test\n' > "${SUB}/.version"
   LIB="${SUB}/dist/script/docker/lib"
-  printf '\ndemo_building\ndemo_build_failed\ndemo_unprovisionable\n' \
+  printf '\ndemo_building\ndemo_build_failed\ndemo_built_concurrently\ndemo_unprovisionable\n' \
     >> "${LIB}/log-events.txt"
   DEMO_DF="${SUB}/dockerfile/Dockerfile.demo"
   DEMO_CTX="${SUB}/dockerfile/demo-ctx"
@@ -172,6 +172,61 @@ printf '%s\n' \"\${_DEMO_RESOLVED}\""
 tool_image_resolve demo"
   assert_refusal 1 demo_build_failed "path=${DEMO_DF}" "status=3" \
     "DEMO-DISPLAY kind=build_failed"
+}
+
+# _mock_docker_race <inspect_ok_from>
+#   build always fails; `image inspect` fails until its <inspect_ok_from>th
+#   call, which and every later one succeed (1 = present from the start is
+#   not used here; 2 = a sibling job finishes the image during our build).
+_mock_docker_race() {
+  local _ok_from="${1:?}"
+  export DOCKER_INSPECT_COUNT="${BATS_TEST_TMPDIR}/inspect.count"
+  : > "${DOCKER_INSPECT_COUNT}"
+  create_mock_dir
+  mock_cmd "docker" \
+    'printf "%s\n" "$*" >> "${DOCKER_LOG}"
+     case "$1" in
+       image) echo x >> "${DOCKER_INSPECT_COUNT}"
+              (( $(wc -l < "${DOCKER_INSPECT_COUNT}") >= '"${_ok_from}"' )) && exit 0
+              exit 1 ;;
+       build) echo "#12 ERROR: image already exists" >&2; exit 1 ;;
+       *) exit 1 ;;
+     esac'
+}
+
+# why: jobs on one CPU host share a docker daemon; the tag is a digest of
+#      the inputs, so when our build loses the naming race the image a
+#      sibling built is the same image. A failed build followed by a
+#      successful inspect is success, reported as an INFO event on stderr
+#      and not as <ns>_build_failed (base#2320).
+@test "tool-image: a failed build whose image then exists returns 0 as <ns>_built_concurrently" {
+  _seed_demo_subtree
+  _mock_docker_race 2
+
+  LOG_FORMAT=json run --separate-stderr bash -c "${DEMO_PRELUDE}
+tool_image_resolve demo"
+  assert_success
+  assert_output ""
+  local _tag
+  _tag="$(_demo_expected_tag)"
+  assert_logged_event demo_built_concurrently "image=${_tag}"
+  refute_stderr_contains demo_build_failed
+  assert_equal "$(grep -c '^build ' "${DOCKER_LOG}")" 1
+  assert_equal "$(grep -c '^image inspect' "${DOCKER_LOG}")" 2
+}
+
+# why: the re-inspect must not turn every failure into success: when the
+#      image is still absent after the failed build the refusal is the
+#      unchanged <ns>_build_failed with status 1 (base#2320).
+@test "tool-image: a failed build whose image is still absent stays <ns>_build_failed" {
+  _seed_demo_subtree
+  _mock_docker_race 99
+
+  LOG_FORMAT=json run --separate-stderr bash -c "${DEMO_PRELUDE}
+tool_image_resolve demo"
+  assert_refusal 1 demo_build_failed "path=${DEMO_DF}" "status=1" \
+    "DEMO-DISPLAY kind=build_failed"
+  refute_stderr_contains demo_built_concurrently
 }
 
 # why: the event id is built from the ns, so every tool refuses under
