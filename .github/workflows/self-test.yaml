@@ -1227,6 +1227,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Per-shard job names (compose project, TMPDIR, test-tools tag, run key)
+        # The 21 shards on one cpu-fleet host share the docker daemon; the
+        # workflow-level per-run names collided (the first shard to finish
+        # reclaimed its siblings' containers, exit 137), base#2272. job_env.sh
+        # gives each shard its own four names.
+        env:
+          JOB_KEY: mutation-roster-${{ matrix.shard }}
+        run: |
+          ./script/ci/job_env.sh >> "${GITHUB_ENV}"
+          grep -E '^(COMPOSE_PROJECT_NAME|TMPDIR|TEST_TOOLS_IMAGE|CI_RUN_KEY)=' "${GITHUB_ENV}"
+
+      - name: Show the names in effect
+        run: |
+          echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+          echo "TMPDIR=${TMPDIR}"
+          echo "TEST_TOOLS_IMAGE=${TEST_TOOLS_IMAGE}"
+          echo "CI_RUN_KEY=${CI_RUN_KEY}"
+          echo "runner=${RUNNER_NAME} host=$(hostname)"
+
       - name: Download this run's test-tools image
         # Built once per arch by its test-tools-image builder (base#1588).
         if: needs.test-tools-image-amd64.outputs.produced == 'true'
@@ -1291,6 +1310,11 @@ jobs:
         if: always()
         continue-on-error: true
         run: ./script/ci/reclaim.sh --run "${CI_RUN_KEY}" --stale 12h
+
+      - name: Remove this shard's compose project and TMPDIR
+        if: always()
+        continue-on-error: true
+        run: ./script/ci/job_cleanup.sh
 
   hadolint:
     # Dedicated Hadolint job (#376). Lints the two template-owned
