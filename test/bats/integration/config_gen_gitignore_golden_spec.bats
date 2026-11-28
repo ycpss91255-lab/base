@@ -19,9 +19,10 @@
 #   <one event per line: SEVERITY body key=value ...>
 #
 # The scratch directory path is written as TMP. Names carry the s82_
-# prefix, since corpus basenames are unique across slices. The cases here
-# emit no event, so stderr is empty and no event field needs dropping;
-# later children that pin events add that normalisation.
+# prefix, since corpus basenames are unique across slices. A JSON event
+# line is projected by _project_stream to `SEVERITY body key=value ...`
+# without timestamp, code.* and thread.id, which change on every run
+# (base#2086).
 
 bats_require_minimum_version 1.5.0
 
@@ -76,10 +77,29 @@ _write_actual() {
     printf 'rc=%d\nmode=%s\n--- file\n' "${_rc}" "${_m}"
     if [[ -e "${_tgt}" ]]; then cat -- "${_tgt}"; fi
     printf -- '--- stdout\n'
-    sed "s|${S}/w|TMP|g" "${S}/stdout"
+    _project_stream "${S}/stdout"
     printf -- '--- stderr\n'
-    sed "s|${S}/w|TMP|g" "${S}/stderr"
+    _project_stream "${S}/stderr"
   } > "${S}/actual/${_name}.golden"
+}
+
+# _project_stream <file> -- print <file> with the work dir path replaced by
+# TMP. A JSON event line is reduced to `SEVERITY body key=value ...` (the
+# attributes, sorted by key), so timestamp, code.* and thread.id, which
+# change on every run, never reach the golden (base#2086). Any other line
+# is copied as is.
+_project_stream() {
+  local _line
+  while IFS= read -r _line || [[ -n "${_line}" ]]; do
+    if [[ "${_line}" == '{'* ]]; then
+      jq -r '[.severity_text, .body]
+        + [ .attributes // {} | to_entries | sort_by(.key)[]
+            | select(.key | test("^(code\\.|thread\\.id$)") | not)
+            | "\(.key)=\(.value)" ] | join(" ")' <<< "${_line}"
+    else
+      printf '%s\n' "${_line}"
+    fi
+  done < "${1}" | sed "s|${S}/w|TMP|g"
 }
 
 # _run_case <name> <target-mode|-> <override-retired:yes|no> <input|->
@@ -358,4 +378,29 @@ _assert_golden() {
   _run_logging_case s82_logging_unterminated s82_logging_unterminated.gitignore \
     "local_path=log/a" ""
   _assert_golden s82_logging_unterminated
+}
+
+# why: a legacy unbounded block is migrated to begin/end markers; the stale
+# /stale/ below it is left outside the block and named in an orphans WARN,
+# while the non-/dir/ line `user` is not named (base#2086).
+@test "s82 logging: a legacy block is migrated and a stale dir is reported" {
+  _run_logging_case s82_logging_legacy_orphan s82_logging_legacy_orphan.gitignore \
+    "local_path=log/a/" ""
+  _assert_golden s82_logging_legacy_orphan
+}
+
+# why: a second orphan shape: a /deploy/ line below the legacy block is
+# reported the same way (base#2086).
+@test "s82 logging: a legacy block with a deploy dir below reports it" {
+  _run_logging_case s82_logging_legacy_deploy s82_logging_legacy_deploy.gitignore \
+    "local_path=log/a/" ""
+  _assert_golden s82_logging_legacy_deploy
+}
+
+# why: nothing below the legacy block means the migration INFO only, no
+# orphans WARN (base#2086).
+@test "s82 logging: a legacy block with nothing below emits no orphans" {
+  _run_logging_case s82_logging_legacy_clean s82_logging_legacy_clean.gitignore \
+    "local_path=log/a/" ""
+  _assert_golden s82_logging_legacy_clean
 }
