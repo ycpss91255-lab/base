@@ -1917,6 +1917,15 @@ jobs:
           JOB_KEY: acceptance-${{ matrix.arch }}
         run: ./script/ci/job_env.sh >> "${GITHUB_ENV}"
 
+      - name: Print this job's compose project, tooling image and run key
+        # COMPOSE_PROJECT_NAME, TEST_TOOLS_IMAGE and CI_RUN_KEY are also set
+        # at workflow level; the CI log of this step shows the per-job
+        # values job_env.sh appended to GITHUB_ENV won, base#2270.
+        run: |
+          echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+          echo "TEST_TOOLS_IMAGE=${TEST_TOOLS_IMAGE}"
+          echo "CI_RUN_KEY=${CI_RUN_KEY}"
+
       - name: Set up Docker Buildx
         # Use the docker driver (not docker-container) so the run-scoped
         # test-tools image lives in the host docker daemon's image store. The subsequent
