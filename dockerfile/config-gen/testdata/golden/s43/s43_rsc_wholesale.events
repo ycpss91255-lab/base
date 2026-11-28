@@ -1,0 +1,2 @@
+dockerfile_patched	  Dockerfile patched: test/smoke/ -> per-stage smoke COPYs under test/bats/smoke/ (#1044)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (repo_smoke_copy), 1 file(s) rewritten	matched=1	available=16	names=repo_smoke_copy	rewritten=1
