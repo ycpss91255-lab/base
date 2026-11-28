@@ -1,0 +1,1 @@
+dockerfile_patched	  Dockerfile patched: dropped redundant explicit lib/wrapper COPY(s) (#567 m3)
