@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **426 tests**.
+Integration specs under `test/bats/integration/`: **432 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -132,7 +132,7 @@ stated expectation and a stale row can never stand for a deleted one.
 | `config-gen binary on a size-limited stdout exits 4 with one frame and a golden prefix` | the Go fault writer covers a write that fails at byte N in-process; this is the same contract on the built binary against a real file whose size limit (RLIMIT_FSIZE via prlimit) lets it take some bytes and then refuse with EFBIG, which /dev/full (0 bytes, ENOSPC) can not show. The answer is exit 4, exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations), and a non-empty stdout that is a strict prefix of the bridge golden (base#1469 I/O contract). SIGXFSZ is ignored so the write returns EFBIG instead of killing the process. prlimit must be on PATH in every environment the spec runs in (test-tools installs util-linux-misc); a missing prlimit fails here, it is never skipped. The same /dev/full and prlimit cases also run under `go test` in Dockerfile.config-gen's test stage (TestTablesDevFullStdoutIsExit4AndOneFrame, TestTablesSizeLimitedStdoutIsExit4AndAGoldenPrefix); this leg holds the shipped static binary to them. |
 | `config-gen binary on a closed stdout pipe exits 4 with one frame, not SIGPIPE` | prlimit and /dev/full fail the write on a file; a reader that is gone is the fourth way the single answer write fails, and the only one a signal can end first: a pipe whose read end is closed before the binary starts, as in `config-gen tables ... \| true`. The binary must not be killed by SIGPIPE (rc 141 from the shell, nothing on stderr); it exits 4 with exactly one `config_gen_output_failed` frame naming the --name label with an empty key (_refusal_violations; stdout is the failing sink, so `-`) (base#1469 I/O contract). The golden is more than 65536 bytes, the default pipe buffer, so the case can not pass by the answer fitting into the buffer before the reader goes. |
 
-### test/bats/integration/config_gen_drift_golden_spec.bats (8)
+### test/bats/integration/config_gen_drift_golden_spec.bats (14)
 
 Before any Go code replaces the drift parsing, today's shell behaviour is
 pinned as goldens. The shell function is the oracle: this spec re-runs it on
@@ -162,6 +162,12 @@ stubbed (HASHNOW, DFNOW, false, false).
 | `s82 drift: the five-difference golden equals the issue's literal events` | the expected events as literals from the issue, so a wrong golden cannot pass by being regenerated the same way as the shell wrote it. |
 | `s82 drift: a duplicated SETUP_CONF_HASH is reported as drift` | SETUP_CONF_HASH twice with the same value is read as the two-line string HASHNOW LF HASHNOW, which differs from the current HASHNOW, so it is reported as drift. |
 | `s82 drift: a repeated GPU_ENABLED keeps its embedded newline` | GPU_ENABLED=false then GPU_ENABLED=true is read as the two-line value false LF true, kept with its embedded newline in the one detail. |
+| `s82 fallback corpus: every input has a golden and every golden an input` | a fallback corpus input with no golden would be read against nothing, and a stale golden would stand for a case no longer run. |
+| `s82 fallback: an absent setup.toml gives conf_no_repo_conf` | with no setup.toml the notice is conf_no_repo_conf, rc 0, nothing on stdout. |
+| `s82 fallback: a setup.toml without a header gives conf_empty_repo_conf` | a setup.toml with no [section] header gives conf_empty_repo_conf. |
+| `s82 fallback: an indented header reports nothing` | an indented [x] counts as a header, so no event. |
+| `s82 fallback: an empty setup.toml gives conf_empty_repo_conf` | an empty setup.toml has no header, so conf_empty_repo_conf. |
+| `s82 fallback: the goldens equal the issue's literal events` | the expected events as literals from the issue, so a wrong golden cannot pass by being regenerated the same way as the shell wrote it. |
 
 ### test/bats/integration/config_gen_gitignore_golden_spec.bats (21)
 
