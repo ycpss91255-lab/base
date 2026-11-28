@@ -3876,13 +3876,14 @@ exit $?`; a failing pre-exec hook aborts before `compose exec` runs).
 | `exec.sh post-exec hook failure still overrides a non-zero container rc (#956)` | - |
 | `exec.sh aborts on a failing pre-exec hook and skips compose exec (#690)` | - |
 
-### test/bats/unit/fleet_jobs_spec.bats (3)
+### test/bats/unit/fleet_jobs_spec.bats (4)
 
 | Test | Description |
 |------|-------------|
 | `fleet_jobs.sh: merges the jobs of several runs into one array (base#2317)` | fleet_stuck.sh reads one array, but the API lists jobs per run. Runs from both the queued and the in-progress listing must all land in that array, or a stuck job in the second listing is never seen (base#2317). |
 | `fleet_jobs.sh: a failing run keeps the other runs' jobs and warns with its id (base#2317)` | One run can answer 403/404 (another workflow, a deleted run). Dropping every run's jobs for that would hide a stuck fleet, so only the failing run is skipped and its id is named in a warning (base#2317). |
 | `fleet_jobs.sh: total API failure prints [] and exits 0 (base#2317)` | When the API is down or the token lacks actions: read, the step must still produce valid input for fleet_stuck.sh and must not fail classify: `[]`, exit 0 (base#2317). |
+| `fleet_jobs.sh: lists runs of each status with per_page=20 (base#2317)` | AC1 caps the listing at 20 runs per status; without per_page=20 the API default (30) is read and a long queue is walked run by run (base#2317). |
 
 ### test/bats/unit/fleet_stuck_spec.bats (8)
 
@@ -7810,7 +7811,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: classify runs the fleet step before the runner step (base#2317)` | The runner step reads steps.fleet.outputs.stuck. A step that exists but runs after it would publish its output too late, so the runner step would always see an empty value and never switch (base#2317). |
 | `self-test.yaml: classify runner step passes FLEET_STUCK from the fleet step (base#2317)` | Without FLEET_STUCK in the runner step's env, select_runner.sh sees it unset and always answers the cpu fleet, however stuck it is (base#2317). |
 | `self-test.yaml: classify permissions include actions: read (base#2317)` | listing a repo's runs and their jobs through gh api needs the actions: read scope. classify's block replaces the workflow-level one, so without the line the API call is refused and the step can only fail open to stuck=false, which never switches (base#2317). |
-| `self-test.yaml: classify fleet step calls script/ci/fleet_jobs.sh (base#2317)` | CI run 46092523272 showed the inlined fleet loop exiting 1 after 4s, which failed classify and skipped every downstream job. The loop lives in script/ci/fleet_jobs.sh, which always exits 0 and is unit-tested; the step must call it (base#2317). |
+| `self-test.yaml: classify fleet step calls script/ci/fleet_jobs.sh (base#2317)` | CI run 46092523272 showed the inlined fleet loop exiting 1 after 4s, which failed classify and skipped every downstream job. The loop now lives in script/ci/fleet_jobs.sh, which always exits 0 and is unit-tested; the step must call it (base#2317). |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 
