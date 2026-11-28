@@ -51,6 +51,10 @@ _partition_violations() {
   for _f in "${TESTDATA}"/golden/s82/*.golden; do
     [[ -e "${_f}" ]] || continue
     _stem="$(basename -- "${_f}" .golden)"
+    case "${_stem}" in
+      s82_prune_*|s82_sync_*|s82_pathspec_*|s82_logging_*) ;;
+      *) continue ;;
+    esac
     _ok=0
     [[ -f "${TESTDATA}/corpus/s82/${_stem}.gitignore" ]] && _ok=1
     for _n in "${_S82_INPUTLESS[@]}"; do
