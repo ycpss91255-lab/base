@@ -437,6 +437,25 @@ empty API answer).
 | `name_host_groups: a nameless gid triggers sudo groupadd hostgrp<gid>` | #589 behaviour (mocked) |
 | `name_host_groups: a named gid does not trigger groupadd` | #589 idempotent skip (mocked) |
 
+### test/bats/unit/bridge_call_sites_spec.bats (7)
+
+the Go config-gen path replaces bridge call sites one by one while both
+paths coexist; without an inventory, progress is only answerable by grep.
+The spec scans dist/ for non-comment call sites outside toml_bridge.sh and
+compares the `file:line` set with the first column of the inventory table.
+Expected rows below are the worked literals from the issue, not recomputed
+from the scan.
+
+| Test | Description |
+|------|-------------|
+| `inventory doc exists` | the inventory is the artefact base#1939 asks for; every other case reads it, so its absence must fail on its own line. |
+| `the real tree and the inventory agree` | the load-bearing case: it ties the doc to the dist/ scan so a new or removed bridge call site cannot land without a row (base#1939). |
+| `each known call site has exactly one row with its slice` | pins the ten call sites named in the issue to their slice, so a row cannot be dropped or re-slotted silently. |
+| `config-gen command and status columns are never empty` | a row without a Go command or status is an inventory that maps nothing; this stops placeholders being left blank. |
+| `an unlisted call site fails the spec and names its file:line` | proves the scan detects an unlisted site and tells the author where, not just that something is wrong. |
+| `a stale row fails the spec and names its file:line` | proves a row whose call site is gone is reported, so the doc cannot rot after a refactor. |
+| `a duplicate row fails the spec` | proves one site cannot be listed twice, which would hide a missing neighbour behind a matching count. |
+
 ### test/bats/unit/build_sh_base_self_spec.bats (2)
 
 build.sh in the base self-use topology (#713): base is the template SOURCE,
@@ -3876,6 +3895,15 @@ exit $?`; a failing pre-exec hook aborts before `compose exec` runs).
 | `exec.sh post-exec hook failure still overrides a non-zero container rc (#956)` | - |
 | `exec.sh aborts on a failing pre-exec hook and skips compose exec (#690)` | - |
 
+### test/bats/unit/fleet_jobs_spec.bats (4)
+
+| Test | Description |
+|------|-------------|
+| `fleet_jobs.sh: merges the jobs of several runs into one array (base#2317)` | fleet_stuck.sh reads one array, but the API lists jobs per run. Runs from both the queued and the in-progress listing must all land in that array, or a stuck job in the second listing is never seen (base#2317). |
+| `fleet_jobs.sh: a failing run keeps the other runs' jobs and warns with its id (base#2317)` | One run can answer 403/404 (another workflow, a deleted run). Dropping every run's jobs for that would hide a stuck fleet, so only the failing run is skipped and its id is named in a warning (base#2317). |
+| `fleet_jobs.sh: total API failure prints [] and exits 0 (base#2317)` | When the API is down or the token lacks actions: read, the step must still produce valid input for fleet_stuck.sh and must not fail classify: `[]`, exit 0 (base#2317). |
+| `fleet_jobs.sh: lists runs of each status with per_page=20 (base#2317)` | AC1 caps the listing at 20 runs per status; without per_page=20 the API default (30) is read and a long queue is walked run by run (base#2317). |
+
 ### test/bats/unit/fleet_stuck_spec.bats (8)
 
 A wrong `true` moves a healthy run to the hosted pool, and a wrong `false`
@@ -4132,7 +4160,7 @@ itself (`git check-attr`) which rule wins.
 | `_sync_gitattributes: a rewrite that cannot take the file's mode is abandoned, file unchanged (base#2246)` | A rewrite that cannot take the file's mode would land a 0600 file over the repo's own; abandoning it is the only safe answer |
 | `gitattributes: the events the sync can raise are registered (base#2246)` | _log_* is strict -- an unregistered event prints the registry's refusal instead of the message that says what is wrong with the file |
 
-### test/bats/unit/githooks_spec.bats (13)
+### test/bats/unit/githooks_spec.bats (19)
 
 Unit tests for the local git hooks (`.githooks/pre-push`) and their
 installer (`script/githooks/install.sh`). The pre-push hook is the first,
@@ -4149,6 +4177,12 @@ silently disable hooks that are already in use.
 | `pre-push: blocks a pushed commit that is bad even when the working tree is fixed` | The hook checks the commit being pushed, not the working tree: a fix that is only in the working tree does not reach the remote |
 | `pre-push: allows a pushed commit that is good even when the working tree is broken` | An unstaged mistake in the working tree is not what is pushed, so it does not block a good commit |
 | `pre-push: a branch deletion is not checked` | Deleting a remote branch pushes no commit, so there is nothing to check |
+| `pre-push: blocks a tag whose name is not vX.Y.Z or vX.Y.Z-rcN` | A tag outside vX.Y.Z / vX.Y.Z-rcN is stopped before it reaches the remote, with the format printed, instead of failing the release later. |
+| `pre-push: allows a tag named vX.Y.Z or vX.Y.Z-rcN` | The accepted shapes must still push. |
+| `pre-push: a tag deletion is not checked` | Deleting a badly named tag is how it gets cleaned up, so it is never blocked. |
+| `pre-push: a branch named like a bad tag is not checked as a tag` | The name rule is for tags; a branch called v1.0 is not a release. |
+| `pre-push: a bad tag on a commit already pushed in the same push is still blocked` | `git push --follow-tags` sends the branch and its tag on one commit; skipping a commit already checked must not skip the tag's name. |
+| `pre-push: the pushed tag name is the remote ref, not the local one` | `git push origin v1.2.3:refs/tags/v1.0` creates `v1.0` on the remote; the name that matters is the remote ref, not the local one. |
 | `pre-push: is tracked as an executable file` | The hook must be executable in the index, or git skips it on Linux and macOS checkouts |
 | `install: sets core.hooksPath to .githooks in the local config` | One command turns the hooks on, in this repo's own config only |
 | `install: is idempotent` | Running the installer twice is harmless |
@@ -4732,7 +4766,7 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `job_cleanup: TMPDIR without /job- is refused, nothing removed` | base#2275 -- a TMPDIR without the /job- prefix (e.g. the shared /tmp) must never be deleted. |
 | `job_cleanup: script text has no system prune, docker rm or network rm` | base#2275 -- scope limit: only the one project, never a global prune or an unscoped removal. |
 
-### test/bats/unit/job_env_spec.bats (11)
+### test/bats/unit/job_env_spec.bats (13)
 
 Several cpu-runner jobs share one sibling docker daemon, so a fixed compose
 project name or /tmp path lets two jobs trample each other. The project name
@@ -4741,7 +4775,9 @@ RUNNER_TEMP so sibling containers can see it, base#2274.
 
 | Test | Description |
 |------|-------------|
-| `job_env: worked example prints exactly the two documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
+| `job_env: worked example prints exactly the three documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
+| `job_env: different JOB_KEY values give different TEST_TOOLS_IMAGE` | Jobs on one host share one docker daemon, so a shared test-tools image tag makes concurrent builds fail with "already exists"; each job needs its own tag, base#2321. |
+| `job_env: TEST_TOOLS_IMAGE and COMPOSE_PROJECT_NAME share one id` | The image tag and the compose project must carry the same <run>-<attempt>-<slug> id so one job's resources can be traced together; a diverging id would break that link, base#2321. |
 | `job_env: creates the TMPDIR directory` | The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274. |
 | `job_env: different JOB_KEY values give different output` | Distinct jobs of one run must not share a compose project or TMPDIR, which is the whole reason the script exists, base#2274. |
 | `job_env: every non-alphanumeric character becomes one dash, none collapsed or trimmed` | The slug rule is one '-' per non-alphanumeric character with no collapsing or trimming; a realistic matrix JOB_KEY with multi and edge separators pins it, base#2274. |
@@ -7240,7 +7276,7 @@ alias / `network.network_name` / `devices.device_` / `security.cap_add_` /
 | `_schema_validate gates the [security] keys the resolver reads (#876)` | - |
 | `_schema_validate gates image.rule_N against the dispatch prefixes (#876)` | - |
 
-### test/bats/unit/select_runner_spec.bats (24)
+### test/bats/unit/select_runner_spec.bats (29)
 
 A wrong `true` hands a fork's code to a self-hosted runner, and a wrong
 `false` silently moves every run to the hosted pool. Each row of the issue's
@@ -7272,6 +7308,11 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: schedule with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | An unlisted event is untrusted, so the switch cannot lift it onto self-hosted (base#2266). |
 | `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
 | `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
+| `select_runner.sh: trusted + FLEET_STUCK=true selects ubuntu-latest with a notice (base#2316)` | When the CPU fleet is stuck a trusted event must move to hosted so the run does not queue forever, and the notice tells the run page why (base#2316). |
+| `select_runner.sh: a fork pull_request + FLEET_STUCK=true stays not trusted (base#2316)` | FLEET_STUCK only changes the pool, never the trust verdict, so a fork stays untrusted (base#2316). |
+| `select_runner.sh: trusted + FLEET_STUCK=false still selects the cpu fleet (base#2316)` | false is the healthy-fleet answer of fleet_stuck.sh and must behave exactly like an unset variable, with no stderr (base#2316). |
+| `select_runner.sh: trusted + FLEET_STUCK=yes is ignored with a warning (base#2316)` | An unknown value must not move runs to hosted by accident, so it is read as false and the warning names the value (base#2316). |
+| `select_runner.sh: CI_SELF_HOSTED=off + FLEET_STUCK=true selects ubuntu-latest with only the notice (base#2316)` | With the master switch off the answer is already hosted, so FLEET_STUCK=true adds only the notice and nothing else on stderr (base#2316). |
 
 ### test/bats/unit/self_hosted_guard_lint_spec.bats (28)
 
@@ -7306,7 +7347,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (167)
+### test/bats/unit/self_test_yaml_spec.bats (172)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7793,6 +7834,11 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: ci-rollup needs single-issue-pr and classify never gates it (base#1629)` | Branch protection requires ci-rollup alone. A single-issue-pr job outside its needs would be a check nobody is blocked by, and a select_single_issue_pr key would let classify skip it on a doc-only PR, which is exactly where a bundled PR slips through (base#1629). |
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
 | `self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)` | classify is where the runner choice is made once for the whole workflow. It must run script/ci/select_runner.sh in a step `runner` and publish its two lines as job outputs, so later children can read them without re-deriving trust (base#2268, part of base#1586). |
+| `self-test.yaml: classify has a step with id fleet (base#2317)` | select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes it unless classify runs a step that lists the queued and in-progress runs' jobs and hands them to fleet_stuck.sh. Without a step `fleet`, the env stays empty and a dead CPU host keeps every job queued forever instead of falling back to ubuntu-latest (base#2317, part of base#1586). |
+| `self-test.yaml: classify runs the fleet step before the runner step (base#2317)` | The runner step reads steps.fleet.outputs.stuck. A step that exists but runs after it would publish its output too late, so the runner step would always see an empty value and never switch (base#2317). |
+| `self-test.yaml: classify runner step passes FLEET_STUCK from the fleet step (base#2317)` | Without FLEET_STUCK in the runner step's env, select_runner.sh sees it unset and always answers the cpu fleet, however stuck it is (base#2317). |
+| `self-test.yaml: classify permissions include actions: read (base#2317)` | listing a repo's runs and their jobs through gh api needs the actions: read scope. classify's block replaces the workflow-level one, so without the line the API call is refused and the step can only fail open to stuck=false, which never switches (base#2317). |
+| `self-test.yaml: classify fleet step calls script/ci/fleet_jobs.sh (base#2317)` | CI run 46092523272 showed the inlined fleet loop exiting 1 after 4s, which failed classify and skipped every downstream job. The loop now lives in script/ci/fleet_jobs.sh, which always exits 0 and is unit-tested; the step must call it (base#2317). |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 
@@ -9655,7 +9701,7 @@ handing the extractor exactly them.
 | `toml-fixture: has a lint-static CI join` | One plain-runner lint group, no docker -- and exactly one, because none gates nothing and two pays twice |
 | `toml-fixture: its failure event id is registered` | An unregistered event id is an anonymous exit: the log line carries no name a reader can look up |
 
-### test/bats/unit/tool_image_spec.bats (8)
+### test/bats/unit/tool_image_spec.bats (10)
 
 the TOML bridge provisions its image from the shipped Dockerfile under a
 content-digest tag; the config generator needs the same, with a build
@@ -9679,6 +9725,8 @@ docker is a mock that records its argv. Unit level (ADR-00000018).
 | `tool-image: the profile's override variable is used verbatim, with no docker call` | the override and memo are the profile's variables, not a tool's literal names: a non-empty override wins verbatim with no docker call, and the memo is the named global. |
 | `tool-image: the profile's memo variable holds the resolution for the shell` | the memo variable is a profile field; a helper that memoised under a fixed name would make two tools share one slot. A second resolve in the same shell reads the profile's variable and asks docker nothing. |
 | `tool-image: a failed build carries the display callback text and returns 1` | the shim's display callback writes the text; the helper owns the event id, attributes and the folded builder output, and returns 1. |
+| `tool-image: a failed build whose image then exists returns 0 as <ns>_built_concurrently` | jobs on one CPU host share a docker daemon; the tag is a digest of the inputs, so when our build loses the naming race the image a sibling built is the same image. A failed build followed by a successful inspect is success, reported as an INFO event on stderr and not as <ns>_build_failed (base#2320). |
+| `tool-image: a failed build whose image is still absent stays <ns>_build_failed` | the re-inspect must not turn every failure into success: when the image is still absent after the failed build the refusal is the unchanged <ns>_build_failed with status 1 (base#2320). |
 | `tool-image: a missing Dockerfile refuses as <ns>_unprovisionable` | the event id is built from the ns, so every tool refuses under its own name, with the shim's display text and the missing path. |
 | `tool-image: the bridge with TOML_BRIDGE_IMAGE= derives and inspects` | TOML_BRIDGE_IMAGE set but empty counts as unset, as it does today: the bridge derives and inspects. Pinned here because the bridge now reaches the override through the helper. |
 | `tool-image: the toml_bridge wrapper and tool_image_derive toml_bridge agree` | the bridge's functions are wrappers over the helper, so the bridge and the helper name the same tag. |
