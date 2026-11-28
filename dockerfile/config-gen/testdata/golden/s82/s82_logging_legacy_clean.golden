@@ -1,0 +1,9 @@
+rc=0
+mode=644
+--- file
+# managed by template: [logging] local_path begin (do not remove)
+/log/a/
+# managed by template: [logging] local_path end (do not remove)
+--- stdout
+INFO gitignore_managed_block_migrated display=TMP/.gitignore: migrated the [logging] local_path block to explicit begin/end markers. path=TMP/.gitignore service.lang=bash service.name=init
+--- stderr
