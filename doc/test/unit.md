@@ -7338,7 +7338,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (168)
+### test/bats/unit/self_test_yaml_spec.bats (170)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7826,6 +7826,8 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
 | `self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)` | classify is where the runner choice is made once for the whole workflow. It must run script/ci/select_runner.sh in a step `runner` and publish its two lines as job outputs, so later children can read them without re-deriving trust (base#2268, part of base#1586). |
 | `self-test.yaml: coverage runs-on comes from classify runs_on_cpu and the rest of the job is unchanged (base#2273)` | coverage is the kcov shard PRIMARY gate; its runner now comes from classify's runs_on_cpu (ubuntu-latest when the switch is off, a fork or an untrusted event), and nothing else about the job may move (base#2273, part of base#1586). |
+| `self-test.yaml: coverage shard exports per-shard job names via job_env.sh before the first docker step (base#2273)` | the cpu fleet runs several coverage shards on one host and one docker daemon, so the workflow-level TEST_TOOLS_IMAGE and COMPOSE_PROJECT_NAME (one per run) collided between shards: 'image test-tools:ci-46086266476-1 already exists', 'network base-ci-46086266476-1_default not found', exit 137 (run 46086266476). Each shard must take its own names from script/ci/job_env.sh before its first docker step (base#2273, base#2274, base#2321). |
+| `self-test.yaml: coverage shard removes its own compose project and TMPDIR in an always() step (base#2273)` | - |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 

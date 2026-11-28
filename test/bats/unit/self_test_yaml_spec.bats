@@ -5253,3 +5253,37 @@ EOT
   assert_success
   assert_output '${{ fromJSON(needs.compute-shards.outputs.shards) }}'
 }
+
+# why: the cpu fleet runs several coverage shards on one host and one docker
+# daemon, so the workflow-level TEST_TOOLS_IMAGE and COMPOSE_PROJECT_NAME
+# (one per run) collided between shards: 'image test-tools:ci-46086266476-1
+# already exists', 'network base-ci-46086266476-1_default not found', exit 137
+# (run 46086266476). Each shard must take its own names from
+# script/ci/job_env.sh before its first docker step (base#2273, base#2274,
+# base#2321).
+@test "self-test.yaml: coverage shard exports per-shard job names via job_env.sh before the first docker step (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .env.JOB_KEY'
+  assert_success
+  assert_output 'coverage-${{ matrix.shard }}'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.coverage.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/obtain_test_tools.sh")) | .key'
+  assert_success
+  obtain_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  [[ "${obtain_idx}" =~ ^[0-9]+$ ]]
+  [ "${job_env_idx}" -lt "${obtain_idx}" ]
+}
+
+@test "self-test.yaml: coverage shard removes its own compose project and TMPDIR in an always() step (base#2273)" {
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  run _yaml_eval "${WF}" '.jobs.coverage.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .run'
+  assert_success
+  assert_output --partial './script/ci/job_cleanup.sh'
+}
