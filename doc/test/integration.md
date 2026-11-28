@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **432 tests**.
+Integration specs under `test/bats/integration/`: **433 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -169,7 +169,7 @@ stubbed (HASHNOW, DFNOW, false, false).
 | `s82 fallback: an empty setup.toml gives conf_empty_repo_conf` | an empty setup.toml has no header, so conf_empty_repo_conf. |
 | `s82 fallback: the goldens equal the issue's literal events` | the expected events as literals from the issue, so a wrong golden cannot pass by being regenerated the same way as the shell wrote it. |
 
-### test/bats/integration/config_gen_gitignore_golden_spec.bats (21)
+### test/bats/integration/config_gen_gitignore_golden_spec.bats (22)
 
 Before any Go code replaces the gitignore parsing, today's shell behaviour
 is pinned as goldens. The shell function is the oracle: this spec re-runs it
@@ -189,6 +189,7 @@ that pin events add that normalisation.
 | Test | Description |
 |------|-------------|
 | `s82 corpus: every input has a golden and every golden an input` | a fixture with no golden would be read against nothing, and a stale golden would stand for a case no longer run. |
+| `s82 corpus: an orphan golden with an owned prefix fails the pairing check` | the pairing check covers only the goldens this spec owns (the s82_prune_, s82_sync_, s82_pathspec_ and s82_logging_ names). In a scratch copy of the s82 data, which also holds the drift and fallback goldens that config_gen_drift_golden_spec.bats owns, an orphan golden with an owned prefix is the only violation reported; the other specs' goldens are not flagged (base#2372). |
 | `s82 prune: retired entries go below the marker only` | the managed half is the lines below the marker; the entry above it is the user's own and stays, both retired entries below go, the missing final newline is added, and the file keeps mode 640 (base#1356). |
 | `s82 prune: a file with no marker is unchanged` | with no marker nothing is claimed as managed, so nothing is pruned. |
 | `s82 prune: an absent target is a no-op and creates no file` | an absent target is a no-op: rc 0 and no file is created. |
