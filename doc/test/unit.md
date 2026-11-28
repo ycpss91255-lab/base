@@ -1363,7 +1363,7 @@ open.
 | `preflight --list: annotates a conditional requirement with its guard (#801)` | - |
 | `preflight: a malformed conditional guard (no '=') fails loudly as a config error (exit 2), never silently skipped (#801)` | - |
 
-### test/bats/unit/ci_reclaim_spec.bats (15)
+### test/bats/unit/ci_reclaim_spec.bats (16)
 
 Ownership-scoped CI-host garbage collection (`script/ci/reclaim.sh`, #900).
 `runs-on: ubuntu-latest` gives every job a fresh single-tenant VM, so no run
@@ -1380,6 +1380,7 @@ between them can be asserted at all.
 | `reclaim.sh rejects a --stale window that is not a duration` | - |
 | `reclaim.sh --run removes this run's artifacts across all four kinds` | - |
 | `reclaim.sh --run leaves a CONCURRENT run's artifacts alone (the trap)` | - |
+| `reclaim.sh --run with a per-job key spares sibling jobs on the same host` | - |
 | `reclaim.sh --run does not mistake attempt 10 for attempt 1` | - |
 | `reclaim.sh --run finds an artifact by its ownership label alone` | - |
 | `reclaim.sh --run never issues a blanket prune` | - |
@@ -4766,7 +4767,7 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `job_cleanup: TMPDIR without /job- is refused, nothing removed` | base#2275 -- a TMPDIR without the /job- prefix (e.g. the shared /tmp) must never be deleted. |
 | `job_cleanup: script text has no system prune, docker rm or network rm` | base#2275 -- scope limit: only the one project, never a global prune or an unscoped removal. |
 
-### test/bats/unit/job_env_spec.bats (13)
+### test/bats/unit/job_env_spec.bats (14)
 
 Several cpu-runner jobs share one sibling docker daemon, so a fixed compose
 project name or /tmp path lets two jobs trample each other. The project name
@@ -4775,9 +4776,10 @@ RUNNER_TEMP so sibling containers can see it, base#2274.
 
 | Test | Description |
 |------|-------------|
-| `job_env: worked example prints exactly the three documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
+| `job_env: worked example prints exactly the four documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
 | `job_env: different JOB_KEY values give different TEST_TOOLS_IMAGE` | Jobs on one host share one docker daemon, so a shared test-tools image tag makes concurrent builds fail with "already exists"; each job needs its own tag, base#2321. |
 | `job_env: TEST_TOOLS_IMAGE and COMPOSE_PROJECT_NAME share one id` | The image tag and the compose project must carry the same <run>-<attempt>-<slug> id so one job's resources can be traced together; a diverging id would break that link, base#2321. |
+| `job_env: CI_RUN_KEY is the COMPOSE_PROJECT_NAME id without the ci- prefix` | reclaim.sh claims resources by this key; a key shared by the whole run lets the first job to finish remove containers of sibling jobs on the same host (run 46112164146, exit 137), so the key must carry the same per-job id as the compose project, base#2328. |
 | `job_env: creates the TMPDIR directory` | The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274. |
 | `job_env: different JOB_KEY values give different output` | Distinct jobs of one run must not share a compose project or TMPDIR, which is the whole reason the script exists, base#2274. |
 | `job_env: every non-alphanumeric character becomes one dash, none collapsed or trimmed` | The slug rule is one '-' per non-alphanumeric character with no collapsing or trimming; a realistic matrix JOB_KEY with multi and edge separators pins it, base#2274. |
