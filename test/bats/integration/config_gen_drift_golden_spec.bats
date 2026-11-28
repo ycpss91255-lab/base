@@ -180,3 +180,117 @@ _assert_golden() {
   _run_drift_case s82_drift_dup_gpu s82_drift_dup_gpu.env
   _assert_golden s82_drift_dup_gpu
 }
+
+# ---------------------------------------------------------------------
+# _announce_template_default_fallback (base#2091, slice S82h)
+#
+# The corpus input is the per-repo setup.toml, copied to ${S}/w/setup.toml;
+# `-` leaves the directory without one. The golden format is the one above
+# (mode=absent, empty file section); the events are WARN lines on stderr,
+# run with the English messages (_LANG unset) and the real _setup_msg.
+# ---------------------------------------------------------------------
+
+_S82_FALLBACK_INPUTLESS=(s82_fallback_absent)
+
+# _fallback_violations -- as _drift_violations, for s82_fallback_*.toml.
+_fallback_violations() {
+  local _f _stem _n _ok
+  for _f in "${TESTDATA}"/corpus/s82/s82_fallback_*.toml; do
+    [[ -e "${_f}" ]] || continue
+    _stem="$(basename -- "${_f}" .toml)"
+    [[ -f "${TESTDATA}/golden/s82/${_stem}.golden" ]] \
+      || printf 'corpus input with no golden: %s\n' "${_stem}"
+  done
+  for _f in "${TESTDATA}"/golden/s82/s82_fallback_*.golden; do
+    [[ -e "${_f}" ]] || continue
+    _stem="$(basename -- "${_f}" .golden)"
+    _ok=0
+    [[ -f "${TESTDATA}/corpus/s82/${_stem}.toml" ]] && _ok=1
+    for _n in "${_S82_FALLBACK_INPUTLESS[@]}"; do
+      [[ "${_n}" == "${_stem}" ]] && _ok=1
+    done
+    (( _ok == 1 )) || printf 'golden with no corpus input: %s\n' "${_stem}"
+  done
+  return 0
+}
+
+# _run_fallback_case <name> <input|-> -- run _announce_template_default_fallback
+# on ${S}/w and write the actual golden to ${S}/actual/<name>.golden.
+_run_fallback_case() {
+  local _name="${1}" _input="${2}" _rc=0
+  rm -rf -- "${S}/w"
+  mkdir -p "${S}/w" "${S}/actual"
+  if [[ "${_input}" != - ]]; then
+    cp -- "${TESTDATA}/corpus/s82/${_input}" "${S}/w/setup.toml"
+  fi
+  (
+    export LOG_FORMAT=json
+    unset _LANG
+    # shellcheck source=dist/script/docker/lib/_lib.sh
+    source /source/dist/script/docker/lib/_lib.sh
+    # shellcheck source=dist/script/docker/wrapper/setup.sh
+    source /source/dist/script/docker/wrapper/setup.sh
+    # shellcheck source=dist/script/docker/lib/drift.sh
+    source /source/dist/script/docker/lib/drift.sh
+    _announce_template_default_fallback "${S}/w"
+  ) > "${S}/stdout" 2> "${S}/stderr.raw" || _rc=$?
+  _project_events "${S}/stderr.raw" > "${S}/stderr"
+  {
+    printf 'rc=%d\nmode=absent\n--- file\n--- stdout\n' "${_rc}"
+    cat -- "${S}/stdout"
+    printf -- '--- stderr\n'
+    cat -- "${S}/stderr"
+  } > "${S}/actual/${_name}.golden"
+}
+
+# why: a fallback corpus input with no golden would be read against
+# nothing, and a stale golden would stand for a case no longer run.
+@test "s82 fallback corpus: every input has a golden and every golden an input" {
+  run _fallback_violations
+  assert_success
+  assert_output ""
+}
+
+# why: with no setup.toml the notice is conf_no_repo_conf, rc 0, nothing
+# on stdout.
+@test "s82 fallback: an absent setup.toml gives conf_no_repo_conf" {
+  _run_fallback_case s82_fallback_absent -
+  _assert_golden s82_fallback_absent
+}
+
+# why: a setup.toml with no [section] header gives conf_empty_repo_conf.
+@test "s82 fallback: a setup.toml without a header gives conf_empty_repo_conf" {
+  _run_fallback_case s82_fallback_nosection s82_fallback_nosection.toml
+  _assert_golden s82_fallback_nosection
+}
+
+# why: an indented [x] counts as a header, so no event.
+@test "s82 fallback: an indented header reports nothing" {
+  _run_fallback_case s82_fallback_indented s82_fallback_indented.toml
+  _assert_golden s82_fallback_indented
+}
+
+# why: an empty setup.toml has no header, so conf_empty_repo_conf.
+@test "s82 fallback: an empty setup.toml gives conf_empty_repo_conf" {
+  _run_fallback_case s82_fallback_empty s82_fallback_empty.toml
+  _assert_golden s82_fallback_empty
+}
+
+# why: the expected events as literals from the issue, so a wrong golden
+# cannot pass by being regenerated the same way as the shell wrote it.
+@test "s82 fallback: the goldens equal the issue's literal events" {
+  run cat "${TESTDATA}/golden/s82/s82_fallback_absent.golden"
+  assert_success
+  assert_output "$(printf '%s\n' \
+    'rc=0' 'mode=absent' '--- file' '--- stdout' '--- stderr' \
+    'WARN conf_no_repo_conf display="no per-repo setup.toml — using template defaults for all sections"')"
+  run cat "${TESTDATA}/golden/s82/s82_fallback_nosection.golden"
+  assert_success
+  assert_output "$(printf '%s\n' \
+    'rc=0' 'mode=absent' '--- file' '--- stdout' '--- stderr' \
+    'WARN conf_empty_repo_conf display="per-repo setup.toml has no section overrides — using template defaults for all sections"')"
+  run cat "${TESTDATA}/golden/s82/s82_fallback_indented.golden"
+  assert_success
+  assert_output "$(printf '%s\n' \
+    'rc=0' 'mode=absent' '--- file' '--- stdout' '--- stderr')"
+}
