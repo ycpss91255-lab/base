@@ -33,9 +33,11 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+printf '%s\n' "${endpoint}" >>"${fix}/calls.log"
 case "${endpoint}" in
   */actions/runs\?status=*)
-    file="${fix}/runs_${endpoint##*status=}.json" ;;
+    st="${endpoint##*status=}"; st="${st%%&*}"
+    file="${fix}/runs_${st}.json" ;;
   */actions/runs/*/jobs)
     id="${endpoint%/jobs}"; id="${id##*/}"
     file="${fix}/jobs_${id}.json" ;;
@@ -114,4 +116,17 @@ _jobs() {
   assert_success
   assert_output '[]'
   [[ "${stderr}" == *"::warning::"* ]]
+}
+
+# why: AC1 caps the listing at 20 runs per status; without per_page=20 the API
+# default (30) is read and a long queue is walked run by run (base#2317).
+@test "fleet_jobs.sh: lists runs of each status with per_page=20 (base#2317)" {
+  _runs queued
+  _runs in_progress
+  run --separate-stderr bash "${JOBS}"
+  assert_success
+  run grep -c 'actions/runs?status=queued.*per_page=20' "${FAKE}/calls.log"
+  assert_output '1'
+  run grep -c 'actions/runs?status=in_progress.*per_page=20' "${FAKE}/calls.log"
+  assert_output '1'
 }
