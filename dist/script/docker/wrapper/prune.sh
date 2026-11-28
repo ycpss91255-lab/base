@@ -412,7 +412,7 @@ _run_prune() {
   "${cmd[@]}" 2>"${_err_file}" || _rc=$?
   cat "${_err_file}" >&2
   if [[ "${_rc}" -ne 0 ]] && grep -q 'a prune operation is already running' "${_err_file}"; then
-    printf '::notice::prune: another prune is running on this daemon, skipped %s\n' "${kind}" >&2
+    _log_warn prune prune_skipped_concurrent "display=another prune is running on this daemon, skipped ${kind}" "kind=${kind}"
     _rc=0
   fi
   rm -f "${_err_file}"

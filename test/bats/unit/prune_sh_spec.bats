@@ -616,7 +616,7 @@ EOS
   chmod +x "${BIN_DIR}/docker"
   run --separate-stderr bash "${SANDBOX}/prune.sh" --all
   assert_success
-  [[ "${stderr}" == *"::notice::prune: another prune is running on this daemon, skipped image"* ]]
+  [[ "${stderr}" == *"another prune is running on this daemon, skipped image"* ]]
   run cat "${DOCKER_CALLS}"
   assert_output --partial "network prune"
   assert_output --partial "image prune"
