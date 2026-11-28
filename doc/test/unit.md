@@ -2486,7 +2486,7 @@ The planted copy is traced once per file and shared by every case.
 | `config_gen_readers: the run blocks are both config-gen jobs', each matrix value expanded (base#1584)` | cycle 30, review round 2. Each run block runs as the job runs it, so a `${{ matrix.<key> }}` is expanded once per value of the job's matrix: config-gen-redpath runs `just test go-redpath <n>/5` for shards 1..5 (its matrix, which self_test_yaml_spec holds to the shard table), and together the five shards run every redpath case. Both jobs' just-pin blocks are there too. |
 | `config_gen_readers: a run block with an expression it cannot evaluate is refused (base#1584)` | cycle 30, review round 2. An expression other than one matrix key is a value this script would have to guess, so the block is refused rather than run with the expression left in or dropped. |
 
-### test/bats/unit/config_gen_s32_golden_spec.bats (21)
+### test/bats/unit/config_gen_s32_golden_spec.bats (22)
 
 The Go converter that replaces `_migrate_ini_to_toml` must match the shell
 byte for byte. Each corpus/s32/<name>.ini is converted by the shell into a
@@ -2518,6 +2518,7 @@ missing or differs, so a golden can never drift from the shell.
 | `s32 a zero index is declined (base#2085)` | Index 0 cannot be represented; the converter declines. |
 | `s32 a duplicate index is declined (base#2085)` | The same index written twice is declined as a duplicate index. |
 | `s32 clearing an index after filling it is declined (base#2085)` | Filling then clearing the same index is declined as a duplicate index. |
+| `s32 .env.local quoting converts to quoted TOML strings (base#2088)` | .env.local quoting converts as the shell does: paired outer quotes are stripped, only the first = splits, surrounding blanks are trimmed, comments are skipped and every value is written as a quoted string; the golden pins the bytes and the single migrated event. |
 
 ### test/bats/unit/config_gen_s7_verdicts_spec.bats (2)
 
@@ -7272,7 +7273,7 @@ table is pinned so neither direction can drift (base#2265).
 | `select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing EVENT_NAME fails closed to hosted while the error line stays as before (base#2266). |
 | `select_runner.sh: unset REPO with CI_SELF_HOSTED=cpu selects ubuntu-latest (base#2266)` | A missing REPO fails closed to hosted while the error line stays as before (base#2266). |
 
-### test/bats/unit/self_hosted_guard_lint_spec.bats (26)
+### test/bats/unit/self_hosted_guard_lint_spec.bats (28)
 
 | Test | Description |
 |------|-------------|
@@ -7288,6 +7289,8 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS on a bare hostname label` | - |
 | `self-hosted guard: names the exact condition to paste in the failure message` | - |
 | `self-hosted guard: PASSES a literal GitHub-hosted runs-on with no guard` | - |
+| `self-hosted guard: PASSES an unguarded runs-on from classify runs_on_cpu (base#2286)` | base#2286. classify 的 runs_on_cpu 已由 select_runner.sh 依事件決定 runner，fork PR 仍落在 hosted，所以這個 runs-on 不需要再加 guard。 |
+| `self-hosted guard: FAILS an unguarded runs-on from any other classify output (base#2286)` | base#2286. 只有 runs_on_cpu 被認作已守衛；其他 classify 輸出仍須 guard， 否則放寬會漏掉真正未守衛的 self-hosted runs-on。 |
 | `self-hosted guard: PASSES the arm + amd hosted families and a windows/macos runner` | - |
 | `self-hosted guard: PASSES a literal matrix that resolves entirely to hosted labels` | - |
 | `self-hosted guard: PASSES a LOCAL reusable-workflow call` | - |
