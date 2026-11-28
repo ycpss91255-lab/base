@@ -39,7 +39,9 @@ _S82_INPUTLESS=(s82_prune_absent s82_sync_absent s82_sync_mode
   s82_logging_empty_absent)
 
 # _partition_violations -- print one line per corpus input with no golden
-# and per golden with neither an input nor a listed inputless name.
+# and per owned golden (the four prefixes in the case below) with neither an
+# input nor a listed inputless name. Other s82 goldens belong to
+# config_gen_drift_golden_spec.bats and are skipped (base#2372).
 _partition_violations() {
   local _f _stem _n _ok
   for _f in "${TESTDATA}"/corpus/s82/*.gitignore; do
@@ -51,6 +53,10 @@ _partition_violations() {
   for _f in "${TESTDATA}"/golden/s82/*.golden; do
     [[ -e "${_f}" ]] || continue
     _stem="$(basename -- "${_f}" .golden)"
+    case "${_stem}" in
+      s82_prune_*|s82_sync_*|s82_pathspec_*|s82_logging_*) ;;
+      *) continue ;;
+    esac
     _ok=0
     [[ -f "${TESTDATA}/corpus/s82/${_stem}.gitignore" ]] && _ok=1
     for _n in "${_S82_INPUTLESS[@]}"; do
@@ -190,6 +196,23 @@ _assert_golden() {
   run _partition_violations
   assert_success
   assert_output ""
+}
+
+# why: the pairing check covers only the goldens this spec owns (the
+# s82_prune_, s82_sync_, s82_pathspec_ and s82_logging_ names). In a scratch
+# copy of the s82 data, which also holds the drift and fallback goldens that
+# config_gen_drift_golden_spec.bats owns, an orphan golden with an owned
+# prefix is the only violation reported; the other specs' goldens are not
+# flagged (base#2372).
+@test "s82 corpus: an orphan golden with an owned prefix fails the pairing check" {
+  mkdir -p "${S}/td/corpus" "${S}/td/golden"
+  cp -r -- "${TESTDATA}/corpus/s82" "${S}/td/corpus/s82"
+  cp -r -- "${TESTDATA}/golden/s82" "${S}/td/golden/s82"
+  : > "${S}/td/golden/s82/s82_logging_orphan.golden"
+  TESTDATA="${S}/td"
+  run _partition_violations
+  assert_success
+  assert_output "golden with no corpus input: s82_logging_orphan"
 }
 
 # why: the managed half is the lines below the marker; the entry above it
