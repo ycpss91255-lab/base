@@ -1,0 +1,2 @@
+entrypoint_advisory	  script/entrypoint.sh still execs, but the ENTRYPOINT is base's orchestrator, which SOURCES it -- the exec fires mid-source and the watchdog never arms. Drop it; the orchestrator owns the final exec. Nothing was changed here.
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (bringup_residue), 0 file(s) rewritten
