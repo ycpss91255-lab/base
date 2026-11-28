@@ -764,9 +764,10 @@ just githooks install   # turn on the tracked git hooks in .githooks/ (this repo
 just githooks check     # verify the hooks are active (exit 0 when they are)
 ```
 
-Run `just githooks install` once per clone. The `pre-push` hook then runs
-the `workflow-run-name` lint before every push, with no Docker; CI runs the
-same check and stays the real gate.
+Run `just githooks install` once per clone. Before every push, the
+`pre-push` hook then refuses a tag not named `vX.Y.Z` or `vX.Y.Z-rcN` and
+runs the `workflow-run-name` lint, with no Docker; CI runs the same checks
+and stays the real gate.
 
 The coverage badge is the kcov line rate of the Bash sources under the Bats
 suite, measured once per release; Go packages are gated by per-package
