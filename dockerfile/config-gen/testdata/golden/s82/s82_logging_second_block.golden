@@ -1,0 +1,10 @@
+rc=1
+mode=644
+--- file
+# managed by template: [logging] local_path begin (do not remove)
+# managed by template: [logging] local_path end (do not remove)
+# managed by template: [logging] local_path begin (do not remove)
+# managed by template: [logging] local_path end (do not remove)
+--- stdout
+--- stderr
+ERROR gitignore_managed_block_invalid display=TMP/.gitignore:3: a second [logging] local_path managed block begins here (the first began at line 1). Keep exactly one block, then re-run the sync. line=3 path=TMP/.gitignore service.lang=bash service.name=init
