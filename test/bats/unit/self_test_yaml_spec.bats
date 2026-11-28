@@ -5224,6 +5224,108 @@ FLEET_STUCK=${{ steps.fleet.outputs.stuck }}
 EOT
 }
 
+# why: the 21 mutation-roster shards take their runner from classify, so the
+# CI_SELF_HOSTED switch moves them together; nothing else about the job
+# changes (base#2272, part of base#1586).
+@test "self-test.yaml: mutation-roster runs-on comes from classify runs_on_cpu, rest unchanged (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster["timeout-minutes"]'
+  assert_success
+  assert_output '150'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.strategy.matrix.shard | length'
+  assert_success
+  assert_output '21'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.strategy.matrix.shard[0], .jobs.mutation-roster.strategy.matrix.shard[20]'
+  assert_success
+  assert_output - <<'EOT'
+1/21
+21/21
+EOT
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.strategy["fail-fast"]'
+  assert_success
+  assert_output 'false'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.if'
+  assert_success
+  assert_output "needs.classify.outputs.select_mutation_roster == 'true'"
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.needs | join(",")'
+  assert_success
+  assert_output 'actionlint,classify,test-tools-image-amd64'
+}
+
+# why: the 21 mutation-roster shards now share one cpu-fleet host and one
+# docker daemon. With the workflow-level per-run TEST_TOOLS_IMAGE,
+# COMPOSE_PROJECT_NAME, TMPDIR and CI_RUN_KEY, the first shard to finish ran
+# `reclaim.sh --run "${CI_RUN_KEY}"` and removed its siblings' containers (the
+# same fault coverage had, run 46112164146, exit 137). Each shard must take
+# its own four names from script/ci/job_env.sh before its first docker step
+# (base#2272, same shape as coverage, base#2273).
+@test "self-test.yaml: mutation-roster shard exports per-shard job names via job_env.sh before the first docker step (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .env.JOB_KEY'
+  assert_success
+  assert_output 'mutation-roster-${{ matrix.shard }}'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/obtain_test_tools.sh")) | .key'
+  assert_success
+  obtain_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  [[ "${obtain_idx}" =~ ^[0-9]+$ ]]
+  [ "${job_env_idx}" -lt "${obtain_idx}" ]
+}
+
+# why: each shard removes only its own compose project and TMPDIR, in an
+# always() step so a failed or cancelled shard still cleans up (base#2272).
+@test "self-test.yaml: mutation-roster shard removes its own compose project and TMPDIR in an always() step (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .run'
+  assert_success
+  assert_output --partial './script/ci/job_cleanup.sh'
+}
+
+# why: the per-job values only win if nothing sets CI_RUN_KEY back to the run
+# key, and every consumer of it (build label, reclaim) runs after job_env.sh
+# (base#2272).
+@test "self-test.yaml: mutation-roster never re-sets CI_RUN_KEY and its consumers come after the job_env.sh step (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.env.CI_RUN_KEY // "unset"'
+  assert_success
+  assert_output 'unset'
+  run _yaml_eval "${WF}" '[.jobs.mutation-roster.steps[] | select(.env.CI_RUN_KEY != null)] | length'
+  assert_success
+  assert_output '0'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select((.value | tostring) | contains("CI_RUN_KEY")) | .key'
+  assert_success
+  local idx n=0
+  while IFS= read -r idx; do
+    [[ "${idx}" == "${job_env_idx}" ]] && continue
+    [ "${idx}" -gt "${job_env_idx}" ]
+    n=$((n + 1))
+  done <<<"${output}"
+  [ "${n}" -ge 2 ]
+}
+
+# why: the CI log is the proof that the per-shard values win over the
+# workflow-level env, so a step must echo all four names (base#2272).
+@test "self-test.yaml: mutation-roster shard echoes the four per-shard names (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.name == "Show the names in effect") | .run'
+  assert_success
+  assert_output --partial 'echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"'
+  assert_output --partial 'echo "TMPDIR=${TMPDIR}"'
+  assert_output --partial 'echo "TEST_TOOLS_IMAGE=${TEST_TOOLS_IMAGE}"'
+  assert_output --partial 'echo "CI_RUN_KEY=${CI_RUN_KEY}"'
+}
+
 # why: config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED
 # switch via classify's runs_on_cpu (base#2271, part of base#1586). This is the
 # load-bearing case: with a hardcoded ubuntu-latest the switch never moves the
@@ -5257,14 +5359,14 @@ EOT
 # runs-on from classify's runs_on_cpu so the CI_SELF_HOSTED switch decides where
 # it runs; config-gen-redpath followed in base#2271. Every other job keeps its
 # own runs-on until its own child moves it (base#2269, part of base#1586).
-@test "self-test.yaml: only config-gen-gates and config-gen-redpath take runs-on from runs_on_cpu (base#2269, base#2271)" {
+@test "self-test.yaml: only config-gen-gates, config-gen-redpath and mutation-roster take runs-on from runs_on_cpu (base#2269, base#2271, base#2272)" {
   run _yaml_eval "${WF}" '.jobs["config-gen-gates"]["runs-on"]'
   assert_success
   assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
   run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
   assert_success
   assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
-  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates" and .key != "config-gen-redpath") | (.value["runs-on"] // "") | tostring')"
+  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates" and .key != "config-gen-redpath" and .key != "mutation-roster") | (.value["runs-on"] // "") | tostring')"
   assert_failure
 }
 
