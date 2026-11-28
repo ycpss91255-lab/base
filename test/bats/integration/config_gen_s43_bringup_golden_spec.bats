@@ -27,9 +27,11 @@ setup() {
   GOLDEN="${TESTDATA}/golden/s43"
 }
 
-# _project_events <raw-json-lines-file> -- <body> TAB <display>.
+# _project_events <raw-json-lines-file> -- <body> TAB <display>. _log_warn
+# writes to stderr, so raw.events holds both streams; non-JSON lines are
+# skipped (base#2078).
 _project_events() {
-  jq -r '[.body, .attributes.display] | join("\t")' "$1"
+  jq -R -r 'fromjson? | select(type == "object") | [.body, .attributes.display] | join("\t")' "$1"
 }
 
 # _regen_case <case> -- run apply_migrations on s43_bringup_<case>.Dockerfile
@@ -49,7 +51,7 @@ _regen_case() {
     cd "${_d}" || exit 1
     LOG_FORMAT=json bash -c '
       source "$1/_lib.sh"; source "$1/dockerfile_migrate.sh"
-      apply_migrations Dockerfile > raw.events
+      apply_migrations Dockerfile > raw.events 2>&1
       migrated_files > out.files
     ' _ "${LIB}"
   ) || return 1
