@@ -4757,7 +4757,7 @@ are hard to trigger from a real `bash template/init.sh` invocation
 | `job_cleanup: TMPDIR without /job- is refused, nothing removed` | base#2275 -- a TMPDIR without the /job- prefix (e.g. the shared /tmp) must never be deleted. |
 | `job_cleanup: script text has no system prune, docker rm or network rm` | base#2275 -- scope limit: only the one project, never a global prune or an unscoped removal. |
 
-### test/bats/unit/job_env_spec.bats (11)
+### test/bats/unit/job_env_spec.bats (13)
 
 Several cpu-runner jobs share one sibling docker daemon, so a fixed compose
 project name or /tmp path lets two jobs trample each other. The project name
@@ -4766,7 +4766,9 @@ RUNNER_TEMP so sibling containers can see it, base#2274.
 
 | Test | Description |
 |------|-------------|
-| `job_env: worked example prints exactly the two documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
+| `job_env: worked example prints exactly the three documented lines` | The one place the exact literals are pinned: the project name and TMPDIR format are what every workflow step will export, so any drift here changes names across all jobs, base#2274. |
+| `job_env: different JOB_KEY values give different TEST_TOOLS_IMAGE` | Jobs on one host share one docker daemon, so a shared test-tools image tag makes concurrent builds fail with "already exists"; each job needs its own tag, base#2321. |
+| `job_env: TEST_TOOLS_IMAGE and COMPOSE_PROJECT_NAME share one id` | The image tag and the compose project must carry the same <run>-<attempt>-<slug> id so one job's resources can be traced together; a diverging id would break that link, base#2321. |
 | `job_env: creates the TMPDIR directory` | The script prints a path, but sibling containers need the directory to exist under RUNNER_TEMP; a printed-but-missing TMPDIR would fail only later inside the job, base#2274. |
 | `job_env: different JOB_KEY values give different output` | Distinct jobs of one run must not share a compose project or TMPDIR, which is the whole reason the script exists, base#2274. |
 | `job_env: every non-alphanumeric character becomes one dash, none collapsed or trimmed` | The slug rule is one '-' per non-alphanumeric character with no collapsing or trimming; a realistic matrix JOB_KEY with multi and edge separators pins it, base#2274. |

@@ -78,6 +78,7 @@ readonly _MOVING_TAG_ALLOWLIST=(
   'dist/script/docker/wrapper/build.sh|indirect|line:_test_tools_image=|1|test-tools:${_tt_ver}|the local tag for the pinned .base/.version'
   'script/ci/acceptance.sh|indirect|line:--entrypoint toml-bridge|1|test-tools:${ver}|the local version-scoped tag'
   'script/ci/acceptance.sh|indirect|line:echo "toml-bridge in |1|test-tools:${ver}|message naming the local version-scoped tag'
+  "script/ci/job_env.sh|indirect|line:printf 'TEST_TOOLS_IMAGE=test-tools:ci-%s|1|test-tools:ci-%s|the per-job local tag, base#2321"
   '.github/workflows/self-test.yaml|indirect|line:TEST_TOOLS_IMAGE: |1|test-tools:ci-${{|a per-run local tag'
   '.github/workflows/self-test.yaml|indirect|line:TEST_TOOLS_ARTIFACT_TAG: |1|test-tools:artifact-${{|a per-run artifact tag'
   '.github/workflows/release-worker.yaml|moving|comment|1|test-tools:latest|history comment (the rc tags moved :latest)'
