@@ -1,0 +1,3 @@
+# Coverage floors of the packages S8a brings (base#1854): <pkg> <floor>|none,
+# pkg relative to the module. Ratcheted up by cg-gates ratchet, never lowered.
+internal/load 93.3
