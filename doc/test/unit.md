@@ -2659,7 +2659,7 @@ empty setup.toml section and answer zero (base#1398).
 | `_print_config_summary refuses a setup.toml that cannot be parsed (base#1398)` | The summary is the screen a user reads before a build; an empty setup.toml section over a file that failed to parse tells them their configuration is the template defaults when nothing was read (base#1398). |
 | `_print_config_summary refuses a malformed setup.toml with no recognised header (base#1398)` | The empty-file hint is chosen by a header grep, and a malformed file the grep does not recognise (`[gui` unclosed, or a bare unterminated `mode = "off`) took that branch: it printed "no section overrides -- using template defaults" with rc 0 and never parsed the file. The parse decides, not the grep (base#1398). |
 
-### test/bats/unit/coverage_badge_spec.bats (49)
+### test/bats/unit/coverage_badge_spec.bats (51)
 
 Unit tests for `script/release/coverage_badge.sh` (#952) -- the release
 coverage badge generator that replaces the README's static `Coverage-Kcov`
@@ -2718,6 +2718,8 @@ three tests assert the repo's own published figure, not the generator.
 | `coverage_badge: the un-wired release step is recorded as pending, with its issue` | The ADR and the recipe doc name docker_harness#289 instead of claiming a caller that does not exist |
 | `coverage_badge: the generator header records the bump wiring as pending` | The property list is where the round-2 reword did not reach |
 | `coverage_badge: the dirty check covers every source kcov instruments` | - |
+| `coverage_badge: a bash fixture under config-gen testdata is not an instrumented source (base#2373)` | config-gen's golden corpus (dockerfile/config-gen/testdata/) holds bash-shebang files such as an entrypoint.sh. They are the migration's INPUT DATA, compared byte for byte, never run by the suite, so kcov never measures them and SOURCE_PATHSPEC must not have to name them (base#2373). The scratch tree holds two such files (a `.sh` one and a suffixless one); the dirty check must not report either as an unguarded instrumented source. |
+| `coverage_badge: a bash file elsewhere under config-gen is still unguarded (base#2373)` | the testdata exclusion must stay as narrow as the issue says: a bash file anywhere else under dockerfile/config-gen/ is real, executed source and still has to be reported as unguarded, otherwise the exclusion would silently widen into the whole config-gen tree (base#2373). |
 | `coverage_badge: the roster's drift note promises only the guard it has` | - |
 | `coverage_badge: the README shows the committed badge, not a static one` | The `Coverage-Kcov` badge is gone and the SVG is referenced |
 | `coverage_badge: every localized README shows the committed badge` | All three translations, by their own relative path |
