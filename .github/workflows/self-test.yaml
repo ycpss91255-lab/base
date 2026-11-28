@@ -205,6 +205,9 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      # Lists the queued and in-progress runs' jobs for the fleet step
+      # (base#2317).
+      actions: read
     outputs:
       code_changed: ${{ steps.diff.outputs.code_changed }}
       system_relevant: ${{ steps.diff.outputs.system_relevant }}
@@ -254,6 +257,16 @@ jobs:
           HEAD_REF: ${{ github.event.merge_group.head_ref }}
         run: bash ./script/ci/merge_group_trust.sh >> "${GITHUB_OUTPUT}"
 
+      # Whether a self-hosted job has sat queued too long, so the runner
+      # step can fall back to ubuntu-latest (base#2317, part of base#1586).
+      # fleet_jobs.sh always exits 0: an API error drops those jobs with a
+      # ::warning::, and fleet_stuck.sh then answers stuck=false.
+      - id: fleet
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: bash ./script/ci/fleet_jobs.sh | bash ./script/ci/fleet_stuck.sh >> "${GITHUB_OUTPUT}"
+
       # Whether this event's code is trusted enough for a self-hosted
       # runner, and which runs-on that means (base#2268, part of base#1586).
       - id: runner
@@ -263,6 +276,7 @@ jobs:
           REPO: ${{ github.repository }}
           MERGE_GROUP_SAME_REPO: ${{ steps.trust.outputs.same_repo }}
           CI_SELF_HOSTED: ${{ vars.CI_SELF_HOSTED }}
+          FLEET_STUCK: ${{ steps.fleet.outputs.stuck }}
         run: bash ./script/ci/select_runner.sh >> "${GITHUB_OUTPUT}"
 
       - id: diff
