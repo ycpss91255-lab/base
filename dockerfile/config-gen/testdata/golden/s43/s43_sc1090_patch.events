@@ -1,0 +1,2 @@
+entrypoint_patched	  entrypoint patched: shellcheck SC1091 -> SC1090,SC1091 (#567 m6)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (sc1090), 1 file(s) rewritten	matched=1	available=16	names=sc1090	rewritten=1
