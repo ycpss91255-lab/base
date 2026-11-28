@@ -7311,7 +7311,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (167)
+### test/bats/unit/self_test_yaml_spec.bats (171)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7798,6 +7798,10 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: ci-rollup needs single-issue-pr and classify never gates it (base#1629)` | Branch protection requires ci-rollup alone. A single-issue-pr job outside its needs would be a check nobody is blocked by, and a select_single_issue_pr key would let classify skip it on a doc-only PR, which is exactly where a bundled PR slips through (base#1629). |
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
 | `self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)` | classify is where the runner choice is made once for the whole workflow. It must run script/ci/select_runner.sh in a step `runner` and publish its two lines as job outputs, so later children can read them without re-deriving trust (base#2268, part of base#1586). |
+| `self-test.yaml: classify has a step with id fleet (base#2317)` | select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes it unless classify runs a step that lists the queued and in-progress runs' jobs and hands them to fleet_stuck.sh. Without a step `fleet`, the env stays empty and a dead CPU host keeps every job queued forever instead of falling back to ubuntu-latest (base#2317, part of base#1586). |
+| `self-test.yaml: classify runs the fleet step before the runner step (base#2317)` | The runner step reads steps.fleet.outputs.stuck. A step that exists but runs after it would publish its output too late, so the runner step would always see an empty value and never switch (base#2317). |
+| `self-test.yaml: classify runner step passes FLEET_STUCK from the fleet step (base#2317)` | Without FLEET_STUCK in the runner step's env, select_runner.sh sees it unset and always answers the cpu fleet, however stuck it is (base#2317). |
+| `self-test.yaml: classify permissions include actions: read (base#2317)` | listing a repo's runs and their jobs through gh api needs the actions: read scope. classify's block replaces the workflow-level one, so without the line the API call is refused and the step can only fail open to stuck=false, which never switches (base#2317). |
 
 ### test/bats/unit/setup_cmd_spec.bats (228)
 
