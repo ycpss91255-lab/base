@@ -1,0 +1,1 @@
+dockerfile_patched	  Dockerfile patched: _entrypoint_logging.sh -> runtime/logging.sh (#567 m4)

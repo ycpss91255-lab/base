@@ -1,0 +1,1 @@
+entrypoint_patched	  entrypoint patched: _entrypoint_logging.sh -> logging.sh source (#567 m4)
