@@ -99,10 +99,10 @@ _jobs() {
   # No jobs_12.json: the fake gh fails for run 12.
   run --separate-stderr bash "${JOBS}"
   assert_success
+  local warned="${stderr}"
   run jq -c '[.[].id]' <<<"${output}"
   assert_output '[111]'
-  run --separate-stderr bash "${JOBS}"
-  [[ "${stderr}" == *"::warning::"*12* ]]
+  [[ "${warned}" == *"::warning::"*12* ]]
 }
 
 # why: When the API is down or the token lacks actions: read, the step must
