@@ -1,0 +1,2 @@
+dockerfile_unchanged	  Dockerfile unchanged: retired CONFIG_DIR pip helper line kept — config/pip/requirements.txt carries real requirements, so the line still installs them (#567 m2)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (pip_helper), 0 file(s) rewritten	matched=1	available=16	names=pip_helper	rewritten=0

@@ -1,0 +1,2 @@
+dockerfile_patched	  Dockerfile patched: dropped retired CONFIG_DIR pip helper line (#567 m2) — re-add an explicit pip step if you ship a real requirements file
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (pip_helper), 1 file(s) rewritten	matched=1	available=16	names=pip_helper	rewritten=1

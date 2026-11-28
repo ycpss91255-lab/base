@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **424 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -300,6 +300,41 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_pip_helper_golden_spec.bats (13)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_pip_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2057):
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> [TAB
+matched=.. TAB available=.. TAB names=.. TAB rewritten=..] Two differences
+from base#2057: - sidecar: the scratch directory always gets config/; an
+optional s43_pip_<case>.requirements is copied to
+config/pip/requirements.txt. - events: dockerfile_patched /
+dockerfile_unchanged are _log_warn lines on stderr, only the report is on
+stdout, so stdout and stderr are merged (2>&1) and the emit order is the
+event order. The fixture is run as the relative path `Dockerfile` in a
+scratch directory. The prefix is s43_pip_, not s43_migrate_ (that is the
+base#2055 partition).
+
+| Test | Description |
+|------|-------------|
+| `s43 pip golden: absent requirements drops the pip block` | no requirements file, so the pip block (comment + RUN) is dropped. |
+| `s43 pip golden: placeholder requirements drops the pip block` | a comment-only requirements file counts as a placeholder, so the block is dropped. |
+| `s43 pip golden: real requirements keeps the pip line` | a real requirement keeps the pip line, nothing is rewritten. |
+| `s43 pip golden: no pip line matches nothing` | a Dockerfile with no pip line matches nothing. |
+| `s43 pip golden: absent events golden equals the issue's literal events` | the issue gives the dropped-block events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 pip golden: absent dockerfile golden equals the issue's literal` | the issue gives the Dockerfile after the drop as a literal. |
+| `s43 pip golden: absent files golden is the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 pip golden: placeholder goldens are byte-identical to absent goldens` | the comment-only requirements ends in the same state as the absent one. |
+| `s43 pip golden: real events golden equals the issue's literal events` | real requirements are an unchanged warn plus a 0-rewritten report, the issue gives them as literals. |
+| `s43 pip golden: real files golden is 0 bytes and dockerfile equals its fixture` | nothing is rewritten, so .files is 0 bytes and the dockerfile golden is the fixture bytes. |
+| `s43 pip golden: noline events golden is the single none report` | no pip line is a no-op: one report event with names=none. |
+| `s43 pip golden: noline files golden is 0 bytes and dockerfile equals its fixture` | nothing is rewritten, so .files is 0 bytes and the dockerfile golden is the fixture bytes. |
+| `s43 pip golden: every fixture has exactly its three goldens and no extra` | each pip fixture has exactly the three goldens, no golden or sidecar lacks a fixture. Driven by the fixture list so later fixtures do not break it. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
