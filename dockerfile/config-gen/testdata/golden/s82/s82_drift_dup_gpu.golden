@@ -1,0 +1,7 @@
+rc=1
+mode=absent
+--- file
+--- stdout
+--- stderr
+WARN env_drift_detected display="drift detected since last setup.sh run:"
+WARN env_drift_detail display="  - GPU detection changed: false\ntrue → false" detail="GPU detection changed: false\ntrue → false"
