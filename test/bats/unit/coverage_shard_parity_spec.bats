@@ -78,7 +78,7 @@ _make_parity_root() {
 }
 
 # _install_parity_mocks <kcov_log>
-#   kcov: logs its argv, answers `--merge` with a merged report, otherwise
+#   kcov: logs its argv to its own file <kcov_log>.<pid> (base#2338), answers `--merge` with a merged report, otherwise
 #   drops its own `--flag=value` options, leaves a report in its output
 #   directory and runs the command it wraps. bats: writes the junit report
 #   with the <testsuite name> rule measured above (header), one suite per
@@ -90,7 +90,7 @@ _install_parity_mocks() {
   mock_cmd "nproc" 'echo 32'
   mock_cmd "parallel" 'exit 0'
   mock_cmd "kcov" '
-    printf "%s\n" "$*" >> "'"${_log}"'"
+    printf "%s\n" "$*" >> "'"${_log}"'.$$"
     if [ "$1" = "--merge" ]; then
       mkdir -p "$2/kcov-merged" && printf "<coverage/>\n" > "$2/kcov-merged/cobertura.xml"
       exit 0
@@ -154,7 +154,7 @@ _driver_prelude() {
 #   The number of kcov processes that instrumented a slice (the merge is
 #   not one).
 _instrumented_runs() {
-  grep -vc -- '^--merge' "${1}" || true
+  cat "${1}".* | grep -vc -- '^--merge' || true
 }
 
 # ════════════════════════════════════════════════════════════════════
@@ -369,7 +369,7 @@ _slice_loads() {
       if (load > max) max = load
     }
     END { printf "max=%d total=%d\n", max, total }
-  ' "${2}" "${1}"
+  ' "${2}" <(cat "${1}".*)
 }
 
 # why: a shard's slices run at the same time, so its heaviest slice is its
