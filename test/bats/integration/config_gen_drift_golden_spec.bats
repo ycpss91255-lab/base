@@ -39,27 +39,34 @@ setup() {
 # directory holding no .env.generated.
 _S82_DRIFT_INPUTLESS=(s82_drift_absent)
 
-# _drift_violations -- print one line per drift corpus input with no golden
-# and per drift golden with neither an input nor a listed inputless name.
-_drift_violations() {
-  local _f _stem _n _ok
-  for _f in "${TESTDATA}"/corpus/s82/s82_drift_*.env; do
+# _pairing_violations <glob-prefix> <input-ext> <inputless-name>... -- print
+# one line per corpus input s82_<prefix>*.<ext> with no golden and per golden
+# with neither an input nor a listed inputless name.
+_pairing_violations() {
+  local _prefix="${1}" _ext="${2}" _f _stem _n _ok
+  shift 2
+  for _f in "${TESTDATA}"/corpus/s82/"${_prefix}"*."${_ext}"; do
     [[ -e "${_f}" ]] || continue
-    _stem="$(basename -- "${_f}" .env)"
+    _stem="$(basename -- "${_f}" ."${_ext}")"
     [[ -f "${TESTDATA}/golden/s82/${_stem}.golden" ]] \
       || printf 'corpus input with no golden: %s\n' "${_stem}"
   done
-  for _f in "${TESTDATA}"/golden/s82/s82_drift_*.golden; do
+  for _f in "${TESTDATA}"/golden/s82/"${_prefix}"*.golden; do
     [[ -e "${_f}" ]] || continue
     _stem="$(basename -- "${_f}" .golden)"
     _ok=0
-    [[ -f "${TESTDATA}/corpus/s82/${_stem}.env" ]] && _ok=1
-    for _n in "${_S82_DRIFT_INPUTLESS[@]}"; do
+    [[ -f "${TESTDATA}/corpus/s82/${_stem}.${_ext}" ]] && _ok=1
+    for _n in "$@"; do
       [[ "${_n}" == "${_stem}" ]] && _ok=1
     done
     (( _ok == 1 )) || printf 'golden with no corpus input: %s\n' "${_stem}"
   done
   return 0
+}
+
+# _drift_violations -- _pairing_violations for the s82_drift_*.env corpus.
+_drift_violations() {
+  _pairing_violations s82_drift_ env "${_S82_DRIFT_INPUTLESS[@]}"
 }
 
 # _project_events <raw-json-lines-file> -- one line per event:
@@ -192,26 +199,10 @@ _assert_golden() {
 
 _S82_FALLBACK_INPUTLESS=(s82_fallback_absent)
 
-# _fallback_violations -- as _drift_violations, for s82_fallback_*.toml.
+# _fallback_violations -- _pairing_violations for the s82_fallback_*.toml
+# corpus.
 _fallback_violations() {
-  local _f _stem _n _ok
-  for _f in "${TESTDATA}"/corpus/s82/s82_fallback_*.toml; do
-    [[ -e "${_f}" ]] || continue
-    _stem="$(basename -- "${_f}" .toml)"
-    [[ -f "${TESTDATA}/golden/s82/${_stem}.golden" ]] \
-      || printf 'corpus input with no golden: %s\n' "${_stem}"
-  done
-  for _f in "${TESTDATA}"/golden/s82/s82_fallback_*.golden; do
-    [[ -e "${_f}" ]] || continue
-    _stem="$(basename -- "${_f}" .golden)"
-    _ok=0
-    [[ -f "${TESTDATA}/corpus/s82/${_stem}.toml" ]] && _ok=1
-    for _n in "${_S82_FALLBACK_INPUTLESS[@]}"; do
-      [[ "${_n}" == "${_stem}" ]] && _ok=1
-    done
-    (( _ok == 1 )) || printf 'golden with no corpus input: %s\n' "${_stem}"
-  done
-  return 0
+  _pairing_violations s82_fallback_ toml "${_S82_FALLBACK_INPUTLESS[@]}"
 }
 
 # _run_fallback_case <name> <input|-> -- run _announce_template_default_fallback
