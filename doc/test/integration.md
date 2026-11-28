@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **420 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -300,6 +300,33 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_orchestrator_golden_spec.bats (9)
+
+Before any Go migration exists, the shell
+`_migrate_entrypoint_orchestrator_detect` / `_apply`
+(dist/script/docker/lib/dockerfile_migrate.sh) are the oracle. This
+migration only notifies, it never rewrites. Every case under
+dockerfile/config-gen/testdata/corpus/s43/ is a pair:
+s43_orch_<case>.Dockerfile copied to <scratch>/Dockerfile
+s43_orch_<case>.entrypoint.sh copied to <scratch>/script/entrypoint.sh and
+has four goldens under testdata/golden/s43/: .dockerfile the Dockerfile
+bytes after apply (identical to the input) .files `migrated_files` stdout (0
+bytes in every case) .events one event per line, <body> TAB <display> (empty
+when no apply) .detect the detect exit status, 0 or 1 apply is only called
+when detect returns 0, as apply_migrations does.
+
+| Test | Description |
+|------|-------------|
+| `s43 orch golden: old model is noticed and nothing is rewritten` | the pre-orchestrator model is noticed: detect 0, one advisory, no rewrite. |
+| `s43 orch golden: migrated repo is silent` | an already migrated repo is silent. |
+| `s43 orch golden: commented ENTRYPOINT is silent` | a commented ENTRYPOINT is not the live model. |
+| `s43 orch golden: unrelated ENTRYPOINT is silent` | an unrelated ENTRYPOINT is not this model. |
+| `s43 orch golden: old events golden is one advisory line` | the issue pins the old case as one advisory event whose display says nothing was changed; a wrong golden cannot pass by being regenerated alike. |
+| `s43 orch golden: detect goldens are 0 for old and 1 otherwise` | detect exit codes are 0 for old and 1 for the other three (issue table). |
+| `s43 orch golden: files goldens are 0 bytes, silent events are 0 bytes` | every .files golden is 0 bytes, and the silent cases have empty events. |
+| `s43 orch golden: dockerfile goldens equal their fixtures` | the notice rewrites nothing, so every .dockerfile golden is its fixture. |
+| `s43 orch golden: every fixture has exactly its four goldens and no extra` | each orch fixture has exactly its four goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
