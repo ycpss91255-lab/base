@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 #
 # config_gen_s43_sc1090_golden_spec.bats -- the s43 sc1090 (migration 6)
-# corpus against the .dockerfile / .entrypoint / .files / .events goldens
+# corpus against the .dockerfile / .entrypoint.sh / .files / .events goldens
 # (base#2073, S43m of base#1776).
 #
 # why: Before any Go migration exists, the shell `apply_migrations`
@@ -9,9 +9,9 @@
 # _migrate_sc1090_apply) is the oracle. Every
 # dockerfile/config-gen/testdata/corpus/s43/s43_sc1090_<case>.Dockerfile has a
 # sibling s43_sc1090_<case>.entrypoint.sh and four goldens under
-# testdata/golden/s43/ (same shape as base#2057, plus .entrypoint):
+# testdata/golden/s43/ (same shape as base#2057, plus .entrypoint.sh):
 #   .dockerfile  the Dockerfile bytes after apply_migrations
-#   .entrypoint  the script/entrypoint.sh bytes after apply_migrations
+#   .entrypoint.sh  the script/entrypoint.sh bytes after apply_migrations
 #   .files       `migrated_files` stdout (0 bytes when nothing was rewritten)
 #   .events      one projected event per line, tab separated:
 #                <body> TAB <display> [TAB matched=.. TAB available=.. TAB
@@ -65,13 +65,13 @@ _regen_case() {
   ) || return 1
   _project_events "${_d}/raw.events" > "${_d}/out.events"
   cp -- "${_d}/Dockerfile" "${_d}/out.dockerfile"
-  cp -- "${_d}/script/entrypoint.sh" "${_d}/out.entrypoint"
+  cp -- "${_d}/script/entrypoint.sh" "${_d}/out.entrypoint.sh"
 }
 
 # _check_case <case> -- regenerate and compare each output with its golden.
 _check_case() {
   local _name="s43_sc1090_${1}" _d="${BATS_TEST_TMPDIR}/${1}" _e _bad=0
-  for _e in dockerfile entrypoint files events; do
+  for _e in dockerfile entrypoint.sh files events; do
     [[ -f "${GOLDEN}/${_name}.${_e}" ]] || {
       echo "golden missing: ${_name}.${_e}" >&2
       _bad=1
@@ -79,7 +79,7 @@ _check_case() {
   done
   (( _bad == 0 )) || return 1
   _regen_case "$1" || return 1
-  for _e in dockerfile entrypoint files events; do
+  for _e in dockerfile entrypoint.sh files events; do
     cmp -- "${_d}/out.${_e}" "${GOLDEN}/${_name}.${_e}" || _bad=1
   done
   (( _bad == 0 ))
@@ -119,7 +119,7 @@ _check_case() {
 
 # why: the issue gives the patched entrypoint as a literal.
 @test "s43 sc1090 golden: patch entrypoint golden equals the issue's literal" {
-  run cat "${GOLDEN}/s43_sc1090_patch.entrypoint"
+  run cat "${GOLDEN}/s43_sc1090_patch.entrypoint.sh"
   assert_success
   assert_output "$(printf '%s\n%s\n%s' \
     '#!/usr/bin/env bash' \
@@ -155,7 +155,7 @@ _check_case() {
 
 # why: nothing is rewritten, so the done entrypoint golden is the fixture bytes.
 @test "s43 sc1090 golden: done entrypoint golden equals its fixture" {
-  cmp -- "${CORPUS}/s43_sc1090_done.entrypoint.sh" "${GOLDEN}/s43_sc1090_done.entrypoint"
+  cmp -- "${CORPUS}/s43_sc1090_done.entrypoint.sh" "${GOLDEN}/s43_sc1090_done.entrypoint.sh"
 }
 
 # why: the indent case has the same files / events as patch (issue item 3).
@@ -168,7 +168,7 @@ _check_case() {
 
 # why: the issue gives the indent line with its exact spaces.
 @test "s43 sc1090 golden: indent entrypoint golden line 2 keeps its spaces" {
-  run sed -n '2p' "${GOLDEN}/s43_sc1090_indent.entrypoint"
+  run sed -n '2p' "${GOLDEN}/s43_sc1090_indent.entrypoint.sh"
   assert_output "  #  shellcheck disable=SC1090,SC1091  "
 }
 
@@ -196,7 +196,7 @@ _check_case() {
       echo "fixture with no entrypoint: ${_stem}.entrypoint.sh" >&2
       _bad=1
     }
-    for _e in dockerfile entrypoint files events; do
+    for _e in dockerfile entrypoint.sh files events; do
       if [[ ! -f "${GOLDEN}/${_stem}.${_e}" ]]; then
         echo "fixture with no golden: ${_stem}.${_e}" >&2
         _bad=1
@@ -206,9 +206,10 @@ _check_case() {
   for _f in "${GOLDEN}"/s43_sc1090_*; do
     [[ -e "${_f}" ]] || continue
     _stem="$(basename -- "${_f}")"
+    _stem="${_stem%.entrypoint.sh}"
     _stem="${_stem%.*}"
-    case "${_f##*.}" in
-      dockerfile | entrypoint | files | events) ;;
+    case "${_f#"${GOLDEN}/${_stem}."}" in
+      dockerfile | entrypoint.sh | files | events) ;;
       *) echo "unexpected golden extension: ${_f}" >&2; _bad=1 ;;
     esac
     if [[ ! -f "${CORPUS}/${_stem}.Dockerfile" ]]; then

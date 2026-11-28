@@ -308,8 +308,8 @@ Before any Go migration exists, the shell `apply_migrations`
 _migrate_sc1090_apply) is the oracle. Every
 dockerfile/config-gen/testdata/corpus/s43/s43_sc1090_<case>.Dockerfile has a
 sibling s43_sc1090_<case>.entrypoint.sh and four goldens under
-testdata/golden/s43/ (same shape as base#2057, plus .entrypoint):
-.dockerfile the Dockerfile bytes after apply_migrations .entrypoint the
+testdata/golden/s43/ (same shape as base#2057, plus .entrypoint.sh):
+.dockerfile the Dockerfile bytes after apply_migrations .entrypoint.sh the
 script/entrypoint.sh bytes after apply_migrations .files `migrated_files`
 stdout (0 bytes when nothing was rewritten) .events one projected event per
 line, tab separated: <body> TAB <display> [TAB matched=.. TAB available=..
