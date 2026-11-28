@@ -589,7 +589,8 @@ _coverage_skip_audit() {
 #   The set is what a coverage FIGURE must not count: the specs themselves,
 #   the harness that runs them, the two base-management scripts that never
 #   execute inside the container, and the dotfiles / workflow YAML that are
-#   not shell at all.
+#   not shell at all, plus the config-gen golden fixtures under testdata/
+#   (data the generator is checked against, never run; base#2373).
 _coverage_exclude_path() {
   local _excludes=(
     "${REPO_ROOT}/test/"
@@ -599,6 +600,7 @@ _coverage_exclude_path() {
     "${REPO_ROOT}/dist/config/shell/bashrc"
     "${REPO_ROOT}/dist/config/shell/terminator/config"
     "${REPO_ROOT}/dist/config/shell/tmux/tmux.conf"
+    "${REPO_ROOT}/dockerfile/config-gen/testdata/"
     "${REPO_ROOT}/.github/"
   )
   local IFS=,

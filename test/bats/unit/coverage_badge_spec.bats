@@ -1253,7 +1253,7 @@ _scan_scratch_unguarded() {
     > "${_scratch}/dockerfile/config-gen/testdata/corpus/x/a.entrypoint.sh"
   # The golden side of the corpus carries the same script WITHOUT the .sh
   # suffix (`*.entrypoint`), which SOURCE_PATHSPEC does not name; that is
-  # the spelling PR #2357 hit. A `.sh` name alone is already guarded by
+  # the spelling PR base#2357 hit. A `.sh` name alone is already guarded by
   # the `*.sh` entry and would not exercise the exclusion.
   mkdir -p "${_scratch}/dockerfile/config-gen/testdata/golden/x"
   printf '#!/usr/bin/env bash\necho fixture\n' \
