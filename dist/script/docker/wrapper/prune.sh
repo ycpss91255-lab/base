@@ -405,7 +405,7 @@ _run_prune() {
   fi
   # Shared CPU-host daemon: docker allows one prune at a time, so a prune
   # run by another job makes ours fail with "a prune operation is already
-  # running". That is not this job's failure: notice, skip the kind, go on
+  # running". That is not this job's failure: log it, skip the kind, go on
   # (base#2329). Any other error keeps failing as before.
   local _err_file _rc=0
   _err_file="$(mktemp)"
