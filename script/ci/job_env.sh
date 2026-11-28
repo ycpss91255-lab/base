@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# job_env.sh - Print a per-job COMPOSE_PROJECT_NAME and TMPDIR.
+# job_env.sh - Print a per-job COMPOSE_PROJECT_NAME, TMPDIR and TEST_TOOLS_IMAGE.
 #
 # Usage: GITHUB_RUN_ID=.. GITHUB_RUN_ATTEMPT=.. JOB_KEY=.. RUNNER_TEMP=.. \
 #          job_env.sh >> "$GITHUB_ENV"
 #
-# Output is exactly two KEY=value lines. The TMPDIR is created under
+# Output is exactly three KEY=value lines. The TMPDIR is created under
 # RUNNER_TEMP so sibling containers on the shared docker daemon can see it.
 # Jobs on one runner host share that daemon, so a fixed compose project name
-# or /tmp path would let two jobs trample each other, base#2274.
+# or /tmp path would let two jobs trample each other, base#2274. The image
+# tag shares the id so jobs do not overwrite one test-tools tag, base#2321.
 set -euo pipefail
 
 for var in GITHUB_RUN_ID GITHUB_RUN_ATTEMPT JOB_KEY RUNNER_TEMP; do
@@ -29,3 +30,4 @@ mkdir -p "${tmp}"
 
 printf 'COMPOSE_PROJECT_NAME=ci-%s\n' "${id}"
 printf 'TMPDIR=%s\n' "${tmp}"
+printf 'TEST_TOOLS_IMAGE=test-tools:ci-%s\n' "${id}"

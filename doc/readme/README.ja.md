@@ -769,7 +769,7 @@ jobs:
 複数バリアントの呼び出し例、base のリリースの source archive が下流のリリースと
 どう違うかは [publish-worker.md](../guide/publish-worker.md) を参照。
 
-<!-- sync: development-and-tests c8d5580ee71c e475ad766f64 -->
+<!-- sync: development-and-tests e7b0632e31ad d03eeac45f0e -->
 ## 開発とテスト
 
 base の checkout 内で（`script/test/justfile.test`）：
@@ -790,8 +790,9 @@ just githooks check     # hook が有効か確認（有効なら exit 0）
 ```
 
 clone ごとに 1 回 `just githooks install` を実行します。以降、`pre-push` hook が
-push の前に `workflow-run-name` lint を実行します（Docker 不要）。CI も同じ検査を
-実行し、こちらが本当のゲートです。
+push の前に、名前が `vX.Y.Z` でも `vX.Y.Z-rcN` でもない tag を拒否し、
+`workflow-run-name` lint を実行します（Docker 不要）。CI も同じ検査を実行し、
+こちらが本当のゲートです。
 
 カバレッジバッジは Bats 全体が Bash ソースに対して計測した kcov の行カバレッジ
 で、リリースごとに 1 回計測します。Go パッケージはパッケージごとの floor で

@@ -1,0 +1,3 @@
+# Coverage floors of the packages S8b brings (base#1855): <pkg> <floor>|none,
+# pkg relative to the module. Ratcheted up by cg-gates ratchet, never lowered.
+internal/merge 100.0
