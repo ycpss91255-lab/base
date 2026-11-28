@@ -78,9 +78,10 @@ _make_parity_root() {
 }
 
 # _install_parity_mocks <kcov_log>
-#   kcov: logs its argv to its own file <kcov_log>.<pid> (base#2338), answers `--merge` with a merged report, otherwise
-#   drops its own `--flag=value` options, leaves a report in its output
-#   directory and runs the command it wraps. bats: writes the junit report
+#   kcov: logs its argv to its own file <kcov_log>.<pid> (base#2338),
+#   answers `--merge` with a merged report, otherwise drops its own
+#   `--flag=value` options, leaves a report in its output directory and
+#   runs the command it wraps. bats: writes the junit report
 #   with the <testsuite name> rule measured above (header), one suite per
 #   spec it walked, directory targets expanded the way --recursive does.
 #   nproc reads 32 and `parallel` is present, so a job count derived from
@@ -405,7 +406,7 @@ COVERAGE_JOBS=4 _run_coverage 2/2 >/dev/null 2>&1'
 # why: the mock kcov runs as one background process per slice. If they all
 # append to one log file, the per-slice load the test reads depends on
 # concurrent appends. Each kcov invocation must write its own file
-# (kcov.log.<pid>); the readers merge them with `cat kcov.log*`.
+# (kcov.log.<pid>); the readers merge them with `cat kcov.log.*`.
 @test "_run_coverage: every mock kcov invocation logs to its own file (base#2338)" {
   local _log="${BATS_TEST_TMPDIR}/kcov.log"
   _make_parity_root >/dev/null
