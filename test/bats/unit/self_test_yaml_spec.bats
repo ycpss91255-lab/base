@@ -4627,7 +4627,7 @@ _cg_expected_job() {
         '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
     self-test-redpath)
       CG_IF="${CG_REDPATH_IF}" CG_STEPS="${_steps}" CG_SHARD_LIST="[$(seq -s, 1 "${_n}")]" CG_K="${_k}" \
-        yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest",
+        yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}",
           "strategy": {"fail-fast": false, "matrix": {"shard": env(CG_SHARD_LIST),
             "include": [{"shard": env(CG_K), "label": " + rerun, the baseline"}]}},
           "steps": env(CG_STEPS)} | sort_keys(..)' ;;
@@ -5224,18 +5224,47 @@ FLEET_STUCK=${{ steps.fleet.outputs.stuck }}
 EOT
 }
 
+# why: config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED
+# switch via classify's runs_on_cpu (base#2271, part of base#1586). This is the
+# load-bearing case: with a hardcoded ubuntu-latest the switch never moves the
+# shards to the self-hosted fleet. The other assertions pin that the if,
+# timeout and shard matrix stay as they were.
+@test "self-test.yaml: config-gen-redpath runs-on comes from classify runs_on_cpu, rest of the job unchanged (base#2271)" {
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].if'
+  assert_success
+  assert_output "needs.classify.outputs.select_config_gen_redpath == 'true'"
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["timeout-minutes"]'
+  assert_success
+  assert_output '120'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.shard | join(",")'
+  assert_success
+  assert_output '1,2,3,4,5'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include | length'
+  assert_success
+  assert_output '1'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include[0].shard'
+  assert_success
+  assert_output '5'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"].strategy.matrix.include[0].label'
+  assert_success
+  assert_output ' + rerun, the baseline'
+}
+
 # why: config-gen-gates is the longest image job, and the first one to take its
 # runs-on from classify's runs_on_cpu so the CI_SELF_HOSTED switch decides where
-# it runs; every other job, config-gen-redpath included, keeps its own runs-on
-# until its own child moves it (base#2269, part of base#1586).
-@test "self-test.yaml: only config-gen-gates takes runs-on from runs_on_cpu (base#2269)" {
+# it runs; config-gen-redpath followed in base#2271. Every other job keeps its
+# own runs-on until its own child moves it (base#2269, part of base#1586).
+@test "self-test.yaml: only config-gen-gates and config-gen-redpath take runs-on from runs_on_cpu (base#2269, base#2271)" {
   run _yaml_eval "${WF}" '.jobs["config-gen-gates"]["runs-on"]'
   assert_success
   assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
   run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
   assert_success
-  assert_output 'ubuntu-latest'
-  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates") | (.value["runs-on"] // "") | tostring')"
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates" and .key != "config-gen-redpath") | (.value["runs-on"] // "") | tostring')"
   assert_failure
 }
 
