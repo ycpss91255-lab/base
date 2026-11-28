@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **418 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -238,6 +238,22 @@ snapshot is unchanged; the two usage rows that name no existing <out-dir>
 | `publish: an aside that fails leaves the destination untouched (base#1464)` | If the first rename fails nothing has moved yet; the refusal must name that stage and leave the destination exactly as it was. |
 | `publish: an install that fails with no previous output refuses and leaves nothing (base#1464)` | With no previous output there is nothing to restore; a failed install must still refuse by name and leave neither the destination nor any scratch behind. |
 | `publish: an install and a restore that both fail keep the backup and name it (base#1464)` | When the restore fails too, the bytes must survive somewhere named: the backup is kept and the event says where. |
+
+### test/bats/integration/config_gen_s43_arg_user_basic_golden_spec.bats (7)
+
+before any Go migration exists, the shell apply_migrations with
+_MIGRATIONS=( arg_user ) is the oracle; the Go side must match byte for
+byte. Shared generator: s43_arg_user_helper.bash.
+
+| Test | Description |
+|------|-------------|
+| `s43 arg_user golden: bare` | a bare ARG USER is warned about (line 5) after a literal-default one (line 2). |
+| `s43 arg_user golden: alias_root` | two ARG USER="${USER_NAME}" aliases are each warned about as may-run-as-root. |
+| `s43 arg_user golden: unrelated` | ARG USERLAND / ARG USER_NAME are not ARG USER; no warning. |
+| `s43 arg_user golden: bare events golden equals the issue's literal events` | the issue gives the bare events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 arg_user golden: unrelated events golden is the single none-matched report` | the unrelated case has no warning, only the report event. |
+| `s43 arg_user golden: dockerfile goldens equal their fixtures and files goldens are 0 bytes` | arg_user only reports, never rewrites: dockerfile golden == fixture, .files empty. |
+| `s43 arg_user golden: every case has one fixture and exactly its three goldens` | each case has exactly one fixture and exactly three goldens. |
 
 ### test/bats/integration/config_gen_s43_from_golden_spec.bats (14)
 
