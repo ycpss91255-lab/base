@@ -1,0 +1,2 @@
+entrypoint_patched	  entrypoint patched: nounset-guard ROS setup.bash source (#567 m8 / #579)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (nounset_source), 1 file(s) rewritten	matched=1	available=16	names=nounset_source	rewritten=1
