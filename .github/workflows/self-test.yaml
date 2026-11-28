@@ -1662,8 +1662,8 @@ jobs:
         # Shards on one cpu-fleet host share the docker daemon; the
         # workflow-level per-run names collided (image already exists,
         # network not found), base#2273. job_env.sh gives each shard its own
-        # three names; the echo below is what the CI log checks they win
-        # over the workflow-level env.
+        # four names (CI_RUN_KEY included); the echo below is what the CI log
+        # checks they win over the workflow-level env.
         env:
           JOB_KEY: coverage-${{ matrix.shard }}
         run: |
