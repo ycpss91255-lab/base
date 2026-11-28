@@ -333,3 +333,28 @@ _assert_golden() {
   _run_logging_case s82_logging_empty_absent - "" ""
   _assert_golden s82_logging_empty_absent
 }
+
+# why: a legacy unbounded block is migrated to begin/end markers; the stale
+# /stale/ below it is left outside the block and named in an orphans WARN,
+# while the non-/dir/ line `user` is not named (base#2086).
+@test "s82 logging: a legacy block is migrated and a stale dir is reported" {
+  _run_logging_case s82_logging_legacy_orphan s82_logging_legacy_orphan.gitignore \
+    "local_path=log/a/" ""
+  _assert_golden s82_logging_legacy_orphan
+}
+
+# why: a second orphan shape: a /deploy/ line below the legacy block is
+# reported the same way (base#2086).
+@test "s82 logging: a legacy block with a deploy dir below reports it" {
+  _run_logging_case s82_logging_legacy_deploy s82_logging_legacy_deploy.gitignore \
+    "local_path=log/a/" ""
+  _assert_golden s82_logging_legacy_deploy
+}
+
+# why: nothing below the legacy block means the migration INFO only, no
+# orphans WARN (base#2086).
+@test "s82 logging: a legacy block with nothing below emits no orphans" {
+  _run_logging_case s82_logging_legacy_clean s82_logging_legacy_clean.gitignore \
+    "local_path=log/a/" ""
+  _assert_golden s82_logging_legacy_clean
+}
