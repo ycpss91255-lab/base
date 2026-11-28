@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **411 tests**.
+Integration specs under `test/bats/integration/`: **427 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -300,6 +300,40 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_runtime_dir_copy_golden_spec.bats (16)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_rdcopy_<case>.Dockerfile has
+three goldens under testdata/golden/s43/ (same shape as base#2055):
+.dockerfile the Dockerfile bytes after apply_migrations .files
+`migrated_files` stdout (0 bytes when nothing was rewritten) .events one
+projected event per line, tab separated: <body> TAB <display> [TAB
+matched=.. TAB available=.. TAB names=.. TAB rewritten=..] The fixture is
+run as the relative path `Dockerfile` in a scratch directory. The prefix is
+s43_rdcopy_, not s43_migrate_ (that is the base#2055 partition).
+apply_migrations is the driver, so every event the dispatcher reports is
+captured; the warning goes to fd 2, hence 2>&1 into the raw event file.
+
+| Test | Description |
+|------|-------------|
+| `s43 rdcopy golden: three per-file COPYs collapse` | the three per-file helper COPYs collapse into one directory COPY. |
+| `s43 rdcopy golden: a pre-dist subset collapses` | a subset in any order at the pre-dist path collapses (flat_to_dist first). |
+| `s43 rdcopy golden: one dir COPY per stage` | one dir COPY per stage that had a helper COPY. |
+| `s43 rdcopy golden: two helpers on one statement collapse` | a statement hand-listing two helpers collapses to one source. |
+| `s43 rdcopy golden: a relocated destination is preserved` | a hand-relocated destination is preserved. |
+| `s43 rdcopy golden: commented COPYs are collapsed` | the commented runtime-stage scaffold is rewritten too. |
+| `s43 rdcopy golden: an already-collapsed dir COPY is unchanged` | the already-collapsed dir COPY is the fixed point. |
+| `s43 rdcopy golden: a continued statement is declined with a warning` | a backslash-continued statement is declined with a manual-fix warning. |
+| `s43 rdcopy golden: the real consumer shape is healed` | the shape the real consumers carry (flat path, logging.sh per stage). |
+| `s43 rdcopy golden: three dockerfile golden equals the literal` | the three-COPY collapse is a worked literal from the unit spec. |
+| `s43 rdcopy golden: three events golden equals the literal events` | one patch event then the dispatcher report, each a worked literal. |
+| `s43 rdcopy golden: three files golden is the single path Dockerfile` | a rewrite is recorded as the Dockerfile path, one line. |
+| `s43 rdcopy golden: reloc dockerfile golden keeps /opt/base/` | the relocated destination survives as /opt/base/. |
+| `s43 rdcopy golden: continued dockerfile golden equals its fixture, with the warning event` | the continued statement is left byte-for-byte and the warning is reported. |
+| `s43 rdcopy golden: collapsed goldens are the fixed point` | the fixed point is a no-op: 0-byte .files, dockerfile == fixture. |
+| `s43 rdcopy golden: every fixture has exactly its three goldens and no extra` | each rdcopy fixture has exactly the three goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 

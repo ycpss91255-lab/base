@@ -1,0 +1,2 @@
+dockerfile_needs_manual_fix	  Dockerfile still COPYs a runtime helper per file on a continued statement — collapse it by hand into the directory COPY (#971)
+dockerfile_migrations_reported	  Dockerfile migrations: 1 of 16 matched (runtime_dir_copy), 0 file(s) rewritten	matched=1	available=16	names=runtime_dir_copy	rewritten=0
