@@ -5259,6 +5259,78 @@ EOT
   assert_output 'actionlint,classify,test-tools-image-amd64'
 }
 
+# why: the 21 mutation-roster shards now share one cpu-fleet host and one
+# docker daemon. With the workflow-level per-run TEST_TOOLS_IMAGE,
+# COMPOSE_PROJECT_NAME, TMPDIR and CI_RUN_KEY, the first shard to finish ran
+# `reclaim.sh --run "${CI_RUN_KEY}"` and removed its siblings' containers (the
+# same fault coverage had, run 46112164146, exit 137). Each shard must take
+# its own four names from script/ci/job_env.sh before its first docker step
+# (base#2272, same shape as coverage, base#2273).
+@test "self-test.yaml: mutation-roster shard exports per-shard job names via job_env.sh before the first docker step (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .run'
+  assert_success
+  assert_output --partial 'script/ci/job_env.sh >> "${GITHUB_ENV}"'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_env.sh")) | .env.JOB_KEY'
+  assert_success
+  assert_output 'mutation-roster-${{ matrix.shard }}'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/obtain_test_tools.sh")) | .key'
+  assert_success
+  obtain_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  [[ "${obtain_idx}" =~ ^[0-9]+$ ]]
+  [ "${job_env_idx}" -lt "${obtain_idx}" ]
+}
+
+# why: each shard removes only its own compose project and TMPDIR, in an
+# always() step so a failed or cancelled shard still cleans up (base#2272).
+@test "self-test.yaml: mutation-roster shard removes its own compose project and TMPDIR in an always() step (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .run'
+  assert_success
+  assert_output --partial './script/ci/job_cleanup.sh'
+}
+
+# why: the per-job values only win if nothing sets CI_RUN_KEY back to the run
+# key, and every consumer of it (build label, reclaim) runs after job_env.sh
+# (base#2272).
+@test "self-test.yaml: mutation-roster never re-sets CI_RUN_KEY and its consumers come after the job_env.sh step (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.env.CI_RUN_KEY // "unset"'
+  assert_success
+  assert_output 'unset'
+  run _yaml_eval "${WF}" '[.jobs.mutation-roster.steps[] | select(.env.CI_RUN_KEY != null)] | length'
+  assert_success
+  assert_output '0'
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_env.sh")) | .key'
+  assert_success
+  job_env_idx="${output%%$'\n'*}"
+  [[ "${job_env_idx}" =~ ^[0-9]+$ ]]
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps | to_entries | .[] | select((.value | tostring) | contains("CI_RUN_KEY")) | .key'
+  assert_success
+  local idx n=0
+  while IFS= read -r idx; do
+    [[ "${idx}" == "${job_env_idx}" ]] && continue
+    [ "${idx}" -gt "${job_env_idx}" ]
+    n=$((n + 1))
+  done <<<"${output}"
+  [ "${n}" -ge 2 ]
+}
+
+# why: the CI log is the proof that the per-shard values win over the
+# workflow-level env, so a step must echo all four names (base#2272).
+@test "self-test.yaml: mutation-roster shard echoes the four per-shard names (base#2272)" {
+  run _yaml_eval "${WF}" '.jobs.mutation-roster.steps[] | select(.name == "Show the names in effect") | .run'
+  assert_success
+  assert_output --partial 'echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"'
+  assert_output --partial 'echo "TMPDIR=${TMPDIR}"'
+  assert_output --partial 'echo "TEST_TOOLS_IMAGE=${TEST_TOOLS_IMAGE}"'
+  assert_output --partial 'echo "CI_RUN_KEY=${CI_RUN_KEY}"'
+}
+
 # why: select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes
 # it unless classify runs a step that lists the queued and in-progress runs'
 # jobs and hands them to fleet_stuck.sh. Without a step `fleet`, the env

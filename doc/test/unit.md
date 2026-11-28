@@ -7351,7 +7351,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (173)
+### test/bats/unit/self_test_yaml_spec.bats (177)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7839,6 +7839,10 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: single-issue-pr job runs bash script/ci/single_issue_pr.sh (base#1629)` | needs: alone only orders the job. A single-issue-pr job whose step stopped invoking the script would stay green on every PR and gate nothing, so the job body itself must run the script (base#1629). |
 | `self-test.yaml: classify publishes runner_trusted and runs_on_cpu from the runner step (base#2268)` | classify is where the runner choice is made once for the whole workflow. It must run script/ci/select_runner.sh in a step `runner` and publish its two lines as job outputs, so later children can read them without re-deriving trust (base#2268, part of base#1586). |
 | `self-test.yaml: mutation-roster runs-on comes from classify runs_on_cpu, rest unchanged (base#2272)` | the 21 mutation-roster shards take their runner from classify, so the CI_SELF_HOSTED switch moves them together; nothing else about the job changes (base#2272, part of base#1586). |
+| `self-test.yaml: mutation-roster shard exports per-shard job names via job_env.sh before the first docker step (base#2272)` | the 21 mutation-roster shards now share one cpu-fleet host and one docker daemon. With the workflow-level per-run TEST_TOOLS_IMAGE, COMPOSE_PROJECT_NAME, TMPDIR and CI_RUN_KEY, the first shard to finish ran `reclaim.sh --run "${CI_RUN_KEY}"` and removed its siblings' containers (the same fault coverage had, run 46112164146, exit 137). Each shard must take its own four names from script/ci/job_env.sh before its first docker step (base#2272, same shape as coverage, base#2273). |
+| `self-test.yaml: mutation-roster shard removes its own compose project and TMPDIR in an always() step (base#2272)` | each shard removes only its own compose project and TMPDIR, in an always() step so a failed or cancelled shard still cleans up (base#2272). |
+| `self-test.yaml: mutation-roster never re-sets CI_RUN_KEY and its consumers come after the job_env.sh step (base#2272)` | the per-job values only win if nothing sets CI_RUN_KEY back to the run key, and every consumer of it (build label, reclaim) runs after job_env.sh (base#2272). |
+| `self-test.yaml: mutation-roster shard echoes the four per-shard names (base#2272)` | the CI log is the proof that the per-shard values win over the workflow-level env, so a step must echo all four names (base#2272). |
 | `self-test.yaml: classify has a step with id fleet (base#2317)` | select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes it unless classify runs a step that lists the queued and in-progress runs' jobs and hands them to fleet_stuck.sh. Without a step `fleet`, the env stays empty and a dead CPU host keeps every job queued forever instead of falling back to ubuntu-latest (base#2317, part of base#1586). |
 | `self-test.yaml: classify runs the fleet step before the runner step (base#2317)` | The runner step reads steps.fleet.outputs.stuck. A step that exists but runs after it would publish its output too late, so the runner step would always see an empty value and never switch (base#2317). |
 | `self-test.yaml: classify runner step passes FLEET_STUCK from the fleet step (base#2317)` | Without FLEET_STUCK in the runner step's env, select_runner.sh sees it unset and always answers the cpu fleet, however stuck it is (base#2317). |
