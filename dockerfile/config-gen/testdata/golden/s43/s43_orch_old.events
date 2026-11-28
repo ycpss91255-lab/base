@@ -1,0 +1,1 @@
+dockerfile_entrypoint_advisory	  Dockerfile still runs the repo's own /entrypoint.sh as the container ENTRYPOINT. base now ships an orchestrator at /usr/local/lib/base/entrypoint.sh that sources it; migrating means flipping ENTRYPOINT and cleaning script/entrypoint.sh in the SAME commit (README: Container entrypoint). Nothing was changed here.
