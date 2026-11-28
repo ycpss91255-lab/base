@@ -2012,6 +2012,14 @@ jobs:
         # unit tui_spec.
         run: ./script/ci/acceptance.sh
 
+      - name: Remove this job's compose project and TMPDIR (job_cleanup.sh)
+        # job_env.sh gave this job its own compose project and TMPDIR on a
+        # host daemon shared with sibling jobs; remove exactly those, also
+        # after a failed scaffold, base#2270.
+        if: always()
+        continue-on-error: true
+        run: ./script/ci/job_cleanup.sh
+
       # The scaffolded consumer's image / container / network carry no
       # ownership LABEL -- downstream tooling named them, base did not
       # build them. The run key in their name is the proof instead, which
