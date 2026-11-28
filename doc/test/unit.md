@@ -7338,7 +7338,7 @@ table is pinned so neither direction can drift (base#2265).
 | `self-hosted guard: FAILS when the workflows parse to zero jobs` | - |
 | `self-hosted guard: scans every workflow in the directory, not a named list` | - |
 
-### test/bats/unit/self_test_yaml_spec.bats (168)
+### test/bats/unit/self_test_yaml_spec.bats (169)
 
 Structural assertions for `.github/workflows/self-test.yaml`. Locks fourteen
 cumulative invariants:
@@ -7679,6 +7679,7 @@ rolling tag itself (#697, #1010)
 | `self-test.yaml: acceptance documents setup-tui as intentionally out of scope (#769)` | an undocumented gap reads as an oversight and gets "fixed" by a TUI drive that hangs without a pseudo-TTY. The comment is the decision; the refutation keeps anyone from invoking the TUI in a non-interactive job. |
 | `self-test.yaml: acceptance runs as a native-runner matrix over amd64 + arm64 (#603, base#2270)` | acceptance's amd64 leg takes its runner from classify's runs_on_cpu (["ubuntu-latest"] when the switch is off, a fork or an untrusted event); the arm64 leg stays on ubuntu-24.04-arm because the cpu scale set is x64 (base#2270, part of base#1586). |
 | `self-test.yaml: acceptance exports a RUNNER_TEMP TMPDIR via job_env.sh before the scaffold step (base#2270)` | on the cpu fleet /tmp is private to the job container while the toml-bridge `docker run -v` goes to the host daemon, so a scaffold under /tmp is invisible to it (conf_toml_merge_failed, run 46080939073). Only paths under RUNNER_TEMP are same-path visible, so the job must export a TMPDIR there via script/ci/job_env.sh before acceptance.sh's mktemp runs (base#2270, base#2274). |
+| `self-test.yaml: acceptance runs job_cleanup.sh in an always() step after the scaffold step (base#2270)` | job_env.sh gives the job its own compose project and TMPDIR on a host daemon shared with sibling jobs; job_cleanup.sh removes exactly those, and it must run after a failed scaffold too, so the step is `if: always()` and comes after the step that scaffolds (base#2270, base#2275). |
 | `self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)` | - |
 | `self-test.yaml: acceptance Obtain step pulls the matrix platform, not a hardcoded amd64 (#603)` | - |
 | `self-test.yaml: system job declares needs on actionlint AND classify (#317)` | - |

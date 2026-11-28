@@ -697,6 +697,28 @@ _acceptance_code() {
   [ "${job_env_idx}" -lt "${scaffold_idx}" ]
 }
 
+# why: job_env.sh gives the job its own compose project and TMPDIR on a host
+# daemon shared with sibling jobs; job_cleanup.sh removes exactly those, and it
+# must run after a failed scaffold too, so the step is `if: always()` and comes
+# after the step that scaffolds (base#2270, base#2275).
+@test "self-test.yaml: acceptance runs job_cleanup.sh in an always() step after the scaffold step (base#2270)" {
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .run'
+  assert_success
+  assert_output --partial './script/ci/job_cleanup.sh'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps[] | select(.run // "" | contains("script/ci/job_cleanup.sh")) | .if'
+  assert_success
+  assert_output 'always()'
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/job_cleanup.sh")) | .key'
+  assert_success
+  cleanup_idx="${output%%$'\n'*}"
+  run _yaml_eval "${WF}" '.jobs.acceptance.steps | to_entries | .[] | select(.value.run // "" | contains("script/ci/acceptance.sh")) | .key'
+  assert_success
+  scaffold_idx="${output%%$'\n'*}"
+  [[ "${cleanup_idx}" =~ ^[0-9]+$ ]]
+  [[ "${scaffold_idx}" =~ ^[0-9]+$ ]]
+  [ "${cleanup_idx}" -gt "${scaffold_idx}" ]
+}
+
 @test "self-test.yaml: acceptance shards run on the matrix runner (#603, base#2270)" {
   run _yaml_eval "${WF}" '.jobs.acceptance["runs-on"]'
   assert_success
