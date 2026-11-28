@@ -2911,7 +2911,7 @@ partition; the cases below pin both, and what it refuses.
 | `_run_bats_path: BATS_FILE runs bats on that path; BATS_FILTER appends -f` | #523 single-path runner |
 | `_run_bats_path: filter-only runs bats across unit + integration` | #523 filter-only runner |
 
-### test/bats/unit/coverage_shard_parity_spec.bats (15)
+### test/bats/unit/coverage_shard_parity_spec.bats (16)
 
 a local coverage shard and CI's shard of the same name were two different
 runs. Three inputs decide a shard, and each differed:
@@ -2949,6 +2949,7 @@ name is not a spec identity on its own.
 | `job count: COVERAGE_JOBS sets a shard's kcov slice count (base#1410)` | the override is the knob CI sets explicitly and a developer may set to reproduce a different runner. |
 | `job count: main --coverage-shard forwards COVERAGE_JOBS, the hosted default when unset (base#1410)` | the host side. The container cannot see the host's intent unless the count crosses the compose boundary: `just test coverage N/T` says the hosted default out loud, and an ambient COVERAGE_JOBS (CI's) wins. |
 | `self-test.yaml: the coverage shard step passes COVERAGE_JOBS and the weights blob to test.sh (base#1410)` | CI must not lean on the runner's core count -- a self-hosted runner or a larger hosted SKU would silently re-slice every shard. |
+| `_slice_evidence: prints each kcov line with its number and load (base#2338)` | a mismatch of the load totals must show which spec is missing, so _slice_evidence prints every merged kcov line prefixed with its line number and its summed weight (base#2338). |
 | `_run_coverage: a shard's specs are dealt to slices by weight, not in turn (base#2189)` | a shard's slices run at the same time, so its heaviest slice is its wall time; here the best possible one is the 300 spec alone. |
 | `_run_coverage: every mock kcov invocation logs to its own file (base#2338)` | the mock kcov runs as one background process per slice. If they all append to one log file, the per-slice load the test reads depends on concurrent appends. Each kcov invocation must write its own file (kcov.log.<pid>); the readers merge them with `cat kcov.log.*`. |
 | `parity: the local --shard-weights path and the compute-shards path run the same spec list (base#1410)` | ONE decoder. The blob compute-shards publishes is what reaches the container on both paths -- CI's (an ambient SHARD_WEIGHTS_BLOB) and the local one (`--shard-weights <file>`, encoded the way compute-shards encodes) -- and the in-container dispatch turns it into the weights the partition reads BEFORE it runs the shard. Same weights file, same shard, same spec list; and the list is not the `@test`-count fallback, or the comparison would hold with no weights reaching the run at all. |

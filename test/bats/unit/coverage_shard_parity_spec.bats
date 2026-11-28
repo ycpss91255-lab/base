@@ -373,6 +373,26 @@ _slice_loads() {
   ' "${2}" <(cat "${1}".*)
 }
 
+# _slice_evidence <kcov_log> <weights>
+#   Failure evidence (base#2338): every merged kcov line prefixed with its
+#   line number; an instrumented run also carries its summed spec weight.
+_slice_evidence() {
+  awk '
+    NR == FNR { w[$2] = $1; next }
+    /^--merge/ { printf "%d merge %s\n", FNR, $0; next }
+    {
+      load = 0
+      for (i = 1; i <= NF; i++) {
+        if ($i !~ /\.bats$/) continue
+        k = $i
+        sub(/^.*\/pool\//, "", k)
+        load += (k in w) ? w[k] : 1
+      }
+      printf "%d load=%d %s\n", FNR, load, $0
+    }
+  ' "${2}" <(cat "${1}".*)
+}
+
 # why: a mismatch of the load totals must show which spec is missing, so
 # _slice_evidence prints every merged kcov line prefixed with its line
 # number and its summed weight (base#2338).
@@ -415,7 +435,12 @@ COVERAGE_JOBS=4 _run_coverage 2/2 >/dev/null 2>&1'
   # 714 is the shard's total weight: 300, four of 100, fourteen of 1.
   run _slice_loads "${_log}" "${_wf}"
   assert_success
-  assert_output "max=300 total=714"
+  # On a mismatch print the whole kcov log and each line's load to fd 3.
+  [[ "${output}" == "max=300 total=714" ]] || {
+    echo "# slice loads: ${output}" >&3
+    _slice_evidence "${_log}" "${_wf}" | sed 's/^/# /' >&3
+    false
+  }
 }
 
 # why: the mock kcov runs as one background process per slice. If they all
