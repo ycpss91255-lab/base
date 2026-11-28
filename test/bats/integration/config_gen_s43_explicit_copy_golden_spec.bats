@@ -73,6 +73,15 @@ _check_case() {
   (( _bad == 0 ))
 }
 
+# _migrated_literal -- the Dockerfile the issue expects once the explicit
+# COPY is dropped (identical for the single and multi fixtures).
+_migrated_literal() {
+  printf '%s\n%s\n%s' \
+    'FROM busybox AS lint' \
+    'COPY .base/script/docker/lib /lint/lib' \
+    'RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh'
+}
+
 # ── one test per case ───────────────────────────────────────────────────────
 
 # why: the single-line explicit COPY is dropped, the lib dir COPY stays.
@@ -100,20 +109,14 @@ _check_case() {
 @test "s43 ecopy golden: single dockerfile golden equals the issue's literal" {
   run cat "${GOLDEN}/s43_ecopy_single.dockerfile"
   assert_success
-  assert_output "$(printf '%s\n%s\n%s' \
-    'FROM busybox AS lint' \
-    'COPY .base/script/docker/lib /lint/lib' \
-    'RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh')"
+  assert_output "$(_migrated_literal)"
 }
 
 # why: the issue gives the multi-line result: whole block gone, lib kept.
 @test "s43 ecopy golden: multi dockerfile golden equals the issue's literal" {
   run cat "${GOLDEN}/s43_ecopy_multi.dockerfile"
   assert_success
-  assert_output "$(printf '%s\n%s\n%s' \
-    'FROM busybox AS lint' \
-    'COPY .base/script/docker/lib /lint/lib' \
-    'RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh')"
+  assert_output "$(_migrated_literal)"
 }
 
 # why: a rewrite reports dockerfile_patched exactly once.
