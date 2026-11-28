@@ -373,6 +373,21 @@ _slice_loads() {
   ' "${2}" <(cat "${1}".*)
 }
 
+# why: a mismatch of the load totals must show which spec is missing, so
+# _slice_evidence prints every merged kcov line prefixed with its line
+# number and its summed weight (base#2338).
+@test "_slice_evidence: prints each kcov line with its number and load (base#2338)" {
+  local _log="${BATS_TEST_TMPDIR}/kcov.log"
+  printf '%s\n' 'kcov /x/pool/test/a_spec.bats /x/pool/test/b_spec.bats' > "${_log}.1"
+  printf '%s\n' '--merge out in' > "${_log}.2"
+  printf '%s\n' '300 test/a_spec.bats' > "${BATS_TEST_TMPDIR}/w"
+
+  run _slice_evidence "${_log}" "${BATS_TEST_TMPDIR}/w"
+  assert_success
+  assert_line --index 0 "1 load=301 kcov /x/pool/test/a_spec.bats /x/pool/test/b_spec.bats"
+  assert_line --index 1 "2 merge --merge out in"
+}
+
 # why: a shard's slices run at the same time, so its heaviest slice is its
 # wall time; here the best possible one is the 300 spec alone.
 @test "_run_coverage: a shard's specs are dealt to slices by weight, not in turn (base#2189)" {
