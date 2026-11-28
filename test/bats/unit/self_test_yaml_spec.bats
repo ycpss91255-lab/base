@@ -5224,9 +5224,11 @@ FLEET_STUCK=${{ steps.fleet.outputs.stuck }}
 EOT
 }
 
-# config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED
-# switch via classify's runs_on_cpu; everything else on the job is unchanged
-# (base#2271, part of base#1586). Expected values are the issue's literals.
+# why: config-gen-redpath's 5 shards take their runner from the CI_SELF_HOSTED
+# switch via classify's runs_on_cpu (base#2271, part of base#1586). This is the
+# load-bearing case: with a hardcoded ubuntu-latest the switch never moves the
+# shards to the self-hosted fleet. The other assertions pin that the if,
+# timeout and shard matrix stay as they were.
 @test "self-test.yaml: config-gen-redpath runs-on comes from classify runs_on_cpu, rest of the job unchanged (base#2271)" {
   run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
   assert_success
