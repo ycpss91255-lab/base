@@ -65,7 +65,10 @@
 #     self-hosted migration -- they are already the "pick a machine per
 #     shard" jobs -- so they are exactly where the insurance belongs.
 #   - `runs-on: ${{ inputs.runner }}` or any other expression --
-#     caller-supplied, unknowable here.
+#     caller-supplied, unknowable here. The one exception is
+#     `${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}`: classify's
+#     select_runner.sh gives the cpu fleet only to a trusted event, so the
+#     job needs no guard (base#2286).
 #   - A job with no `runs-on` that calls a REMOTE reusable workflow
 #     (`uses: owner/repo/...@ref`): the callee picks the machine and the
 #     callee is not in this tree. A LOCAL call (`uses: ./...`) is exempt,
@@ -366,6 +369,10 @@ _shg_eligibility_reason() {
       for _value in ${_SHG_MATRIX["${_key}"]}; do
         _labels+=("${_value}")
       done
+    elif [[ "${_SHG_RUNSON}" =~ ^\$\{\{[[:space:]]*fromJSON\(needs\.classify\.outputs\.runs_on_cpu\)[[:space:]]*\}\}$ ]]; then
+      # base#2286: select_runner.sh hands the cpu fleet only to a trusted
+      # event and ubuntu-latest otherwise, so a fork PR stays hosted.
+      return 0
     elif [[ "${_SHG_RUNSON}" == *"${_SHG_EXPR_OPEN}"* ]]; then
       printf "runs-on is the expression '%s', whose value is not knowable here\n" \
         "${_SHG_RUNSON}"

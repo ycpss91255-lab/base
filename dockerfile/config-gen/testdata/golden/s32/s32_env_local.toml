@@ -1,0 +1,5 @@
+[environment]
+A = "x y"
+B = "q"
+C = "a=b"
+D = "5"

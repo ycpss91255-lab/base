@@ -117,8 +117,9 @@ _run_row() {
 # --- runs_on: CI_SELF_HOSTED master switch, base#2266 (part of base#1586) ---
 #
 # stdout is exactly two lines: `trusted=...` then `runs_on=<compact JSON
-# array>`. Only a trusted event with CI_SELF_HOSTED=cpu gets the CPU fleet
-# label set; every other row falls back to hosted ubuntu-latest.
+# array>`. Default-on since base#2287: a trusted event with CI_SELF_HOSTED
+# unset, empty or `cpu` gets the CPU fleet label set; `off`, any other value
+# and every untrusted event fall back to hosted ubuntu-latest.
 
 # _run_switch <event> <head_repo> <repo> <ci_self_hosted>
 _run_switch() {
@@ -135,16 +136,61 @@ _run_switch() {
   assert_equal "${lines[1]}" 'runs_on=["self-hosted","linux","x64","cpu"]'
 }
 
-# why: An unset switch is the rollback path, so a trusted event stays on hosted (base#2266).
-@test "select_runner.sh: trusted + CI_SELF_HOSTED unset selects ubuntu-latest (base#2266)" {
+# why: Default-on (owner 2026-11-28): an empty switch must reach the CPU fleet so nobody has to set a variable (base#2287).
+@test "select_runner.sh: trusted + CI_SELF_HOSTED empty selects the cpu fleet (base#2287)" {
   _run_switch push "" o/r ""
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=true"
+  assert_equal "${lines[1]}" 'runs_on=["self-hosted","linux","x64","cpu"]'
+}
+
+# why: A variable that was never defined is the normal day-to-day state and must also reach the CPU fleet (base#2287).
+@test "select_runner.sh: trusted + CI_SELF_HOSTED unset selects the cpu fleet (base#2287)" {
+  EVENT_NAME=push REPO=o/r run --separate-stderr bash "${SELECT}"
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=true"
+  assert_equal "${lines[1]}" 'runs_on=["self-hosted","linux","x64","cpu"]'
+}
+
+# why: off is the rollback path used when every CPU host is down, so a trusted event goes to hosted (base#2287).
+@test "select_runner.sh: trusted + CI_SELF_HOSTED=off selects ubuntu-latest (base#2287)" {
+  _run_switch push "" o/r off
   assert_success
   assert_equal "${#lines[@]}" 2
   assert_equal "${lines[0]}" "trusted=true"
   assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
 }
 
-# why: Only the value cpu opens the fleet; gpu has no fleet here, so it falls back (base#2266).
+# why: An untrusted event stays hosted even when the switch is unset, the new default must not open it (base#2287).
+@test "select_runner.sh: a fork pull_request with CI_SELF_HOSTED unset selects ubuntu-latest (base#2287)" {
+  EVENT_NAME=pull_request HEAD_REPO=fork/r REPO=o/r run --separate-stderr bash "${SELECT}"
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=false"
+  assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
+}
+
+# why: An untrusted event stays hosted with off as well, same answer as every other value (base#2287).
+@test "select_runner.sh: schedule with CI_SELF_HOSTED=off selects ubuntu-latest (base#2287)" {
+  _run_switch schedule "" o/r off
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=false"
+  assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
+}
+
+# why: Missing inputs fail closed to hosted even though an unset switch now means on (base#2287).
+@test "select_runner.sh: unset EVENT_NAME with CI_SELF_HOSTED unset selects ubuntu-latest (base#2287)" {
+  REPO=o/r run --separate-stderr bash "${SELECT}"
+  assert_success
+  assert_equal "${#lines[@]}" 2
+  assert_equal "${lines[0]}" "trusted=false"
+  assert_equal "${lines[1]}" 'runs_on=["ubuntu-latest"]'
+}
+
+# why: gpu has no fleet here, so any value other than empty or cpu falls back (base#2287).
 @test "select_runner.sh: trusted + CI_SELF_HOSTED=gpu selects ubuntu-latest (base#2266)" {
   _run_switch push "" o/r gpu
   assert_success
