@@ -1786,15 +1786,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Remove this shard's compose project and TMPDIR
-        if: always()
-        continue-on-error: true
-        run: ./script/ci/job_cleanup.sh
-
+      # reclaim runs before job_cleanup: job_cleanup removes TMPDIR, which
+      # reclaim's prune.sh delegation needs (base#2273).
       - name: Reclaim this run's docker artifacts
         if: always()
         continue-on-error: true
         run: ./script/ci/reclaim.sh --run "${CI_RUN_KEY}" --stale 12h
+
+      - name: Remove this shard's compose project and TMPDIR
+        if: always()
+        continue-on-error: true
+        run: ./script/ci/job_cleanup.sh
 
   coverage-gate:
     # Self-hosted coverage-floor gate (ADR-00000008, self-hosted
