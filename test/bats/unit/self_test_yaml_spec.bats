@@ -4738,7 +4738,7 @@ _cg_expected_job() {
   case "${1}" in
     self-test)
       CG_IF="${CG_GATES_IF}" CG_STEPS="${_steps}" yq -n -o json -I0 \
-        '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
+        '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}", "steps": env(CG_STEPS)} | sort_keys(..)' ;;
     self-test-redpath)
       CG_IF="${CG_REDPATH_IF}" CG_STEPS="${_steps}" CG_SHARD_LIST="[$(seq -s, 1 "${_n}")]" CG_K="${_k}" \
         yq -n -o json -I0 '{"if": strenv(CG_IF), "needs": ["classify"], "runs-on": "ubuntu-latest",
@@ -5337,11 +5337,29 @@ CI_SELF_HOSTED=${{ vars.CI_SELF_HOSTED }}
 FLEET_STUCK=${{ steps.fleet.outputs.stuck }}
 EOT
   # Only the switched jobs take their runner from the classify output, in
-  # runs-on or in a matrix leg's runner; acceptance is the one switched here
-  # (base#2270).
+  # runs-on or in a matrix leg's runner; acceptance (base#2270) and config-gen-gates (base#2269) are the
+  # switched ones.
   run _yaml_eval "${WF}" '.jobs | to_entries | .[] | select(((.value["runs-on"] // "") | tostring | contains("runs_on_cpu")) or (([.value.strategy.matrix.include[]?.runner // ""] | map(tostring) | join(",")) | contains("runs_on_cpu"))) | .key'
   assert_success
-  assert_output 'acceptance'
+  assert_output - <<'EOT'
+acceptance
+config-gen-gates
+EOT
+}
+
+# why: config-gen-gates is the longest image job, and the first one to take its
+# runs-on from classify's runs_on_cpu so the CI_SELF_HOSTED switch decides where
+# it runs; every other job, config-gen-redpath included, keeps its own runs-on
+# until its own child moves it (base#2269, part of base#1586).
+@test "self-test.yaml: only config-gen-gates (besides acceptance) takes runs-on from runs_on_cpu (base#2269)" {
+  run _yaml_eval "${WF}" '.jobs["config-gen-gates"]["runs-on"]'
+  assert_success
+  assert_output '${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}'
+  run _yaml_eval "${WF}" '.jobs["config-gen-redpath"]["runs-on"]'
+  assert_success
+  assert_output 'ubuntu-latest'
+  run grep -F 'runs_on_cpu' <<<"$(_yaml_eval "${WF}" '.jobs | to_entries | .[] | select(.key != "config-gen-gates" and .key != "acceptance") | (.value["runs-on"] // "") | tostring')"
+  assert_failure
 }
 
 # why: select_runner.sh reads FLEET_STUCK (base#2316), but nothing computes

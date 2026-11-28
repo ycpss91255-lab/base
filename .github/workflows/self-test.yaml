@@ -2205,7 +2205,7 @@ jobs:
     # $GITHUB_ENV -- fails that spec rather than leaving this job green
     # with the gates unrun. The map drops select_config_gen for docs, spec
     # leaves and exact config-gen deny-list paths.
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.classify.outputs.runs_on_cpu) }}
     # The gates' test and final stages: two docker builds and the mutation
     # gate over the changed packages. A ceiling, not a budget; not raised
     # by base#1547.
