@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration specs under `test/bats/integration/`: **426 tests**.
+Integration specs under `test/bats/integration/`: **439 tests**.
 
 > Part of the `just test` self-test suite — what runs in the `Self Test`
 > CI job. See [TEST.md](TEST.md) for the index across all test levels and
@@ -347,6 +347,38 @@ one-to-one-to-one.
 | `s43 migrate golden: rewritten goldens hold no .base/downstream/` | no .base/downstream/ may survive in a rewritten golden, and the rewritten COPY source is the dist path from the issue. |
 | `s43 migrate golden: a missing Dockerfile skips with one event and no files` | a missing Dockerfile is not an error; the Go side needs rc 0, no migrated files and the one skip event. |
 | `s43 migrate golden: every fixture has exactly its three goldens and no extra` | each migrate fixture must have exactly the three goldens and no golden may lack a fixture, so the corpus cannot drift. |
+
+### test/bats/integration/config_gen_s43_sc1090_golden_spec.bats (13)
+
+Before any Go migration exists, the shell `apply_migrations`
+(dist/script/docker/lib/dockerfile_migrate.sh, _migrate_sc1090_detect /
+_migrate_sc1090_apply) is the oracle. Every
+dockerfile/config-gen/testdata/corpus/s43/s43_sc1090_<case>.Dockerfile has a
+sibling s43_sc1090_<case>.entrypoint.sh and four goldens under
+testdata/golden/s43/ (same shape as base#2057, plus .entrypoint.sh):
+.dockerfile the Dockerfile bytes after apply_migrations .entrypoint.sh the
+script/entrypoint.sh bytes after apply_migrations .files `migrated_files`
+stdout (0 bytes when nothing was rewritten) .events one projected event per
+line, tab separated: <body> TAB <display> [TAB matched=.. TAB available=..
+TAB names=.. TAB rewritten=..] The fixture is run as the relative path
+`Dockerfile` in a scratch directory with the entrypoint copied to
+script/entrypoint.sh.
+
+| Test | Description |
+|------|-------------|
+| `s43 sc1090 golden: patch case is rewritten` | a SC1091-only disable line is widened to SC1090,SC1091. |
+| `s43 sc1090 golden: done case is unchanged` | an entrypoint already carrying SC1090,SC1091 is the fixed point. |
+| `s43 sc1090 golden: indent case keeps its whitespace` | leading / inner / trailing whitespace of the directive line is preserved. |
+| `s43 sc1090 golden: patch events golden equals the issue's literal events` | the issue gives the patch events as literals; pin them so a wrong golden cannot pass by being regenerated the same way. |
+| `s43 sc1090 golden: patch entrypoint golden equals the issue's literal` | the issue gives the patched entrypoint as a literal. |
+| `s43 sc1090 golden: patch entrypoint fixture equals the issue's literal input` | the patch input is the issue's literal three lines. |
+| `s43 sc1090 golden: patch files golden is the single entrypoint path` | the issue gives the patch files output as the single path ./script/entrypoint.sh. |
+| `s43 sc1090 golden: done files golden is 0 bytes and events literal` | the fixed point is a no-op: 0-byte .files, one report event. |
+| `s43 sc1090 golden: done entrypoint golden equals its fixture` | nothing is rewritten, so the done entrypoint golden is the fixture bytes. |
+| `s43 sc1090 golden: indent files and events goldens equal the patch ones` | the indent case has the same files / events as patch (issue item 3). |
+| `s43 sc1090 golden: indent entrypoint golden line 2 keeps its spaces` | the issue gives the indent line with its exact spaces. |
+| `s43 sc1090 golden: dockerfile fixtures and goldens are the one FROM line` | every case's Dockerfile is the single line `FROM busybox AS devel` and migration 6 never touches it. |
+| `s43 sc1090 golden: every fixture has exactly its four goldens and no extra` | each sc1090 fixture has exactly its four goldens and no golden lacks a fixture. |
 
 ### test/bats/integration/config_gen_s43_stage_golden_spec.bats (20)
 
